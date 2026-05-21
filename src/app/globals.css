@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+@layer components {
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .status-in-stock {
+    @apply bg-green-100 text-green-800;
+  }
+  .status-checked-out {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  .status-in-repair {
+    @apply bg-red-100 text-red-800;
+  }
+  .status-in-testing {
+    @apply bg-blue-100 text-blue-800;
+  }
+  .nav-link {
+    @apply px-4 py-2 text-sm font-medium text-white/80 hover:text-white transition-colors rounded-md;
+  }
+  .nav-link-active {
+    @apply px-4 py-2 text-sm font-medium text-white bg-white/10 rounded-md;
+  }
+}
