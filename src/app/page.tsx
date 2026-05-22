@@ -31,7 +31,7 @@ export default function Home() {
         <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab} />
         <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-12">
           <OverdueAlertsBanner />
-          <DashboardStats />
+          <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
           <div className="mt-4">
             <NetworkSyncButton />
           </div>
@@ -40,7 +40,7 @@ export default function Home() {
             {activeTab === 'testbeds' && <ProgramsTab />}
             {activeTab === 'locations' && <LocationsTab />}
             {activeTab === 'people' && <PeopleTab />}
-            {activeTab === 'shipments' && <ShipmentsTab />}
+            {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
           </div>
         </main>
       </div>

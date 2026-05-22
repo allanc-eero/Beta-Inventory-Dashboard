@@ -78,9 +78,9 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
   }).filter(Boolean) as ParsedRow[];
 }
 
-export default function ShipmentsTab() {
+export default function ShipmentsTab({ showPendingReturns }: { showPendingReturns?: boolean }) {
   const { devices, addDevice, updateDevice, addShipment, markShipmentDelivered, getAllShipments, addHistoryEntry } = useDeviceStore();
-  const [activeView, setActiveView] = useState<'upload' | 'history'>('upload');
+  const [activeView, setActiveView] = useState<'upload' | 'history' | 'pending_returns'>(showPendingReturns ? 'pending_returns' : 'upload');
   const [pasteInput, setPasteInput] = useState('');
   const [carrier, setCarrier] = useState<Carrier>('DHL');
   const [fcLocation, setFcLocation] = useState('');
@@ -93,6 +93,7 @@ export default function ShipmentsTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allShipments = getAllShipments();
+  const pendingReturnDevices = devices.filter((d) => d.status === 'pending_return');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -288,6 +289,12 @@ export default function ShipmentsTab() {
           >
             Shipment History ({allShipments.length})
           </button>
+          <button
+            onClick={() => setActiveView('pending_returns')}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeView === 'pending_returns' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${pendingReturnDevices.length > 0 ? 'text-orange-600' : ''}`}
+          >
+            Pending Returns {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
+          </button>
         </div>
       </div>
 
@@ -459,6 +466,90 @@ export default function ShipmentsTab() {
 
       {activeView === 'history' && (
         <ShipmentHistory shipments={allShipments} onMarkDelivered={markShipmentDelivered} />
+      )}
+
+      {activeView === 'pending_returns' && (
+        <div className="space-y-4">
+          {/* Explanation */}
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-orange-800 mb-1">Pending Device Returns</h3>
+            <p className="text-xs text-orange-700">
+              These devices have been requested for return — a return email was sent to the tester. They remain here until you confirm the device has been physically received back. Devices overdue by 2+ weeks are highlighted in red.
+            </p>
+          </div>
+
+          {pendingReturnDevices.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <p className="text-gray-400 text-sm">No devices pending return</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tester</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email Sent</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Days Waiting</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pendingReturnDevices
+                    .sort((a, b) => new Date(a.returnEmailSentAt || '').getTime() - new Date(b.returnEmailSentAt || '').getTime())
+                    .map((d) => {
+                      const daysSince = d.returnEmailSentAt
+                        ? Math.floor((Date.now() - new Date(d.returnEmailSentAt).getTime()) / (1000 * 60 * 60 * 24))
+                        : 0;
+                      const isOverdue = daysSince >= 14;
+                      return (
+                        <tr key={d.id} className={isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                          <td className="px-4 py-3 font-mono text-xs font-medium text-blue-700">{d.serialNumber}</td>
+                          <td className="px-4 py-3 text-gray-700">{d.assignedTo || '—'}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">{d.assignedEmail || '—'}</td>
+                          <td className="px-4 py-3 text-xs text-gray-600">
+                            {d.returnEmailSentAt ? new Date(d.returnEmailSentAt).toLocaleDateString() : '—'}
+                            {d.returnEmailCount && d.returnEmailCount > 1 && (
+                              <span className="ml-1 text-orange-600">({d.returnEmailCount}× sent)</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              isOverdue ? 'bg-red-100 text-red-700' :
+                              daysSince >= 7 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {daysSince} day{daysSince !== 1 ? 's' : ''}
+                              {isOverdue && ' — OVERDUE'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => {
+                                updateDevice(d.id, { status: 'deactivated' as any, deactivated: true });
+                                addHistoryEntry({
+                                  id: crypto.randomUUID(),
+                                  deviceId: d.id,
+                                  timestamp: new Date().toISOString(),
+                                  action: 'return_confirmed',
+                                  user: 'Admin',
+                                  description: 'Device return confirmed. Removed from pending returns and marked as deactivated.',
+                                });
+                              }}
+                              className="px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
+                            >
+                              ✓ Confirm Received
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,11 @@ import { useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Monitor, Users, MapPin, FlaskConical, CheckCircle, AlertTriangle } from 'lucide-react';
 
-export default function DashboardStats() {
+interface DashboardStatsProps {
+  onOverdueClick?: () => void;
+}
+
+export default function DashboardStats({ onOverdueClick }: DashboardStatsProps) {
   const { devices, people, testbeds } = useDeviceStore();
 
   const stats = useMemo(() => {
@@ -29,14 +33,18 @@ export default function DashboardStats() {
       { label: 'Countries', value: countries, icon: MapPin, color: 'bg-orange-500' },
       { label: 'Programs', value: programs, icon: FlaskConical, color: 'bg-indigo-500' },
       { label: 'People', value: people.length, icon: Users, color: 'bg-teal-500' },
-      { label: 'Overdue', value: overdue, icon: AlertTriangle, color: overdue > 0 ? 'bg-red-500' : 'bg-gray-400' },
+      { label: 'Overdue', value: overdue, icon: AlertTriangle, color: overdue > 0 ? 'bg-red-500' : 'bg-gray-400', onClick: onOverdueClick },
     ];
-  }, [devices, people, testbeds]);
+  }, [devices, people, testbeds, onOverdueClick]);
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-      {stats.map(({ label, value, icon: Icon, color }) => (
-        <div key={label} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+      {stats.map(({ label, value, icon: Icon, color, onClick }) => (
+        <div
+          key={label}
+          onClick={onClick}
+          className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 ${onClick ? 'cursor-pointer hover:shadow-md hover:border-gray-200 transition-shadow' : ''}`}
+        >
           <div className={`${color} text-white p-1.5 rounded-lg w-fit mb-2`}>
             <Icon size={20} />
           </div>
