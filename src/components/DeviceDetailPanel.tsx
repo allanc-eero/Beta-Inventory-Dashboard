@@ -93,7 +93,7 @@ function exportDeviceCSV(device: Device) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DeviceDetailPanel({ device: initialDevice, onClose }: DeviceDetailPanelProps) {
-  const { devices, updateDevice, checkinDevice } = useDeviceStore();
+  const { devices, updateDevice, checkinDevice, addHistoryEntry } = useDeviceStore();
   const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(device);
@@ -183,6 +183,52 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose }: De
               <SectionBlock title="CONTACT">
                 {renderFields(CONTACT_FIELDS)}
                 <DetailField label="PROGRAM" value={device.program} editing={false} field="program" editData={editData} setEditData={setEditData} />
+              </SectionBlock>
+            )}
+
+            {/* Email Tracking */}
+            {(device.returnEmailSentAt || device.status === 'deactivated') && (
+              <SectionBlock title="RETURN STATUS">
+                {device.returnEmailSentAt && (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">EMAIL SENT</span>
+                    <span className="text-sm text-green-700">{new Date(device.returnEmailSentAt).toLocaleDateString()} ({device.returnEmailCount || 1}×)</span>
+                  </div>
+                )}
+                {device.returnReminderSentAt && (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">REMINDER SENT</span>
+                    <span className="text-sm text-orange-600">{new Date(device.returnReminderSentAt).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {!device.returnEmailSentAt && (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">EMAIL SENT</span>
+                    <span className="text-sm text-gray-400">No return email sent</span>
+                  </div>
+                )}
+                {device.returnEmailSentAt && device.status === 'deactivated' && (
+                  <button
+                    onClick={() => {
+                      const testerName = device.assignedTo || device.checkedOutTo || 'Team Member';
+                      const subject = encodeURIComponent(`[Follow-up] Please return your eero device — ${device.serialNumber}`);
+                      const body = encodeURIComponent(`Hi ${testerName},\n\nThis is a follow-up regarding the return of your eero device.\n\nDevice: ${device.serialNumber} (${device.model})\n\nWe sent a return request on ${new Date(device.returnEmailSentAt!).toLocaleDateString()} but haven't received the device back yet. Please return it at your earliest convenience.\n\nIf you've already shipped it, please disregard this message and reply with the tracking number.\n\nThank you,\nDevice Management Team`);
+                      window.open(`mailto:${device.assignedEmail}?subject=${subject}&body=${body}`, '_self');
+                      updateDevice(device.id, { returnReminderSentAt: new Date().toISOString(), returnEmailCount: (device.returnEmailCount || 1) + 1 });
+                      addHistoryEntry({
+                        id: crypto.randomUUID(),
+                        deviceId: device.id,
+                        timestamp: new Date().toISOString(),
+                        action: 'reminder_sent',
+                        user: 'Admin',
+                        description: `Follow-up reminder email sent to ${device.assignedEmail} for device return`,
+                      });
+                    }}
+                    className="mt-2 px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50 w-full text-center"
+                  >
+                    Send Return Reminder
+                  </button>
+                )}
               </SectionBlock>
             )}
           </div>

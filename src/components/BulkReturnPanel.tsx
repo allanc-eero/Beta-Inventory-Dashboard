@@ -17,14 +17,44 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
   const [brickDevices, setBrickDevices] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('[Action Required] Return {count} eero device(s)');
+  const [emailBody, setEmailBody] = useState(`Hi {name},
+
+We need you to return {count} eero device(s).
+
+Devices to return:
+{devices}
+
+Please follow these steps:
+1. Disconnect all devices from power and your network
+2. Pack them securely
+3. Print the attached return shipping label
+4. Drop off at any UPS or FedEx location
+
+Please return within 7 business days.
+
+If you have any questions, please reply to this email.
+
+Thank you,
+Device Management Team`);
+  const [perTesterEmails, setPerTesterEmails] = useState<Record<string, string>>({});
+  const [perTesterSubjects, setPerTesterSubjects] = useState<Record<string, string>>({});
 
   const requiresReturn = reason === 'defective' || reason === 'end_of_program';
   const willBrick = reason === 'lost' || (reason === 'end_of_program' && brickDevices);
 
-  // Group devices by assignee for email/label generation
+  // Group devices by assignee for email/label generation (deduplicated by serial)
   const groupedByAssignee = useMemo(() => {
+    // Deduplicate devices by serial number first
+    const seen = new Set<string>();
+    const uniqueDevices = devices.filter((d) => {
+      if (seen.has(d.serialNumber)) return false;
+      seen.add(d.serialNumber);
+      return true;
+    });
+
     const groups: Record<string, Device[]> = {};
-    devices.forEach((d) => {
+    uniqueDevices.forEach((d) => {
       const key = d.assignedEmail || d.assignedTo || 'unassigned';
       if (!groups[key]) groups[key] = [];
       groups[key].push(d);
@@ -32,7 +62,32 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
     return groups;
   }, [devices]);
 
-  const assigneeCount = Object.keys(groupedByAssignee).length;
+  const assigneeCount = Object.keys(groupedByAssignee).filter((k) => k !== 'unassigned').length;
+
+  // Deduplicated device list for display and processing
+  const uniqueDevices = useMemo(() => {
+    const seen = new Set<string>();
+    return devices.filter((d) => {
+      if (seen.has(d.serialNumber)) return false;
+      seen.add(d.serialNumber);
+      return true;
+    });
+  }, [devices]);
+
+  // Initialize per-tester emails from template when groups are ready
+  useEffect(() => {
+    const emails: Record<string, string> = {};
+    Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
+      if (email === 'unassigned') return;
+      const testerName = assigneeDevices[0].assignedTo || assigneeDevices[0].checkedOutTo || 'Team Member';
+      const deviceList = assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model})`).join('\n');
+      emails[email] = emailBody
+        .replace(/\{name\}/g, testerName)
+        .replace(/\{devices\}/g, deviceList)
+        .replace(/\{count\}/g, String(assigneeDevices.length));
+    });
+    setPerTesterEmails(emails);
+  }, []); // Only on mount
 
   // Lock body scroll
   useEffect(() => {
@@ -44,7 +99,7 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
     setProcessing(true);
 
     // Get program for epic mapping
-    const program = devices[0]?.program || 'beta';
+    const program = uniqueDevices[0]?.program || 'beta';
     const epicMap: Record<string, string> = {
       beta: 'BETA-RETURNS', dogfood: 'DOGFOOD-RETURNS', prq: 'PRQ-RETURNS',
       pvt: 'PVT-RETURNS', evt: 'EVT-RETURNS', dvt: 'DVT-RETURNS', other: 'GENERAL-RETURNS',
@@ -53,7 +108,7 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
     const ticketKey = `QA-${Math.floor(Math.random() * 90000) + 10000}`;
 
     // Process each device (deactivate without individual JIRA tickets)
-    devices.forEach((device) => {
+    uniqueDevices.forEach((device) => {
       updateDevice(device.id, { status: 'deactivated' as any, deactivated: true });
       addHistoryEntry({
         id: crypto.randomUUID(),
@@ -78,28 +133,28 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
     });
 
     // Create ONE consolidated JIRA ticket for the entire batch
-    const serialList = devices.map((d) => d.serialNumber).join(', ');
-    const assigneeList = [...new Set(devices.map((d) => d.assignedEmail || d.assignedTo).filter(Boolean))].join(', ');
+    const serialList = uniqueDevices.map((d) => d.serialNumber).join(', ');
+    const assigneeList = [...new Set(uniqueDevices.map((d) => d.assignedEmail || d.assignedTo).filter(Boolean))].join(', ');
     createJiraTicket({
       id: crypto.randomUUID(),
       key: ticketKey,
-      deviceId: devices[0].id, // Link to first device (ticket covers all)
+      deviceId: uniqueDevices[0].id, // Link to first device (ticket covers all)
       type: 'device_issue',
       status: 'open',
-      summary: `[${epic}] Bulk return: ${devices.length} device(s) — ${reason.replace(/_/g, ' ')}`,
+      summary: `[${epic}] Bulk return: ${uniqueDevices.length} device(s) — ${reason.replace(/_/g, ' ')}`,
       createdAt: new Date().toISOString(),
-      linkedFirmware: devices[0]?.firmwareVersion,
+      linkedFirmware: uniqueDevices[0]?.firmwareVersion,
     });
 
     // Log the consolidated JIRA to each device's timeline
-    devices.forEach((device) => {
+    uniqueDevices.forEach((device) => {
       addHistoryEntry({
         id: crypto.randomUUID(),
         deviceId: device.id,
         timestamp: new Date().toISOString(),
         action: 'jira_created',
         user: 'Admin',
-        description: `Consolidated JIRA ${ticketKey} created in epic ${epic} — ${devices.length} devices in batch (${reason.replace(/_/g, ' ')})`,
+        description: `Consolidated JIRA ${ticketKey} created in epic ${epic} — ${uniqueDevices.length} devices in batch (${reason.replace(/_/g, ' ')})`,
       });
     });
 
@@ -108,33 +163,29 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
       Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
         if (email === 'unassigned') return;
 
-        // Open one email per tester with all their devices listed
-        const testerName = assigneeDevices[0].assignedTo || assigneeDevices[0].checkedOutTo || 'Team Member';
-        const serialList = assigneeDevices.map((d) => d.serialNumber).join(', ');
-        const reasonText = reason === 'defective' ? 'a hardware defect' : 'end of program phase';
-
-        const subject = encodeURIComponent(`[Action Required] Return ${assigneeDevices.length} eero device(s)`);
-        const body = encodeURIComponent(
-`Hi ${testerName},
-
-We need you to return ${assigneeDevices.length} eero device(s) due to ${reasonText}.
-
-Devices to return:
-${assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model})`).join('\n')}
-
-Please follow these steps:
-1. Disconnect all devices from power and your network
-2. Pack them securely (together is fine if they fit)
-3. Print the attached return shipping label and attach it to the outside of the package
-4. Drop off at any UPS or FedEx location, or schedule a pickup
-
-Please return within 7 business days.
-
-If you have any questions, please reply to this email.
-
-Thank you,
-Device Management Team`
+        // Use the per-tester editable email content
+        const subject = encodeURIComponent(
+          (perTesterSubjects[email] || emailSubject).replace(/\{count\}/g, String(assigneeDevices.length))
         );
+        const bodyText = perTesterEmails[email] || '';
+        const body = encodeURIComponent(bodyText);
+
+        // Log the email to each device's timeline and update tracking fields
+        assigneeDevices.forEach((device) => {
+          addHistoryEntry({
+            id: crypto.randomUUID(),
+            deviceId: device.id,
+            timestamp: new Date().toISOString(),
+            action: 'email_sent',
+            user: 'Admin',
+            description: `Return email sent to ${email}:\n\nSubject: ${(perTesterSubjects[email] || emailSubject).replace(/\{count\}/g, String(assigneeDevices.length))}\n\n${bodyText}`,
+          });
+          // Update email tracking fields on the device
+          updateDevice(device.id, {
+            returnEmailSentAt: new Date().toISOString(),
+            returnEmailCount: (device.returnEmailCount || 0) + 1,
+          });
+        });
 
         // Open email (only for first tester to avoid popup blocking)
         if (email === Object.keys(groupedByAssignee)[0]) {
@@ -201,6 +252,28 @@ Device Management Team`
   };
 
   if (done) {
+    const exportBatchCSV = () => {
+      const rows = [['Serial Number', 'Tester Name', 'Email', 'Action', 'Reason', 'Date']];
+      uniqueDevices.forEach((d) => {
+        rows.push([
+          d.serialNumber,
+          d.assignedTo || d.checkedOutTo || '',
+          d.assignedEmail || '',
+          willBrick ? 'Bricked & Deactivated' : 'Deactivated',
+          reason.replace(/_/g, ' '),
+          new Date().toLocaleDateString(),
+        ]);
+      });
+      const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bulk-return-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
     return (
       <div className="fixed inset-0 top-12 z-40 bg-gray-50 overflow-y-auto">
         <div className="max-w-[900px] mx-auto px-6 py-8">
@@ -208,14 +281,22 @@ Device Management Team`
             <p className="text-4xl mb-4">✓</p>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Bulk Return Complete</h2>
             <p className="text-sm text-gray-500 mb-6">
-              {devices.length} device(s) processed. JIRA tickets created. {requiresReturn ? `${assigneeCount} return email(s) and label(s) generated.` : ''}
+              {uniqueDevices.length} device(s) processed. JIRA tickets created. {requiresReturn ? `${assigneeCount} return email(s) and label(s) generated.` : ''}
             </p>
-            <button
-              onClick={onClose}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-            >
-              Back to Devices
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={exportBatchCSV}
+                className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Export Batch Report (CSV)
+              </button>
+              <button
+                onClick={onClose}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+              >
+                Back to Devices
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -236,13 +317,13 @@ Device Management Team`
         {/* Title */}
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Bulk Return to eero</h1>
         <p className="text-sm text-gray-500 mb-8">
-          Process {devices.length} device(s) for return. Emails and labels will be grouped by tester.
+          Process {uniqueDevices.length} device(s) for return. Emails and labels will be grouped by tester.
         </p>
 
         {/* Devices summary table */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Devices Being Returned ({devices.length})
+            Devices Being Returned ({uniqueDevices.length})
           </h3>
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-sm">
@@ -256,7 +337,7 @@ Device Management Team`
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {devices.map((d) => (
+                {uniqueDevices.map((d) => (
                   <tr key={d.id}>
                     <td className="px-3 py-2 font-mono text-xs">{d.serialNumber}</td>
                     <td className="px-3 py-2 text-gray-600">{d.model}</td>
@@ -324,16 +405,76 @@ Device Management Team`
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (applies to all)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Internal Notes <span className="font-normal text-gray-400">(not sent to testers — for your team's records only)</span></label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-20"
-                placeholder="Reason for bulk return..."
+                placeholder="Internal reason for bulk return, context for the team..."
               />
             </div>
           </div>
         </div>
+
+        {/* Email Template + Per-Tester Editable Emails */}
+        {requiresReturn && Object.keys(groupedByAssignee).filter((k) => k !== 'unassigned').length > 0 && (
+          <div className="bg-white rounded-xl border border-blue-200 p-6 mb-8">
+            <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">📧 Emails to Testers</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Each tester gets their own email asking for only the device(s) selected above. Edit any email individually before sending.
+            </p>
+
+            <div className="mb-4">
+              <button
+                onClick={() => {
+                  // Reset all per-tester emails from template
+                  const reset: Record<string, string> = {};
+                  Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
+                    if (email === 'unassigned') return;
+                    const testerName = assigneeDevices[0].assignedTo || assigneeDevices[0].checkedOutTo || 'Team Member';
+                    const deviceList = assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model})`).join('\n');
+                    reset[email] = emailBody
+                      .replace(/\{name\}/g, testerName)
+                      .replace(/\{devices\}/g, deviceList)
+                      .replace(/\{count\}/g, String(assigneeDevices.length));
+                  });
+                  setPerTesterEmails(reset);
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                ↻ Reset all emails from template
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[500px] overflow-y-auto">
+              {Object.entries(groupedByAssignee)
+                .filter(([key]) => key !== 'unassigned')
+                .map(([email, assigneeDevices]) => (
+                  <div key={email} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">To: {email}</span>
+                      <span className="text-xs text-gray-400">{assigneeDevices.length} device(s) from this return</span>
+                    </div>
+                    <div className="p-4">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                      <input
+                        type="text"
+                        value={(perTesterSubjects[email] || emailSubject).replace(/\{count\}/g, String(assigneeDevices.length))}
+                        onChange={(e) => setPerTesterSubjects({ ...perTesterSubjects, [email]: e.target.value })}
+                        className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
+                      <textarea
+                        value={perTesterEmails[email] || ''}
+                        onChange={(e) => setPerTesterEmails({ ...perTesterEmails, [email]: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-mono resize-none h-40 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* What will happen */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
@@ -341,11 +482,11 @@ Device Management Team`
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-green-500 mt-0.5">✓</span>
-              <p className="text-sm text-gray-700"><span className="font-medium">{devices.length}</span> device(s) will be marked as deactivated</p>
+              <p className="text-sm text-gray-700"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as deactivated</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-green-500 mt-0.5">✓</span>
-              <p className="text-sm text-gray-700"><span className="font-medium">1</span> consolidated JIRA ticket created covering all {devices.length} device(s)</p>
+              <p className="text-sm text-gray-700"><span className="font-medium">1</span> consolidated JIRA ticket created covering all {uniqueDevices.length} device(s)</p>
             </div>
             {requiresReturn && (
               <>
@@ -362,13 +503,13 @@ Device Management Team`
             {reason === 'lost' && (
               <div className="flex items-start gap-3">
                 <span className="text-red-500 mt-0.5">⚠️</span>
-                <p className="text-sm text-red-700 font-medium">{devices.length} device(s) will be remotely bricked — they will never connect to a network again</p>
+                <p className="text-sm text-red-700 font-medium">{uniqueDevices.length} device(s) will be remotely bricked — they will never connect to a network again</p>
               </div>
             )}
             {reason === 'end_of_program' && brickDevices && (
               <div className="flex items-start gap-3">
                 <span className="text-red-500 mt-0.5">⚠️</span>
-                <p className="text-sm text-red-700 font-medium">{devices.length} device(s) will be remotely bricked via the Partner API — they will never connect to a network again</p>
+                <p className="text-sm text-red-700 font-medium">{uniqueDevices.length} device(s) will be remotely bricked via the Partner API — they will never connect to a network again</p>
               </div>
             )}
             <div className="flex items-start gap-3">
@@ -390,8 +531,8 @@ Device Management Team`
               />
               <span className="text-sm text-red-700">
                 {reason === 'lost'
-                  ? `I confirm these ${devices.length} device(s) are lost or unrecoverable and should be permanently bricked. This action cannot be undone.`
-                  : `I confirm these ${devices.length} device(s) should be permanently bricked as part of the end-of-program process. They will never connect to a network again. This action cannot be undone.`
+                  ? `I confirm these ${uniqueDevices.length} device(s) are lost or unrecoverable and should be permanently bricked. This action cannot be undone.`
+                  : `I confirm these ${uniqueDevices.length} device(s) should be permanently bricked as part of the end-of-program process. They will never connect to a network again. This action cannot be undone.`
                 }
               </span>
             </label>
@@ -413,7 +554,7 @@ Device Management Team`
               willBrick ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {processing ? 'Processing...' : willBrick ? `Brick & Deactivate ${devices.length} Device(s)` : `Submit (${devices.length} devices)`}
+            {processing ? 'Processing...' : willBrick ? `Brick & Deactivate ${uniqueDevices.length} Device(s)` : `Submit (${uniqueDevices.length} devices)`}
           </button>
         </div>
       </div>

@@ -84,6 +84,10 @@ export interface Device {
   // Timestamps
   createdAt: string;
   updatedAt: string;
+  // Email tracking
+  returnEmailSentAt?: string;
+  returnReminderSentAt?: string;
+  returnEmailCount?: number;
 }
 
 export interface Testbed {
