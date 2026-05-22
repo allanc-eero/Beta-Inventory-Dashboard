@@ -298,7 +298,7 @@ function StatusBadge({ status }: { status: DeviceStatus }) {
     deactivated: { class: 'bg-gray-100 text-gray-600', label: 'Deactivated' },
   };
 
-  const c = config[status];
+  const c = config[status] || { class: 'bg-gray-100 text-gray-600', label: status };
   return (
     <span className={`status-badge ${c.class}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />

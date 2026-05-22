@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program } from '@/types';
+import DeviceDetailPanel from './DeviceDetailPanel';
 
 type ProgramStatus = 'active' | 'completed' | 'archived';
 type DeviceAction = 'return' | 'release' | 'move' | 'archive' | 'brick_and_return';
@@ -31,6 +32,7 @@ export default function ProgramsTab() {
   const { devices, updateDevice, addHistoryEntry, addClosedProgram, getClosedPrograms } = useDeviceStore();
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [closingProgram, setClosingProgram] = useState(false);
+  const [detailDevice, setDetailDevice] = useState<Device | null>(null);
   const [deviceActions, setDeviceActions] = useState<Record<string, DeviceAction>>({});
   const [moveTarget, setMoveTarget] = useState<Program>('dogfood');
   const [processing, setProcessing] = useState(false);
@@ -327,6 +329,7 @@ Device Management Team`
     };
 
     return (
+      <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -380,7 +383,14 @@ Device Management Team`
             <tbody className="divide-y divide-gray-100">
               {selectedDevices.map((device) => (
                 <tr key={device.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs">{device.serialNumber}</td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    <button
+                      onClick={() => setDetailDevice(device)}
+                      className="text-blue-700 font-medium hover:underline cursor-pointer"
+                    >
+                      {device.serialNumber}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{device.assignedTo || device.assignedEmail || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${device.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -404,6 +414,11 @@ Device Management Team`
           </table>
         </div>
       </div>
+
+      {detailDevice && (
+        <DeviceDetailPanel device={detailDevice} onClose={() => setDetailDevice(null)} />
+      )}
+      </>
     );
   }
 
@@ -435,15 +450,15 @@ Device Management Team`
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="text-center">
                 <p className="text-lg font-bold text-gray-900">{prog.deviceCount}</p>
-                <p className="text-xs text-gray-500">Total</p>
+                <p className="text-xs text-gray-500">Total Devices</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold text-green-600">{prog.onlineCount}</p>
-                <p className="text-xs text-gray-500">Online</p>
+                <p className="text-xs text-gray-500">Online Devices</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold text-yellow-600">{prog.offlineCount}</p>
-                <p className="text-xs text-gray-500">Offline</p>
+                <p className="text-xs text-gray-500">Offline Devices</p>
               </div>
             </div>
 
@@ -506,9 +521,22 @@ Device Management Team`
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {cp.actions.map((a, i) => (
+                        {cp.actions.map((a, i) => {
+                          const device = devices.find((d) => d.serialNumber === a.serial);
+                          return (
                           <tr key={i}>
-                            <td className="px-3 py-1.5 font-mono">{a.serial}</td>
+                            <td className="px-3 py-1.5 font-mono">
+                              {device ? (
+                                <button
+                                  onClick={() => setDetailDevice(device)}
+                                  className="text-blue-700 font-medium hover:underline cursor-pointer"
+                                >
+                                  {a.serial}
+                                </button>
+                              ) : (
+                                <span>{a.serial}</span>
+                              )}
+                            </td>
                             <td className="px-3 py-1.5 text-gray-600">{a.assignee}</td>
                             <td className="px-3 py-1.5">
                               <span className={`px-1.5 py-0.5 rounded-full text-xs ${
@@ -520,7 +548,8 @@ Device Management Team`
                               </span>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -529,6 +558,10 @@ Device Management Team`
             ))}
           </div>
         </div>
+      )}
+
+      {detailDevice && (
+        <DeviceDetailPanel device={detailDevice} onClose={() => setDetailDevice(null)} />
       )}
     </div>
   );

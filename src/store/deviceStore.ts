@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Device, Testbed, Location, Person, CheckoutRecord, DeviceStatus, Program, HistoryEntry, SpeedTestResult, JiraTicket, DeactivationRecord, OverdueAlert, FirmwareInfo, Shipment, ShipmentStatus, Carrier, Attachment, AttachmentType, SyncMetadata, ClosedProgramRecord, OptOutRecord } from '@/types';
+import { Device, Testbed, Location, Person, CheckoutRecord, DeviceStatus, Program, HistoryEntry, SpeedTestResult, JiraTicket, DeactivationRecord, OverdueAlert, FirmwareInfo, Shipment, ShipmentStatus, Carrier, Attachment, AttachmentType, SyncMetadata, ClosedProgramRecord, OptOutRecord, TesterProfile } from '@/types';
 
 interface DeviceStore {
   devices: Device[];
@@ -112,6 +112,13 @@ interface DeviceStore {
   addOptOut: (record: OptOutRecord) => void;
   getOptOuts: () => OptOutRecord[];
 
+  // ─── Tester Profiles ──────────────────────────────────────────────────
+  testerProfiles: TesterProfile[];
+  upsertTesterProfile: (profile: Partial<TesterProfile> & { email: string }) => void;
+  getTesterProfile: (email: string) => TesterProfile | undefined;
+  getAllTesterProfiles: () => TesterProfile[];
+  applyTesterProfile: (deviceId: string, email: string) => void;
+
   // Bulk actions
   clearAllData: () => void;
 }
@@ -142,6 +149,7 @@ export const useDeviceStore = create<DeviceStore>()(
       },
       closedPrograms: [],
       optOutRecords: [],
+      testerProfiles: [],
 
       // Device actions
       addDevice: (device) =>
@@ -808,9 +816,83 @@ export const useDeviceStore = create<DeviceStore>()(
 
       getOptOuts: () => get().optOutRecords,
 
+      // ─── Tester Profiles ──────────────────────────────────────────────────
+      upsertTesterProfile: (profileData) => {
+        const email = profileData.email.toLowerCase().trim();
+        const existing = get().testerProfiles.find((p) => p.email.toLowerCase() === email);
+
+        if (existing) {
+          // Update existing profile — only overwrite fields that have new non-empty values
+          const updates: Partial<TesterProfile> = { updatedAt: new Date().toISOString() };
+          if (profileData.name && profileData.name !== existing.name) updates.name = profileData.name;
+          if (profileData.contactEmail && profileData.contactEmail !== existing.contactEmail) updates.contactEmail = profileData.contactEmail;
+          if (profileData.alternateEmail && profileData.alternateEmail !== existing.alternateEmail) updates.alternateEmail = profileData.alternateEmail;
+          if (profileData.country && profileData.country !== existing.country) updates.country = profileData.country;
+          if (profileData.location && profileData.location !== existing.location) updates.location = profileData.location;
+          if (profileData.networkId && profileData.networkId !== existing.networkId) updates.networkId = profileData.networkId;
+          if (profileData.adminId && profileData.adminId !== existing.adminId) updates.adminId = profileData.adminId;
+          if (profileData.internetSpeed && profileData.internetSpeed !== existing.internetSpeed) updates.internetSpeed = profileData.internetSpeed;
+          if (profileData.notes && profileData.notes !== existing.notes) updates.notes = profileData.notes;
+          // Merge programs list
+          if (profileData.programs) {
+            const merged = new Set([...existing.programs, ...profileData.programs]);
+            updates.programs = Array.from(merged);
+          }
+
+          set((state) => ({
+            testerProfiles: state.testerProfiles.map((p) =>
+              p.email.toLowerCase() === email ? { ...p, ...updates } : p
+            ),
+          }));
+        } else {
+          // Create new profile
+          const newProfile: TesterProfile = {
+            id: crypto.randomUUID(),
+            email: email,
+            name: profileData.name || '',
+            contactEmail: profileData.contactEmail || '',
+            alternateEmail: profileData.alternateEmail || '',
+            country: profileData.country || '',
+            location: profileData.location || '',
+            networkId: profileData.networkId || '',
+            adminId: profileData.adminId || '',
+            internetSpeed: profileData.internetSpeed || '',
+            notes: profileData.notes || '',
+            programs: profileData.programs || [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          set((state) => ({ testerProfiles: [...state.testerProfiles, newProfile] }));
+        }
+      },
+
+      getTesterProfile: (email) =>
+        get().testerProfiles.find((p) => p.email.toLowerCase() === email.toLowerCase().trim()),
+
+      getAllTesterProfiles: () => get().testerProfiles,
+
+      applyTesterProfile: (deviceId, email) => {
+        const profile = get().getTesterProfile(email);
+        if (!profile) return;
+
+        const updates: Partial<Device> = {};
+        if (profile.name) updates.assignedTo = profile.name;
+        if (profile.contactEmail) updates.contactEmail = profile.contactEmail;
+        if (profile.alternateEmail) updates.alternateEmail = profile.alternateEmail;
+        if (profile.country) updates.country = profile.country;
+        if (profile.location) updates.location = profile.location;
+        if (profile.networkId) updates.network = profile.networkId;
+        if (profile.adminId) updates.adminId = profile.adminId;
+        if (profile.name) updates.checkedOutTo = profile.name;
+
+        if (Object.keys(updates).length > 0) {
+          get().updateDevice(deviceId, updates);
+        }
+      },
+
       // Bulk actions
       clearAllData: () =>
-        set({ devices: [], testbeds: [], locations: [], people: [], checkoutHistory: [], deviceHistory: [], speedTests: [], jiraTickets: [], deactivationRecords: [], overdueAlerts: [], shipments: [], attachments: [], closedPrograms: [], optOutRecords: [] }),
+        set({ devices: [], testbeds: [], locations: [], people: [], checkoutHistory: [], deviceHistory: [], speedTests: [], jiraTickets: [], deactivationRecords: [], overdueAlerts: [], shipments: [], attachments: [], closedPrograms: [], optOutRecords: [], testerProfiles: [] }),
     }),
     {
       name: 'device-tracker-storage',

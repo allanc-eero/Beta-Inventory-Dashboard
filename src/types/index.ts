@@ -47,6 +47,8 @@ export interface Device {
   status: DeviceStatus;
   assignedTo: string;
   assignedEmail: string;
+  contactEmail: string;
+  alternateEmail: string;
   location: string;
   adminLocation: string;
   network: string;
@@ -256,4 +258,22 @@ export interface Attachment {
   uploadedBy: string;
   uploadedAt: string;
   notes?: string;
+}
+
+// ─── Feature: Tester Profiles ─────────────────────────────────────────────────
+export interface TesterProfile {
+  id: string;
+  email: string; // primary key — the stable link across programs
+  name: string;
+  contactEmail: string;
+  alternateEmail: string;
+  country: string;
+  location: string;
+  networkId: string;
+  adminId: string;
+  internetSpeed: string;
+  notes: string;
+  programs: string[]; // programs they've participated in
+  createdAt: string;
+  updatedAt: string;
 }

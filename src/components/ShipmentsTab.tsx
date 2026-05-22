@@ -189,6 +189,8 @@ export default function ShipmentsTab() {
             status: 'not_online',
             assignedTo: row.name,
             assignedEmail: row.alias ? `${row.alias}@amazon.com` : '',
+            contactEmail: '',
+            alternateEmail: '',
             location: '',
             adminLocation: '',
             network: '',

@@ -59,6 +59,8 @@ function buildDevice(t: RawTester, index: number): Device {
     status: deviceStatus,
     assignedTo: t.name,
     assignedEmail: t.email,
+    contactEmail: t.contactEmail || '',
+    alternateEmail: '',
     location: t.location,
     adminLocation: '',
     network: t.netId,

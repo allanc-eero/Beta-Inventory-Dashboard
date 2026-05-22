@@ -5,7 +5,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { allSeedDevices, seedPeople } from '@/data/seedData';
 
 export default function SeedDataProvider({ children }: { children: React.ReactNode }) {
-  const { devices, addDevices, people, addPerson } = useDeviceStore();
+  const { devices, addDevices, people, addPerson, testerProfiles, upsertTesterProfile } = useDeviceStore();
   const seeded = useRef(false);
 
   useEffect(() => {
@@ -14,8 +14,27 @@ export default function SeedDataProvider({ children }: { children: React.ReactNo
       seeded.current = true;
       addDevices(allSeedDevices);
       seedPeople.forEach((p) => addPerson(p));
+
+      // Build tester profiles from seed devices
+      if (testerProfiles.length === 0) {
+        allSeedDevices.forEach((d) => {
+          if (d.assignedEmail) {
+            upsertTesterProfile({
+              email: d.assignedEmail,
+              name: d.assignedTo || '',
+              contactEmail: d.contactEmail || '',
+              alternateEmail: d.alternateEmail || '',
+              country: d.country || '',
+              location: d.location || '',
+              networkId: d.network || '',
+              adminId: d.adminId || '',
+              programs: [d.program],
+            });
+          }
+        });
+      }
     }
-  }, [devices.length, addDevices, people, addPerson]);
+  }, [devices.length, addDevices, people, addPerson, testerProfiles.length, upsertTesterProfile]);
 
   return <>{children}</>;
 }

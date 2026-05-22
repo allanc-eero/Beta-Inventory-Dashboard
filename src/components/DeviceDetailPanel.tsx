@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Device } from '@/types';
-import { ExternalLink, RefreshCw, Edit2, ArrowRightLeft, Clock, FileText } from 'lucide-react';
+import { ExternalLink, RefreshCw, Edit2, ArrowRightLeft, Clock, FileText, Download } from 'lucide-react';
 import { useDeviceStore } from '@/store/deviceStore';
 import FirmwarePanel from './FirmwarePanel';
 import HealthPanel from './HealthPanel';
@@ -16,8 +16,10 @@ interface DeviceDetailPanelProps {
   onClose: () => void;
 }
 
-export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanelProps) {
-  const { updateDevice, checkinDevice, getDeviceHistory } = useDeviceStore();
+export default function DeviceDetailPanel({ device: initialDevice, onClose }: DeviceDetailPanelProps) {
+  const { devices, updateDevice, checkinDevice, getDeviceHistory } = useDeviceStore();
+  // Always read the latest version of this device from the store
+  const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(device);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
@@ -40,6 +42,45 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
   const handleCheckin = () => {
     checkinDevice(device.id);
     onClose();
+  };
+
+  const handleExport = () => {
+    const rows = [
+      ['Field', 'Value'],
+      ['Serial Number', device.serialNumber],
+      ['Model', device.model],
+      ['Manufacturer', device.manufacturer],
+      ['Revision', device.revision],
+      ['Hardware Config', device.hardwareConfig],
+      ['Internal Name', device.internalName],
+      ['SKU', device.sku],
+      ['Country', device.country],
+      ['Admin ID', device.unitId],
+      ['Firmware', device.firmwareVersion],
+      ['Status', device.status],
+      ['Assigned To', device.assignedTo],
+      ['Email', device.assignedEmail],
+      ['Contact Email', device.contactEmail || ''],
+      ['Alternate Email', device.alternateEmail || ''],
+      ['Insight Network', device.network],
+      ['Location', device.location],
+      ['Program', device.program],
+      ['Asset Tag', device.assetTag],
+      ['PO / Expensify', device.poExpensify],
+      ['Tracking', device.tracking],
+      ['Jira', device.jira],
+      ['Testbed', device.testbedName],
+      ['Due Date', device.dueDate],
+      ['Notes', device.notes],
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${device.serialNumber}_device_info.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -69,6 +110,13 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              <Download size={14} />
+              Export
+            </button>
             <button className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
               Admin panel <ExternalLink size={13} />
             </button>
@@ -109,8 +157,7 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
               <DetailField label="SKU" value={device.sku} editing={isEditing} field="sku" editData={editData} setEditData={setEditData} />
               <DetailField label="PART NUMBER" value={device.partNumber} editing={isEditing} field="partNumber" editData={editData} setEditData={setEditData} />
               <DetailField label="COUNTRY" value={device.country} editing={isEditing} field="country" editData={editData} setEditData={setEditData} />
-              <DetailField label="ADMIN ID" value={device.adminId} editing={isEditing} field="adminId" editData={editData} setEditData={setEditData} />
-              <DetailField label="UNIT ID" value={device.unitId} editing={isEditing} field="unitId" editData={editData} setEditData={setEditData} />
+              <DetailField label="ADMIN ID" value={device.unitId} editing={isEditing} field="unitId" editData={editData} setEditData={setEditData} linkUrl={device.unitId ? `https://admin.e2ro.com/users/${device.unitId.replace(/^UID0*/, '')}` : undefined} />
               <DetailField label="FIRMWARE" value={device.firmwareVersion} editing={isEditing} field="firmwareVersion" editData={editData} setEditData={setEditData} />
               <DetailField label="DEACTIVATED" value={device.deactivated ? 'yes' : 'no'} editing={false} field="deactivated" editData={editData} setEditData={setEditData} />
             </SectionBlock>
@@ -122,18 +169,12 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
               <DetailField label="STATUS" value={device.status.replace('_', ' ')} editing={false} field="status" editData={editData} setEditData={setEditData} />
               <DetailField label="ASSIGNED TO" value={device.assignedTo || device.checkedOutTo} editing={isEditing} field="assignedTo" editData={editData} setEditData={setEditData} />
               <DetailField label="COUNTRY" value={device.country} editing={isEditing} field="country" editData={editData} setEditData={setEditData} />
-              <DetailField label="NETWORK" value={device.network} editing={isEditing} field="network" editData={editData} setEditData={setEditData} />
+              <DetailField label="INSIGHT NETWORK" value={device.network} editing={isEditing} field="network" editData={editData} setEditData={setEditData} linkUrl={device.network ? `https://insight.eero.com/networks/${device.network}` : undefined} />
             </SectionBlock>
 
             <SectionBlock title="LOGISTICS">
               <DetailField label="ASSET TAG" value={device.assetTag} editing={isEditing} field="assetTag" editData={editData} setEditData={setEditData} />
               <DetailField label="PO / EXPENSIFY" value={device.poExpensify} editing={isEditing} field="poExpensify" editData={editData} setEditData={setEditData} />
-              <DetailField label="ACCOUNTING ID" value={device.accountingId} editing={isEditing} field="accountingId" editData={editData} setEditData={setEditData} />
-              <DetailField label="COST" value={device.cost} editing={isEditing} field="cost" editData={editData} setEditData={setEditData} />
-              <DetailField label="PURCHASE DATE" value={device.purchaseDate} editing={isEditing} field="purchaseDate" editData={editData} setEditData={setEditData} />
-              <DetailField label="IMEI 1" value={device.imei1} editing={isEditing} field="imei1" editData={editData} setEditData={setEditData} />
-              <DetailField label="IMEI 2" value={device.imei2} editing={isEditing} field="imei2" editData={editData} setEditData={setEditData} />
-              <DetailField label="EID" value={device.eid} editing={isEditing} field="eid" editData={editData} setEditData={setEditData} />
               <DetailField label="TRACKING" value={device.tracking} editing={isEditing} field="tracking" editData={editData} setEditData={setEditData} />
               <DetailField label="JIRA" value={device.jira} editing={isEditing} field="jira" editData={editData} setEditData={setEditData} />
             </SectionBlock>
@@ -162,6 +203,8 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
             {device.assignedEmail && (
               <SectionBlock title="CONTACT">
                 <DetailField label="EMAIL" value={device.assignedEmail} editing={isEditing} field="assignedEmail" editData={editData} setEditData={setEditData} />
+                <DetailField label="CONTACT EMAIL" value={device.contactEmail} editing={isEditing} field="contactEmail" editData={editData} setEditData={setEditData} />
+                <DetailField label="ALTERNATE EMAIL" value={device.alternateEmail} editing={isEditing} field="alternateEmail" editData={editData} setEditData={setEditData} />
                 <DetailField label="PROGRAM" value={device.program} editing={false} field="program" editData={editData} setEditData={setEditData} />
                 <DetailField label="DUE DATE" value={device.dueDate} editing={isEditing} field="dueDate" editData={editData} setEditData={setEditData} />
               </SectionBlock>
@@ -231,6 +274,7 @@ function DetailField({
   field,
   editData,
   setEditData,
+  linkUrl,
 }: {
   label: string;
   value: string;
@@ -238,6 +282,7 @@ function DetailField({
   field: keyof Device;
   editData: Device;
   setEditData: (d: Device) => void;
+  linkUrl?: string;
 }) {
   if (editing) {
     return (
@@ -256,7 +301,18 @@ function DetailField({
   return (
     <div className="flex items-baseline gap-3">
       <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">{label}</span>
-      <span className="text-sm text-gray-900">{value || '—'}</span>
+      {linkUrl && value ? (
+        <a
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+        >
+          {value} ↗
+        </a>
+      ) : (
+        <span className="text-sm text-gray-900">{value || '—'}</span>
+      )}
     </div>
   );
 }

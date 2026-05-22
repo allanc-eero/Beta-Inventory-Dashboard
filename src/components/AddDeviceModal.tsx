@@ -10,7 +10,7 @@ interface AddDeviceModalProps {
 }
 
 export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
-  const { addDevice, addHistoryEntry } = useDeviceStore();
+  const { addDevice, addHistoryEntry, getTesterProfile, upsertTesterProfile } = useDeviceStore();
   const [formData, setFormData] = useState({
     serialNumber: '',
     model: 'eero Max 7',
@@ -20,6 +20,21 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
     assignedEmail: '',
     notes: '',
   });
+  const [profileApplied, setProfileApplied] = useState(false);
+
+  // When email field loses focus, try to auto-fill from tester profile
+  const handleEmailBlur = () => {
+    const email = formData.assignedEmail.trim().toLowerCase();
+    if (!email || profileApplied) return;
+    const profile = getTesterProfile(email);
+    if (profile) {
+      setFormData((prev) => ({
+        ...prev,
+        assignedTo: prev.assignedTo || profile.name,
+      }));
+      setProfileApplied(true);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +59,8 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
       status: 'not_online' as DeviceStatus,
       assignedTo: formData.assignedTo,
       assignedEmail: formData.assignedEmail,
+      contactEmail: '',
+      alternateEmail: '',
       location: '', // Populated by API sync
       adminLocation: '',
       network: '',
@@ -77,6 +94,31 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
     };
 
     addDevice(device);
+
+    // Apply tester profile to auto-fill known fields (country, location, network, etc.)
+    const email = formData.assignedEmail.trim().toLowerCase();
+    if (email) {
+      const profile = getTesterProfile(email);
+      if (profile) {
+        const profileUpdates: Partial<Device> = {};
+        if (profile.contactEmail) profileUpdates.contactEmail = profile.contactEmail;
+        if (profile.alternateEmail) profileUpdates.alternateEmail = profile.alternateEmail;
+        if (profile.country) profileUpdates.country = profile.country;
+        if (profile.location) profileUpdates.location = profile.location;
+        if (profile.networkId) profileUpdates.network = profile.networkId;
+        if (profile.adminId) profileUpdates.adminId = profile.adminId;
+        if (Object.keys(profileUpdates).length > 0) {
+          // Use setTimeout to ensure device is in store first
+          setTimeout(() => useDeviceStore.getState().updateDevice(device.id, profileUpdates), 0);
+        }
+      }
+      // Also upsert the profile with any new info
+      upsertTesterProfile({
+        email,
+        name: formData.assignedTo,
+        programs: [formData.program],
+      });
+    }
 
     // Log creation to history
     addHistoryEntry({
@@ -179,9 +221,13 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
                 type="email"
                 value={formData.assignedEmail}
                 onChange={(e) => setFormData({ ...formData, assignedEmail: e.target.value })}
+                onBlur={handleEmailBlur}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="jsmith@amazon.com"
               />
+              {profileApplied && (
+                <p className="text-xs text-green-600 mt-1">✓ Known tester — profile data will be applied</p>
+              )}
             </div>
           </div>
 

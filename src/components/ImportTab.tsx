@@ -7,7 +7,7 @@ import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download, Trash2 } f
 import Papa from 'papaparse';
 
 export default function ImportTab() {
-  const { addDevices, devices, clearAllData } = useDeviceStore();
+  const { addDevices, devices, clearAllData, updateDevice, upsertTesterProfile, getTesterProfile } = useDeviceStore();
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -41,29 +41,31 @@ export default function ImportTab() {
               partNumber: row['part_number'] || row['Part Number'] || '',
               country: row['country'] || row['Country'] || '',
               adminId: row['admin_id'] || row['Admin ID'] || '',
-              unitId: row['unit_id'] || row['Unit ID'] || '',
+              unitId: row['unit_id'] || row['Unit ID'] || row['Unit Id'] || row['UID'] || '',
               deactivated: (row['deactivated'] || row['Deactivated'] || 'no').toLowerCase() === 'yes',
               firmwareVersion: row['firmware_version'] || row['Firmware'] || row['firmware'] || row['FW Version'] || '',
               status: mapStatus(row['status'] || row['Status'] || 'in_stock'),
-              assignedTo: row['assigned_to'] || row['Assigned To'] || row['holder'] || '',
-              assignedEmail: row['assigned_email'] || row['Email'] || row['email'] || '',
+              assignedTo: row['assigned_to'] || row['Assigned To'] || row['holder'] || row['Tester Name'] || row['tester_name'] || row['Name'] || '',
+              assignedEmail: row['assigned_email'] || row['Email'] || row['email'] || row['Tester Email'] || row['tester_email'] || '',
+              contactEmail: row['contact_email'] || row['Contact Email'] || row['contact'] || '',
+              alternateEmail: row['alternate_email'] || row['Alternate Email'] || row['alt_email'] || '',
               location: row['location'] || row['Location'] || '',
               adminLocation: row['admin_location'] || row['Admin Location'] || '',
-              network: row['network'] || row['Network'] || '',
+              network: row['network'] || row['Network'] || row['Network ID'] || row['network_id'] || row['Net ID'] || '',
               program: mapProgram(row['program'] || row['Program'] || 'other'),
               assetTag: row['asset_tag'] || row['Asset Tag'] || '',
-              poExpensify: row['po_expensify'] || row['PO'] || '',
+              poExpensify: row['po_expensify'] || row['PO'] || row['Sales Order'] || row['sales_order'] || row['SO'] || '',
               accountingId: row['accounting_id'] || row['Accounting ID'] || '',
               cost: row['cost'] || row['Cost'] || '',
               purchaseDate: row['purchase_date'] || row['Purchase Date'] || '',
               imei1: row['imei1'] || row['IMEI 1'] || '',
               imei2: row['imei2'] || row['IMEI 2'] || '',
               eid: row['eid'] || row['EID'] || '',
-              tracking: row['tracking'] || row['Tracking'] || '',
+              tracking: row['tracking'] || row['Tracking'] || row['Tracking Number'] || row['tracking_number'] || '',
               jira: row['jira'] || row['JIRA'] || row['Jira'] || '',
-              checkedOutTo: row['checked_out_to'] || row['Checked Out To'] || '',
+              checkedOutTo: row['checked_out_to'] || row['Checked Out To'] || row['Tester Name'] || row['tester_name'] || row['assigned_to'] || row['Assigned To'] || '',
               checkedOutDate: row['checked_out_date'] || row['Checkout Date'] || '',
-              dueDate: row['due_date'] || row['Due Date'] || '',
+              dueDate: row['due_date'] || row['Due Date'] || row['ETA'] || row['eta'] || '',
               notes: row['notes'] || row['Notes'] || '',
               shipmentStatus: row['shipment_status'] || 'delivered',
               fcLocation: row['fc_location'] || '',
@@ -74,7 +76,7 @@ export default function ImportTab() {
               leg2Tracking: row['leg2_tracking'] || '',
               leg2Date: row['leg2_date'] || '',
               testbedId: row['testbed_id'] || '',
-              testbedName: row['testbed_name'] || row['Testbed'] || '',
+              testbedName: row['testbed_name'] || row['Testbed'] || row['Network Group'] || row['network_group'] || '',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             };
@@ -84,7 +86,59 @@ export default function ImportTab() {
               return;
             }
 
-            newDevices.push(device);
+            const email = device.assignedEmail?.toLowerCase().trim();
+
+            // If this device has an email, check for an existing tester profile and auto-fill missing fields
+            if (email) {
+              const profile = getTesterProfile(email);
+              if (profile) {
+                // Auto-fill device fields from the known tester profile (only if not already provided)
+                if (!device.assignedTo && profile.name) device.assignedTo = profile.name;
+                if (!device.contactEmail && profile.contactEmail) device.contactEmail = profile.contactEmail;
+                if (!device.alternateEmail && profile.alternateEmail) device.alternateEmail = profile.alternateEmail;
+                if (!device.country && profile.country) device.country = profile.country;
+                if (!device.location && profile.location) device.location = profile.location;
+                if (!device.network && profile.networkId) device.network = profile.networkId;
+                if (!device.adminId && profile.adminId) device.adminId = profile.adminId;
+                if (!device.checkedOutTo && profile.name) device.checkedOutTo = profile.name;
+              }
+
+              // Upsert the tester profile with whatever data we have from this import row
+              upsertTesterProfile({
+                email: email,
+                name: device.assignedTo || '',
+                contactEmail: device.contactEmail || '',
+                alternateEmail: device.alternateEmail || '',
+                country: device.country || '',
+                location: device.location || '',
+                networkId: device.network || '',
+                adminId: device.adminId || '',
+                internetSpeed: row['internet_speed'] || row['Internet Speed'] || row['internetSpeed'] || '',
+                programs: device.program ? [device.program] : [],
+              });
+            }
+
+            // Check if device already exists (upsert by serial number)
+            const existing = devices.find(
+              (d) => d.serialNumber.toLowerCase() === device.serialNumber.toLowerCase()
+            );
+
+            if (existing) {
+              // Update existing device — only overwrite fields that have values in the import
+              const updates: Partial<Device> = {};
+              (Object.keys(device) as (keyof Device)[]).forEach((key) => {
+                if (key === 'id' || key === 'createdAt') return; // preserve original id and creation date
+                const val = device[key];
+                if (val !== undefined && val !== '' && val !== (existing as any)[key]) {
+                  (updates as any)[key] = val;
+                }
+              });
+              if (Object.keys(updates).length > 0) {
+                updateDevice(existing.id, updates);
+              }
+            } else {
+              newDevices.push(device);
+            }
             success++;
           } catch (err) {
             errors.push(`Row ${index + 2}: ${(err as Error).message}`);
@@ -103,7 +157,7 @@ export default function ImportTab() {
         setImporting(false);
       },
     });
-  }, [addDevices]);
+  }, [addDevices, updateDevice, devices, upsertTesterProfile, getTesterProfile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
