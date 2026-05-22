@@ -554,19 +554,31 @@ export const useDeviceStore = create<DeviceStore>()(
       // ─── Overdue Alerts ─────────────────────────────────────────────────────
       getOverdueDevices: () => {
         const now = new Date();
-        return get().devices
-          .filter((d) => d.dueDate && new Date(d.dueDate) < now && d.checkedOutTo && !d.deactivated)
-          .map((d) => {
+        const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+
+        const overdueDevices = get().devices.filter((d) => {
+          if (d.deactivated) return false;
+          // Original: past due date and checked out
+          if (d.dueDate && new Date(d.dueDate) < now && d.checkedOutTo) return true;
+          // New: pending_return with return email sent 2+ weeks ago
+          if (d.status === 'pending_return' && d.returnEmailSentAt && (now.getTime() - new Date(d.returnEmailSentAt).getTime()) >= twoWeeksMs) return true;
+          return false;
+        });
+
+        return overdueDevices.map((d) => {
             const existing = get().overdueAlerts.find((a) => a.deviceId === d.id);
+            const referenceDate = d.status === 'pending_return' && d.returnEmailSentAt
+              ? d.returnEmailSentAt
+              : d.dueDate;
             return {
               id: existing?.id || crypto.randomUUID(),
               deviceId: d.id,
               serialNumber: d.serialNumber,
               assignedEmail: d.assignedEmail,
-              dueDate: d.dueDate,
-              daysOverdue: Math.floor((now.getTime() - new Date(d.dueDate).getTime()) / (1000 * 60 * 60 * 24)),
-              remindersSent: existing?.remindersSent || 0,
-              lastReminderAt: existing?.lastReminderAt,
+              dueDate: referenceDate || '',
+              daysOverdue: Math.floor((now.getTime() - new Date(referenceDate || now).getTime()) / (1000 * 60 * 60 * 24)),
+              remindersSent: existing?.remindersSent || (d.returnEmailCount || 1) - 1,
+              lastReminderAt: existing?.lastReminderAt || d.returnReminderSentAt,
               acknowledged: existing?.acknowledged || false,
             };
           });

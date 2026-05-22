@@ -12,7 +12,15 @@ export default function DashboardStats() {
     const notOnline = devices.filter((d) => d.status === 'not_online').length;
     const countries = new Set(devices.map((d) => d.country).filter(Boolean)).size;
     const programs = testbeds.length || new Set(devices.map((d) => d.program)).size;
-    const overdue = devices.filter((d) => d.dueDate && new Date(d.dueDate) < new Date() && d.status === 'not_online').length;
+    const now = new Date();
+    const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+    const overdue = devices.filter((d) => {
+      // Original: devices past due date and not online
+      if (d.dueDate && new Date(d.dueDate) < now && d.status === 'not_online') return true;
+      // New: pending_return devices where return email was sent 2+ weeks ago
+      if (d.status === 'pending_return' && d.returnEmailSentAt && (now.getTime() - new Date(d.returnEmailSentAt).getTime()) >= twoWeeksMs) return true;
+      return false;
+    }).length;
 
     return [
       { label: 'Total Devices', value: devices.length, icon: Monitor, color: 'bg-blue-500' },
