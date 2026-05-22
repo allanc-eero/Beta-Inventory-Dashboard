@@ -295,6 +295,7 @@ function StatusBadge({ status }: { status: DeviceStatus }) {
     not_online: { class: 'status-checked-out', label: 'Not Online' },
     in_repair: { class: 'status-in-repair', label: 'In Repair' },
     in_testing: { class: 'status-in-testing', label: 'In Testing' },
+    pending_return: { class: 'bg-orange-100 text-orange-700', label: 'Pending Return' },
     deactivated: { class: 'bg-gray-100 text-gray-600', label: 'Deactivated' },
   };
 

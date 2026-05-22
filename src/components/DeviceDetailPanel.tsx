@@ -60,6 +60,7 @@ const STATUS_CONFIG: Record<string, { class: string; label: string }> = {
   not_online: { class: 'status-checked-out', label: 'Not Online' },
   in_testing: { class: 'status-in-testing', label: 'In Testing' },
   in_repair: { class: 'status-in-repair', label: 'In Repair' },
+  pending_return: { class: 'bg-orange-100 text-orange-700', label: 'Pending Return' },
   deactivated: { class: 'bg-gray-100 text-gray-600', label: 'Deactivated' },
 };
 
@@ -186,48 +187,96 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose }: De
               </SectionBlock>
             )}
 
-            {/* Email Tracking */}
-            {(device.returnEmailSentAt || device.status === 'deactivated') && (
+            {/* Email Tracking & Return Escalation */}
+            {(device.returnEmailSentAt || device.status === 'deactivated' || device.status === 'pending_return') && (
               <SectionBlock title="RETURN STATUS">
-                {device.returnEmailSentAt && (
+                {device.returnEmailSentAt && (() => {
+                  const daysSinceSent = Math.floor((Date.now() - new Date(device.returnEmailSentAt).getTime()) / (1000 * 60 * 60 * 24));
+                  const isWeek1 = daysSinceSent >= 7 && daysSinceSent < 14;
+                  const isWeek2 = daysSinceSent >= 14;
+                  return (
+                    <>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">EMAIL SENT</span>
+                        <span className="text-sm text-green-700">{new Date(device.returnEmailSentAt).toLocaleDateString()} ({device.returnEmailCount || 1}× sent) · {daysSinceSent} day(s) ago</span>
+                      </div>
+                      {device.returnReminderSentAt && (
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">REMINDER SENT</span>
+                          <span className="text-sm text-orange-600">{new Date(device.returnReminderSentAt).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {/* Week 1 escalation: send follow-up */}
+                      {isWeek1 && device.status === 'pending_return' && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-xs font-medium text-yellow-800 mb-2">⏰ 1 week since return request — send a follow-up reminder</p>
+                          <button
+                            onClick={() => {
+                              const testerName = device.assignedTo || 'Team Member';
+                              const subject = encodeURIComponent(`[Follow-up] Please return your eero device — ${device.serialNumber}`);
+                              const body = encodeURIComponent(`Hi ${testerName},\n\nThis is a friendly follow-up. We sent a return request on ${new Date(device.returnEmailSentAt!).toLocaleDateString()} for your eero device (${device.serialNumber}).\n\nPlease return it at your earliest convenience. If you've already shipped it, reply with the tracking number.\n\nThank you,\nDevice Management Team`);
+                              window.open(`mailto:${device.assignedEmail}?subject=${subject}&body=${body}`, '_self');
+                              updateDevice(device.id, { returnReminderSentAt: new Date().toISOString(), returnEmailCount: (device.returnEmailCount || 1) + 1 });
+                              addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'reminder_sent', user: 'Admin', description: `Week 1 follow-up reminder sent to ${device.assignedEmail}` });
+                            }}
+                            className="px-4 py-1.5 text-xs font-medium text-yellow-800 border border-yellow-300 rounded-md hover:bg-yellow-100"
+                          >
+                            Send Follow-up Reminder
+                          </button>
+                        </div>
+                      )}
+                      {/* Week 2 escalation: contact directly or brick */}
+                      {isWeek2 && device.status === 'pending_return' && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-xs font-medium text-red-800 mb-2">🚨 2+ weeks since return request — escalate: contact tester directly or brick the device</p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const testerName = device.assignedTo || 'Team Member';
+                                const subject = encodeURIComponent(`[URGENT] eero device return overdue — ${device.serialNumber}`);
+                                const body = encodeURIComponent(`Hi ${testerName},\n\nThis is an urgent follow-up. Your eero device (${device.serialNumber}) was requested for return on ${new Date(device.returnEmailSentAt!).toLocaleDateString()} — over 2 weeks ago.\n\nPlease return this device immediately or contact us to discuss. If we don't hear back, the device may be remotely deactivated.\n\nThank you,\nDevice Management Team`);
+                                window.open(`mailto:${device.assignedEmail}?subject=${subject}&body=${body}`, '_self');
+                                updateDevice(device.id, { returnReminderSentAt: new Date().toISOString(), returnEmailCount: (device.returnEmailCount || 1) + 1 });
+                                addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'reminder_sent', user: 'Admin', description: `Week 2 URGENT reminder sent to ${device.assignedEmail}` });
+                              }}
+                              className="px-4 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-100"
+                            >
+                              Send Urgent Reminder
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Brick device ${device.serialNumber}? This will permanently deactivate it via the Partner API. This cannot be undone.`)) {
+                                  updateDevice(device.id, { status: 'deactivated' as any, deactivated: true });
+                                  addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'bricked', user: 'Admin', description: `Device bricked after 2+ weeks with no return. Previously assigned to ${device.assignedEmail}` });
+                                }
+                              }}
+                              className="px-4 py-1.5 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                            >
+                              Brick Device
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {/* Confirm return received button */}
+                      {device.status === 'pending_return' && (
+                        <button
+                          onClick={() => {
+                            updateDevice(device.id, { status: 'deactivated' as any, deactivated: true });
+                            addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'return_confirmed', user: 'Admin', description: `Device return confirmed. Marked as deactivated.` });
+                          }}
+                          className="mt-3 px-4 py-2 text-sm font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 w-full text-center"
+                        >
+                          ✓ Confirm Device Received — Mark as Deactivated
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+                {!device.returnEmailSentAt && device.status === 'pending_return' && (
                   <div className="flex items-baseline gap-3">
-                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">EMAIL SENT</span>
-                    <span className="text-sm text-green-700">{new Date(device.returnEmailSentAt).toLocaleDateString()} ({device.returnEmailCount || 1}×)</span>
+                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">STATUS</span>
+                    <span className="text-sm text-orange-600">Pending return — no email sent yet</span>
                   </div>
-                )}
-                {device.returnReminderSentAt && (
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">REMINDER SENT</span>
-                    <span className="text-sm text-orange-600">{new Date(device.returnReminderSentAt).toLocaleDateString()}</span>
-                  </div>
-                )}
-                {!device.returnEmailSentAt && (
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">EMAIL SENT</span>
-                    <span className="text-sm text-gray-400">No return email sent</span>
-                  </div>
-                )}
-                {device.returnEmailSentAt && device.status === 'deactivated' && (
-                  <button
-                    onClick={() => {
-                      const testerName = device.assignedTo || device.checkedOutTo || 'Team Member';
-                      const subject = encodeURIComponent(`[Follow-up] Please return your eero device — ${device.serialNumber}`);
-                      const body = encodeURIComponent(`Hi ${testerName},\n\nThis is a follow-up regarding the return of your eero device.\n\nDevice: ${device.serialNumber} (${device.model})\n\nWe sent a return request on ${new Date(device.returnEmailSentAt!).toLocaleDateString()} but haven't received the device back yet. Please return it at your earliest convenience.\n\nIf you've already shipped it, please disregard this message and reply with the tracking number.\n\nThank you,\nDevice Management Team`);
-                      window.open(`mailto:${device.assignedEmail}?subject=${subject}&body=${body}`, '_self');
-                      updateDevice(device.id, { returnReminderSentAt: new Date().toISOString(), returnEmailCount: (device.returnEmailCount || 1) + 1 });
-                      addHistoryEntry({
-                        id: crypto.randomUUID(),
-                        deviceId: device.id,
-                        timestamp: new Date().toISOString(),
-                        action: 'reminder_sent',
-                        user: 'Admin',
-                        description: `Follow-up reminder email sent to ${device.assignedEmail} for device return`,
-                      });
-                    }}
-                    className="mt-2 px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50 w-full text-center"
-                  >
-                    Send Return Reminder
-                  </button>
                 )}
               </SectionBlock>
             )}

@@ -1,4 +1,4 @@
-export type DeviceStatus = 'online' | 'not_online' | 'in_repair' | 'in_testing' | 'deactivated';
+export type DeviceStatus = 'online' | 'not_online' | 'in_repair' | 'in_testing' | 'deactivated' | 'pending_return';
 
 export type ShipmentStatus = 'ordered' | 'in_transit_to_fc' | 'at_fc' | 'in_transit_to_tester' | 'delivered' | 'online';
 

@@ -107,16 +107,19 @@ Device Management Team`);
     const epic = epicMap[program] || 'GENERAL-RETURNS';
     const ticketKey = `QA-${Math.floor(Math.random() * 90000) + 10000}`;
 
-    // Process each device (deactivate without individual JIRA tickets)
+    // Process each device — mark as pending return (not deactivated until confirmed)
     uniqueDevices.forEach((device) => {
-      updateDevice(device.id, { status: 'deactivated' as any, deactivated: true });
+      const newStatus = willBrick ? 'deactivated' : 'pending_return';
+      updateDevice(device.id, { status: newStatus as any, deactivated: willBrick });
       addHistoryEntry({
         id: crypto.randomUUID(),
         deviceId: device.id,
         timestamp: new Date().toISOString(),
-        action: 'deactivated',
+        action: willBrick ? 'deactivated' : 'return_requested',
         user: 'Admin',
-        description: `Bulk return — reason: ${reason.replace(/_/g, ' ')}${willBrick ? ' (bricked via API)' : ''}. Consolidated JIRA: ${ticketKey}. ${notes}`,
+        description: willBrick
+          ? `Bulk return — reason: ${reason.replace(/_/g, ' ')} (bricked via API). Consolidated JIRA: ${ticketKey}. ${notes}`
+          : `Return requested — reason: ${reason.replace(/_/g, ' ')}. Device marked as pending return. Consolidated JIRA: ${ticketKey}. ${notes}`,
       });
 
       // If bricking, log the API call
@@ -482,7 +485,7 @@ Device Management Team`);
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-green-500 mt-0.5">✓</span>
-              <p className="text-sm text-gray-700"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as deactivated</p>
+              <p className="text-sm text-gray-700"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as {willBrick ? 'deactivated (bricked)' : 'pending return'}</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-green-500 mt-0.5">✓</span>
