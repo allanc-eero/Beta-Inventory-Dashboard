@@ -39,6 +39,9 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const email = formData.assignedEmail.trim().toLowerCase();
+    const profile = email ? getTesterProfile(email) : undefined;
+
     const device: Device = {
       id: crypto.randomUUID(),
       serialNumber: formData.serialNumber,
@@ -47,23 +50,23 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
       revision: '',
       revisionNotes: '',
       hardwareConfig: '',
-      mac: '', // Populated by API sync
+      mac: '',
       internalName: formData.internalName,
       sku: '',
       partNumber: '',
-      country: '',
-      adminId: '',
+      country: profile?.country || '',
+      adminId: profile?.adminId || '',
       unitId: '',
       deactivated: false,
-      firmwareVersion: '', // Populated by API sync
+      firmwareVersion: '',
       status: 'not_online' as DeviceStatus,
-      assignedTo: formData.assignedTo,
+      assignedTo: formData.assignedTo || profile?.name || '',
       assignedEmail: formData.assignedEmail,
-      contactEmail: '',
-      alternateEmail: '',
-      location: '', // Populated by API sync
+      contactEmail: profile?.contactEmail || '',
+      alternateEmail: profile?.alternateEmail || '',
+      location: profile?.location || '',
       adminLocation: '',
-      network: '',
+      network: profile?.networkId || '',
       program: formData.program,
       assetTag: '',
       poExpensify: '',
@@ -75,7 +78,7 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
       eid: '',
       tracking: '',
       jira: '',
-      checkedOutTo: formData.assignedTo,
+      checkedOutTo: formData.assignedTo || profile?.name || '',
       checkedOutDate: formData.assignedTo ? new Date().toISOString() : '',
       dueDate: '',
       notes: formData.notes,
@@ -95,29 +98,9 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
 
     addDevice(device);
 
-    // Apply tester profile to auto-fill known fields (country, location, network, etc.)
-    const email = formData.assignedEmail.trim().toLowerCase();
+    // Upsert tester profile
     if (email) {
-      const profile = getTesterProfile(email);
-      if (profile) {
-        const profileUpdates: Partial<Device> = {};
-        if (profile.contactEmail) profileUpdates.contactEmail = profile.contactEmail;
-        if (profile.alternateEmail) profileUpdates.alternateEmail = profile.alternateEmail;
-        if (profile.country) profileUpdates.country = profile.country;
-        if (profile.location) profileUpdates.location = profile.location;
-        if (profile.networkId) profileUpdates.network = profile.networkId;
-        if (profile.adminId) profileUpdates.adminId = profile.adminId;
-        if (Object.keys(profileUpdates).length > 0) {
-          // Use setTimeout to ensure device is in store first
-          setTimeout(() => useDeviceStore.getState().updateDevice(device.id, profileUpdates), 0);
-        }
-      }
-      // Also upsert the profile with any new info
-      upsertTesterProfile({
-        email,
-        name: formData.assignedTo,
-        programs: [formData.program],
-      });
+      upsertTesterProfile({ email, name: formData.assignedTo, programs: [formData.program] });
     }
 
     // Log creation to history
