@@ -275,7 +275,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Shipments & Allocation</h2>
+        <h2 className="text-lg font-bold text-gray-900">Device Ingestion & Returns</h2>
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setActiveView('upload')}
@@ -287,7 +287,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             onClick={() => setActiveView('history')}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeView === 'history' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            Shipment History ({allShipments.length})
+            Ingestion History ({allShipments.length})
           </button>
           <button
             onClick={() => setActiveView('pending_returns')}
