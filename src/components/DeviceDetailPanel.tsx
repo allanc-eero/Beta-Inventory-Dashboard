@@ -94,7 +94,7 @@ function exportDeviceCSV(device: Device) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DeviceDetailPanel({ device: initialDevice, onClose, onNavigateToPerson }: DeviceDetailPanelProps) {
-  const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
+  const { devices, updateDevice, addHistoryEntry, getTesterProfile } = useDeviceStore();
   const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(device);
@@ -180,7 +180,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
                       >
                         {device.assignedTo || device.checkedOutTo} →
                       </button>
-                      {(() => { const { getTesterProfile } = useDeviceStore.getState(); const p = getTesterProfile(device.assignedEmail || ''); return p?.testerId ? <span className="text-xs font-mono text-gray-400">{p.testerId}</span> : null; })()}
+                      {(() => { const p = getTesterProfile(device.assignedEmail || ''); return p?.testerId ? <span className="text-xs font-mono text-gray-400">{p.testerId}</span> : null; })()}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-900">{device.assignedTo || device.checkedOutTo || '—'}</span>
