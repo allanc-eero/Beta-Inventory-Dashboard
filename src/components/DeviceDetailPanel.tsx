@@ -173,12 +173,15 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
                 <div className="flex items-baseline gap-3">
                   <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ASSIGNED TO</span>
                   {(device.assignedTo || device.checkedOutTo) && onNavigateToPerson ? (
-                    <button
-                      onClick={() => onNavigateToPerson(device.assignedEmail || device.assignedTo || '')}
-                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      {device.assignedTo || device.checkedOutTo} →
-                    </button>
+                    <span className="flex items-center gap-2">
+                      <button
+                        onClick={() => onNavigateToPerson(device.assignedEmail || device.assignedTo || '')}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {device.assignedTo || device.checkedOutTo} →
+                      </button>
+                      {(() => { const { getTesterProfile } = useDeviceStore.getState(); const p = getTesterProfile(device.assignedEmail || ''); return p?.testerId ? <span className="text-xs font-mono text-gray-400">{p.testerId}</span> : null; })()}
+                    </span>
                   ) : (
                     <span className="text-sm text-gray-900">{device.assignedTo || device.checkedOutTo || '—'}</span>
                   )}

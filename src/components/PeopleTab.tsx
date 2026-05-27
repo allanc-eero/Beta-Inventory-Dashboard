@@ -229,6 +229,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 truncate">{person.name}</h3>
                         <p className="text-xs text-gray-500 truncate">{person.email}</p>
+                        {(() => { const p = getTesterProfile(person.email); return p?.testerId ? <p className="text-xs text-gray-400 font-mono">{p.testerId}</p> : null; })()}
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
@@ -308,10 +309,12 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           </span>
                         </div>
                         <div>
-                          <h2 className="text-xl font-bold text-gray-900">{personName}</h2>
-                          {profile?.testerId && (
-                            <p className="text-xs text-gray-400 font-mono mt-0.5">{profile.testerId}</p>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-gray-900">{personName}</h2>
+                            {profile?.testerId && (
+                              <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{profile.testerId}</span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-500 mt-1">
                             {selectedPersonDevices.length} device(s) · {selectedPersonDevices.filter((d) => d.status === 'online').length} online · {selectedPersonDevices.filter((d) => d.status === 'deactivated').length} archived
                           </p>
