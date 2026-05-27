@@ -369,50 +369,95 @@ Device Management Team`
           </div>
         </div>
 
-        {/* Device list */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Assigned To</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {selectedDevices.map((device) => (
-                <tr key={device.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs">
-                    <button
-                      onClick={() => setDetailDevice(device)}
-                      className="text-blue-700 font-medium hover:underline cursor-pointer"
-                    >
-                      {device.serialNumber}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{device.assignedTo || device.assignedEmail || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${device.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {device.status.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={deviceActions[device.id] || 'archive'}
-                      onChange={(e) => setDeviceActions({ ...deviceActions, [device.id]: e.target.value as DeviceAction })}
-                      className="px-2 py-1 text-xs border border-gray-200 rounded-md"
-                    >
-                      <option value="return">Return to eero</option>
-                      <option value="brick_and_return">Brick & Return</option>
-                      <option value="archive">Archive</option>
-                    </select>
-                  </td>
-                </tr>
+        {/* Device list — grouped by region/country */}
+        {(() => {
+          const grouped: Record<string, typeof selectedDevices> = {};
+          selectedDevices.forEach((d) => {
+            const region = d.country || 'Unknown Region';
+            if (!grouped[region]) grouped[region] = [];
+            grouped[region].push(d);
+          });
+          const regions = Object.keys(grouped).sort();
+
+          return (
+            <div className="space-y-4">
+              {regions.map((region) => (
+                <div key={region} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-700">📍 {region}</span>
+                      <span className="text-xs text-gray-400">{grouped[region].length} device(s)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Set region to:</span>
+                      <button
+                        onClick={() => {
+                          const updated = { ...deviceActions };
+                          grouped[region].forEach((d) => { updated[d.id] = 'brick_and_return'; });
+                          setDeviceActions(updated);
+                        }}
+                        className="px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200 rounded hover:bg-red-50"
+                      >
+                        Brick & Return
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated = { ...deviceActions };
+                          grouped[region].forEach((d) => { updated[d.id] = 'archive'; });
+                          setDeviceActions(updated);
+                        }}
+                        className="px-2 py-0.5 text-xs font-medium text-gray-600 border border-gray-200 rounded hover:bg-gray-100"
+                      >
+                        Archive
+                      </button>
+                    </div>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Serial</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Assigned To</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {grouped[region].map((device) => (
+                        <tr key={device.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 font-mono text-xs">
+                            <button
+                              onClick={() => setDetailDevice(device)}
+                              className="text-blue-700 font-medium hover:underline cursor-pointer"
+                            >
+                              {device.serialNumber}
+                            </button>
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-600">{device.assignedTo || device.assignedEmail || '—'}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${device.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {device.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <select
+                              value={deviceActions[device.id] || 'archive'}
+                              onChange={(e) => setDeviceActions({ ...deviceActions, [device.id]: e.target.value as DeviceAction })}
+                              className="px-2 py-1 text-xs border border-gray-200 rounded-md"
+                            >
+                              <option value="return">Return to eero</option>
+                              <option value="brick_and_return">Brick & Return</option>
+                              <option value="archive">Archive</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          );
+        })()}
       </div>
 
       {detailDevice && (
