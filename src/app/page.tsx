@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
 import Navbar from '@/components/Navbar';
 import DevicesTab from '@/components/DevicesTab';
@@ -18,6 +18,9 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('devices');
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const handleSetActiveTab = (tab: TabType) => {
     setActiveTab(tab);
@@ -30,6 +33,21 @@ export default function Home() {
     setSelectedPersonEmail(email);
     setActiveTab('people');
   };
+
+  // Prevent hydration mismatch — don't render data-dependent content until client is ready
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-12">
+          <div className="animate-pulse space-y-4">
+            <div className="h-24 bg-gray-200 rounded-xl" />
+            <div className="h-12 bg-gray-200 rounded-xl" />
+            <div className="h-96 bg-gray-200 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SeedDataProvider>
