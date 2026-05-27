@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Device } from '@/types';
+import { Device, DeviceStatus } from '@/types';
 import { ExternalLink, RefreshCw, Edit2, Clock, Download } from 'lucide-react';
 import { useDeviceStore } from '@/store/deviceStore';
 import FirmwarePanel from './FirmwarePanel';
@@ -94,7 +94,7 @@ function exportDeviceCSV(device: Device) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DeviceDetailPanel({ device: initialDevice, onClose, onNavigateToPerson }: DeviceDetailPanelProps) {
-  const { devices, updateDevice, checkinDevice, addHistoryEntry } = useDeviceStore();
+  const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
   const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(device);
@@ -267,7 +267,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
                             <button
                               onClick={() => {
                                 if (confirm(`Brick device ${device.serialNumber}? This will permanently deactivate it via the Partner API. This cannot be undone.`)) {
-                                  updateDevice(device.id, { status: 'deactivated' as any, deactivated: true });
+                                  updateDevice(device.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
                                   addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'bricked', user: 'Admin', description: `Device bricked after 2+ weeks with no return. Previously assigned to ${device.assignedEmail}` });
                                 }
                               }}
@@ -282,7 +282,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
                       {device.status === 'pending_return' && (
                         <button
                           onClick={() => {
-                            updateDevice(device.id, { status: 'deactivated' as any, deactivated: true });
+                            updateDevice(device.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
                             addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'return_confirmed', user: 'Admin', description: `Device return confirmed. Marked as deactivated.` });
                           }}
                           className="mt-3 px-4 py-2 text-sm font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 w-full text-center"

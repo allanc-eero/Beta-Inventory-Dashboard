@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
-import { Carrier, Shipment, Device, ShipmentStatus } from '@/types';
+import { Carrier, Shipment, Device, ShipmentStatus, DeviceStatus } from '@/types';
 import * as XLSX from 'xlsx';
 
 const CARRIERS: Carrier[] = ['UPS', 'USPS', 'FedEx', 'DHL', 'Other'];
@@ -527,7 +527,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                           <td className="px-4 py-3">
                             <button
                               onClick={() => {
-                                updateDevice(d.id, { status: 'deactivated' as any, deactivated: true });
+                                updateDevice(d.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
                                 addHistoryEntry({
                                   id: crypto.randomUUID(),
                                   deviceId: d.id,

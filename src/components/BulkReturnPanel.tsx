@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Device } from '@/types';
+import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 
 interface BulkReturnPanelProps {
@@ -110,7 +110,7 @@ Device Management Team`);
     // Process each device — mark as pending return (not deactivated until confirmed)
     uniqueDevices.forEach((device) => {
       const newStatus = willBrick ? 'deactivated' : 'pending_return';
-      updateDevice(device.id, { status: newStatus as any, deactivated: willBrick });
+      updateDevice(device.id, { status: newStatus as DeviceStatus, deactivated: willBrick });
       addHistoryEntry({
         id: crypto.randomUUID(),
         deviceId: device.id,

@@ -5,13 +5,11 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
 
-type ProgramStatus = 'active' | 'completed' | 'archived';
-type DeviceAction = 'return' | 'release' | 'move' | 'archive' | 'brick_and_return';
+type DeviceAction = 'return' | 'archive' | 'brick_and_return';
 
 interface ProgramInfo {
   name: Program;
   label: string;
-  status: ProgramStatus;
   deviceCount: number;
   onlineCount: number;
   offlineCount: number;
@@ -34,9 +32,7 @@ export default function ProgramsTab() {
   const [closingProgram, setClosingProgram] = useState(false);
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
   const [deviceActions, setDeviceActions] = useState<Record<string, DeviceAction>>({});
-  const [moveTarget, setMoveTarget] = useState<Program>('dogfood');
   const [processing, setProcessing] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
   const [processResults, setProcessResults] = useState<{
     emailsSent: { email: string; deviceCount: number }[];
     devicesBricked: string[];
@@ -54,7 +50,6 @@ export default function ProgramsTab() {
         return {
           name,
           label: PROGRAM_LABELS[name],
-          status: 'active' as ProgramStatus,
           deviceCount: programDevices.length,
           onlineCount: programDevices.filter((d) => d.status === 'online').length,
           offlineCount: programDevices.filter((d) => d.status === 'not_online').length,
@@ -125,32 +120,6 @@ export default function ProgramsTab() {
             action: 'program_closed',
             user: 'Admin',
             description: `Device bricked & marked for return to eero. Return email will be sent to ${device.assignedEmail || device.assignedTo || 'assignee'}.`,
-          });
-          break;
-
-        case 'release':
-          // Release to tester — clear program tracking, keep assignee
-          updateDevice(deviceId, { program: 'other' as Program, notes: `${device.notes}\n[Released to tester at end of ${selectedProgram} program]` });
-          addHistoryEntry({
-            id: crypto.randomUUID(),
-            deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'program_closed',
-            user: 'Admin',
-            description: `Program ${selectedProgram} closed — device released to tester (${device.assignedTo || device.assignedEmail})`,
-          });
-          break;
-
-        case 'move':
-          // Move to next program
-          updateDevice(deviceId, { program: moveTarget });
-          addHistoryEntry({
-            id: crypto.randomUUID(),
-            deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'program_closed',
-            user: 'Admin',
-            description: `Program ${selectedProgram} closed — device moved to ${moveTarget}`,
           });
           break;
 
@@ -323,8 +292,6 @@ Device Management Team`
     const actionCounts = {
       return: Object.values(deviceActions).filter((a) => a === 'return').length,
       brick_and_return: Object.values(deviceActions).filter((a) => a === 'brick_and_return').length,
-      release: Object.values(deviceActions).filter((a) => a === 'release').length,
-      move: Object.values(deviceActions).filter((a) => a === 'move').length,
       archive: Object.values(deviceActions).filter((a) => a === 'archive').length,
     };
 
@@ -494,12 +461,6 @@ Device Management Team`
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-gray-900">Programs</h2>
       </div>
-
-      {successMsg && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
-          <p className="text-sm text-green-700 font-medium">{successMsg}</p>
-        </div>
-      )}
 
       {/* Active program cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, DeviceStatus, Program } from '@/types';
-import { Search, Filter, Plus, RefreshCw, ChevronDown, Edit2, Monitor } from 'lucide-react';
+import { Search, Plus, Monitor } from 'lucide-react';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import AddDeviceModal from './AddDeviceModal';
 import BulkReturnPanel from './BulkReturnPanel';
@@ -42,14 +42,6 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
       return matchesSearch && matchesStatus && matchesProgram && matchesModel;
     });
   }, [devices, search, statusFilter, programFilter, modelFilter]);
-
-  const toggleSelectAll = () => {
-    if (selectedDevices.size === filteredDevices.length) {
-      setSelectedDevices(new Set());
-    } else {
-      setSelectedDevices(new Set(filteredDevices.map((d) => d.id)));
-    }
-  };
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedDevices);
