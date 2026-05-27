@@ -17,6 +17,7 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
   const [brickDevices, setBrickDevices] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [emailSubject, setEmailSubject] = useState('[Action Required] Return {count} eero device(s)');
   const [emailBody, setEmailBody] = useState(`Hi {name},
 
@@ -575,15 +576,83 @@ Device Management Team`);
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={() => setShowPreview(true)}
             disabled={processing || (willBrick && !confirmed)}
             className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${
               willBrick ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {processing ? 'Processing...' : willBrick ? `Brick & Deactivate ${uniqueDevices.length} Device(s)` : `Submit (${uniqueDevices.length} devices)`}
+            Preview Changes →
           </button>
         </div>
+
+        {/* Preview Modal */}
+        {showPreview && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreview(false)} />
+            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[70vh] overflow-y-auto p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-1">Preview: Bulk Return</h2>
+              <p className="text-xs text-gray-400 mb-4">Generated: {new Date().toLocaleString()} · Nothing has been changed yet.</p>
+
+              {/* What will happen */}
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <span className="text-lg">📦</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{uniqueDevices.length} device(s) will be marked as {willBrick ? 'BRICKED & DEACTIVATED' : 'Pending Return'}</p>
+                    <p className="text-xs text-gray-500">{willBrick ? 'Permanently deactivated via Partner API — cannot be undone' : 'Return emails will be sent. Devices stay active until confirmed received.'}</p>
+                  </div>
+                </div>
+
+                {willBrick && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-xs font-semibold text-red-800 mb-2">🚨 Devices being bricked:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {uniqueDevices.map((d) => (
+                        <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {requiresReturn && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs font-medium text-blue-800">{assigneeCount} return email(s) will be sent (grouped by region, from beta-teams@eero.com)</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Affected testers */}
+              <div className="mb-6">
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Affected testers</p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {Object.entries(groupedByAssignee).filter(([k]) => k !== 'unassigned').map(([email, devs]) => (
+                    <div key={email} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
+                      <span className="text-gray-700">{devs[0].assignedTo || email}</span>
+                      <span className="text-gray-400">{email} · {devs.length} device(s) · {devs[0].country || '?'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  ← Go Back & Edit
+                </button>
+                <button
+                  onClick={() => { setShowPreview(false); handleSubmit(); }}
+                  className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg ${willBrick ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {willBrick ? `Confirm & Brick ${uniqueDevices.length} Device(s)` : `Confirm & Process ${uniqueDevices.length} Device(s)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
