@@ -33,6 +33,7 @@ export default function ProgramsTab() {
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
   const [deviceActions, setDeviceActions] = useState<Record<string, DeviceAction>>({});
   const [processing, setProcessing] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [processResults, setProcessResults] = useState<{
     emailsSent: { email: string; deviceCount: number }[];
     devicesBricked: string[];
@@ -319,7 +320,7 @@ Device Management Team`
             <button onClick={() => handleSetAllActions('archive')} className="px-3 py-1.5 text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100">Archive</button>
           </div>
 
-          {/* Summary counts + Process button */}
+          {/* Summary counts + Preview button */}
           <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100">
             <div className="flex items-center gap-3 text-xs">
               <span className="text-red-700 font-medium">{actionCounts.return} return</span>
@@ -327,14 +328,123 @@ Device Management Team`
               <span className="text-gray-600 font-medium">{actionCounts.archive} archive</span>
             </div>
             <button
-              onClick={handleProcessClose}
+              onClick={() => setShowPreview(true)}
               disabled={processing}
               className="ml-auto px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {processing ? 'Processing...' : `Close Program & Process ${selectedDevices.length} Devices`}
+              Preview Changes →
             </button>
           </div>
         </div>
+
+        {/* Dry Run Preview Modal */}
+        {showPreview && (() => {
+          const brickDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'brick_and_return');
+          const returnDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'return');
+          const archiveDevices = selectedDevices.filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive');
+
+          // Group by region for the preview
+          const brickByRegion: Record<string, Device[]> = {};
+          brickDevices.forEach((d) => { const r = d.country || 'Unknown'; if (!brickByRegion[r]) brickByRegion[r] = []; brickByRegion[r].push(d); });
+          const returnByRegion: Record<string, Device[]> = {};
+          returnDevices.forEach((d) => { const r = d.country || 'Unknown'; if (!returnByRegion[r]) returnByRegion[r] = []; returnByRegion[r].push(d); });
+          const archiveByRegion: Record<string, Device[]> = {};
+          archiveDevices.forEach((d) => { const r = d.country || 'Unknown'; if (!archiveByRegion[r]) archiveByRegion[r] = []; archiveByRegion[r].push(d); });
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreview(false)} />
+              <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">Preview: Close Program {PROGRAM_LABELS[selectedProgram]}</h2>
+                <p className="text-sm text-gray-500 mb-6">Review exactly what will happen before executing. Nothing has been changed yet.</p>
+
+                {/* Brick & Return section */}
+                {brickDevices.length > 0 && (
+                  <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-red-800 mb-2">🚨 BRICK & RETURN — {brickDevices.length} device(s)</h3>
+                    <p className="text-xs text-red-600 mb-3">These devices will be permanently deactivated via the Partner API. They will never connect to a network again. Return emails will be sent.</p>
+                    {Object.entries(brickByRegion).map(([region, devices]) => (
+                      <div key={region} className="mb-2">
+                        <p className="text-xs font-medium text-red-700">📍 {region} ({devices.length})</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Return section */}
+                {returnDevices.length > 0 && (
+                  <div className="mb-5 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-orange-800 mb-2">📦 RETURN TO EERO — {returnDevices.length} device(s)</h3>
+                    <p className="text-xs text-orange-600 mb-3">These devices will be marked as "Pending Return." Return emails will be sent. Devices stay active until you confirm receipt.</p>
+                    {Object.entries(returnByRegion).map(([region, devices]) => (
+                      <div key={region} className="mb-2">
+                        <p className="text-xs font-medium text-orange-700">📍 {region} ({devices.length})</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Archive section */}
+                {archiveDevices.length > 0 && (
+                  <div className="mb-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">📁 ARCHIVE — {archiveDevices.length} device(s)</h3>
+                    <p className="text-xs text-gray-500 mb-3">These devices will be marked as deactivated. Data is preserved. No emails sent.</p>
+                    {Object.entries(archiveByRegion).map(([region, devices]) => (
+                      <div key={region} className="mb-2">
+                        <p className="text-xs font-medium text-gray-600">📍 {region} ({devices.length})</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Summary */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6">
+                  <h3 className="text-sm font-semibold text-blue-800 mb-2">Summary</h3>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xl font-bold text-red-700">{brickDevices.length}</p>
+                      <p className="text-xs text-gray-600">Bricked</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-orange-600">{returnDevices.length}</p>
+                      <p className="text-xs text-gray-600">Pending Return</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-600">{archiveDevices.length}</p>
+                      <p className="text-xs text-gray-600">Archived</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    ← Go Back & Edit
+                  </button>
+                  <button
+                    onClick={() => { setShowPreview(false); handleProcessClose(); }}
+                    disabled={processing}
+                    className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${brickDevices.length > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  >
+                    {processing ? 'Processing...' : `Confirm & Execute (${selectedDevices.length} devices)`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Device list — grouped by region/country */}
         {(() => {
