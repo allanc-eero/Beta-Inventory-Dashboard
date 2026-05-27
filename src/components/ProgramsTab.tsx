@@ -378,9 +378,27 @@ Device Management Team`
             grouped[region].push(d);
           });
           const regions = Object.keys(grouped).sort();
+          const missingRegion = grouped['Unknown Region'] || [];
 
           return (
             <div className="space-y-4">
+              {/* Warning for devices missing region data */}
+              {missingRegion.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-red-600">⚠️</span>
+                    <span className="text-sm font-semibold text-red-800">{missingRegion.length} device(s) missing region/country data</span>
+                  </div>
+                  <p className="text-xs text-red-700 mb-2">These devices have no country assigned. Update them in the device detail or re-import with the Country column filled in.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {missingRegion.map((d) => (
+                      <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                        {d.serialNumber} ({d.assignedTo || d.assignedEmail || 'unassigned'})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {regions.map((region) => (
                 <div key={region} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
