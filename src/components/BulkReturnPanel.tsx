@@ -192,7 +192,7 @@ Device Management Team`);
 
         // Open email (only for first tester to avoid popup blocking)
         if (email === Object.keys(groupedByAssignee)[0]) {
-          window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_self');
+          window.open(`mailto:${email}?from=beta-teams@eero.com&subject=${subject}&body=${body}`, '_self');
         }
 
         // Generate shipping label for this tester
@@ -419,18 +419,17 @@ Device Management Team`);
           </div>
         </div>
 
-        {/* Email Template + Per-Tester Editable Emails */}
+        {/* Email Template + Region-Grouped Emails */}
         {requiresReturn && Object.keys(groupedByAssignee).filter((k) => k !== 'unassigned').length > 0 && (
           <div className="bg-white rounded-xl border border-blue-200 p-6 mb-8">
-            <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">📧 Emails to Testers</h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Each tester gets their own email asking for only the device(s) selected above. Edit any email individually before sending.
+            <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">📧 Emails to Testers — Grouped by Region</h3>
+            <p className="text-xs text-gray-500 mb-2">
+              Emails are grouped by region since return instructions differ per country. Edit each region's template independently. Sent from: <strong>beta-teams@eero.com</strong>
             </p>
 
             <div className="mb-4">
               <button
                 onClick={() => {
-                  // Reset all per-tester emails from template
                   const reset: Record<string, string> = {};
                   Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
                     if (email === 'unassigned') return;
@@ -449,33 +448,58 @@ Device Management Team`);
               </button>
             </div>
 
-            <div className="space-y-4 max-h-[500px] overflow-y-auto">
-              {Object.entries(groupedByAssignee)
-                .filter(([key]) => key !== 'unassigned')
-                .map(([email, assigneeDevices]) => (
-                  <div key={email} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">To: {email}</span>
-                      <span className="text-xs text-gray-400">{assigneeDevices.length} device(s) from this return</span>
+            {/* Group by region */}
+            {(() => {
+              // Build region → emails mapping
+              const regionEmails: Record<string, { email: string; devices: Device[] }[]> = {};
+              Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
+                if (email === 'unassigned') return;
+                const region = assigneeDevices[0]?.country || 'Unknown Region';
+                if (!regionEmails[region]) regionEmails[region] = [];
+                regionEmails[region].push({ email, devices: assigneeDevices });
+              });
+              const regions = Object.keys(regionEmails).sort();
+
+              return (
+                <div className="space-y-6 max-h-[600px] overflow-y-auto">
+                  {regions.map((region) => (
+                    <div key={region} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-700">📍 {region}</span>
+                          <span className="text-xs text-gray-400">{regionEmails[region].length} tester(s) · {regionEmails[region].reduce((sum, t) => sum + t.devices.length, 0)} device(s)</span>
+                        </div>
+                        <span className="text-xs text-gray-400">From: beta-teams@eero.com</span>
+                      </div>
+
+                      <div className="divide-y divide-gray-100">
+                        {regionEmails[region].map(({ email, devices: testerDevices }) => (
+                          <div key={email} className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">To: {email}</span>
+                              <span className="text-xs text-gray-400">{testerDevices.length} device(s)</span>
+                            </div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                            <input
+                              type="text"
+                              value={(perTesterSubjects[email] || emailSubject).replace(/\{count\}/g, String(testerDevices.length))}
+                              onChange={(e) => setPerTesterSubjects({ ...perTesterSubjects, [email]: e.target.value })}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
+                            <textarea
+                              value={perTesterEmails[email] || ''}
+                              onChange={(e) => setPerTesterEmails({ ...perTesterEmails, [email]: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-mono resize-none h-32 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="p-4">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
-                      <input
-                        type="text"
-                        value={(perTesterSubjects[email] || emailSubject).replace(/\{count\}/g, String(assigneeDevices.length))}
-                        onChange={(e) => setPerTesterSubjects({ ...perTesterSubjects, [email]: e.target.value })}
-                        className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
-                      <textarea
-                        value={perTesterEmails[email] || ''}
-                        onChange={(e) => setPerTesterEmails({ ...perTesterEmails, [email]: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-mono resize-none h-40 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                ))}
-            </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 

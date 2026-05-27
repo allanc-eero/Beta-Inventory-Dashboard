@@ -184,7 +184,7 @@ Device Management Team`
 
       // Open email for first tester (browser limits multiple mailto)
       if (email === Object.keys(emailGroups)[0]) {
-        window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_self');
+        window.open(`mailto:${email}?from=beta-teams@eero.com&subject=${subject}&body=${body}`, '_self');
       }
     });
 
