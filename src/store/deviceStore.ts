@@ -117,6 +117,8 @@ interface DeviceStore {
   upsertTesterProfile: (profile: Partial<TesterProfile> & { email: string }) => void;
   getTesterProfile: (email: string) => TesterProfile | undefined;
   getAllTesterProfiles: () => TesterProfile[];
+  findDuplicateProfiles: (name: string, email: string) => TesterProfile[];
+  mergeProfiles: (targetId: string, sourceEmail: string) => void;
   applyTesterProfile: (deviceId: string, email: string) => void;
 
   // Bulk actions
@@ -831,10 +833,13 @@ export const useDeviceStore = create<DeviceStore>()(
       // ─── Tester Profiles ──────────────────────────────────────────────────
       upsertTesterProfile: (profileData) => {
         const email = profileData.email.toLowerCase().trim();
-        const existing = get().testerProfiles.find((p) => p.email.toLowerCase() === email);
+        // Search by primary email OR any additional email
+        const existing = get().testerProfiles.find((p) =>
+          p.email.toLowerCase() === email ||
+          (p.additionalEmails || []).some((e) => e.toLowerCase() === email)
+        );
 
         if (existing) {
-          // Update existing profile — only overwrite fields that have new non-empty values
           const updates: Partial<TesterProfile> = { updatedAt: new Date().toISOString() };
           if (profileData.name && profileData.name !== existing.name) updates.name = profileData.name;
           if (profileData.contactEmail && profileData.contactEmail !== existing.contactEmail) updates.contactEmail = profileData.contactEmail;
@@ -845,22 +850,31 @@ export const useDeviceStore = create<DeviceStore>()(
           if (profileData.adminId && profileData.adminId !== existing.adminId) updates.adminId = profileData.adminId;
           if (profileData.internetSpeed && profileData.internetSpeed !== existing.internetSpeed) updates.internetSpeed = profileData.internetSpeed;
           if (profileData.notes && profileData.notes !== existing.notes) updates.notes = profileData.notes;
-          // Merge programs list
+          // Merge programs
           if (profileData.programs) {
-            const merged = new Set([...existing.programs, ...profileData.programs]);
-            updates.programs = Array.from(merged);
+            updates.programs = Array.from(new Set([...existing.programs, ...profileData.programs]));
           }
+          // Merge additional emails — add the incoming email if it's not already tracked
+          const allEmails = new Set([...(existing.additionalEmails || []).map((e) => e.toLowerCase())]);
+          if (email !== existing.email.toLowerCase()) allEmails.add(email);
+          if (profileData.additionalEmails) profileData.additionalEmails.forEach((e) => allEmails.add(e.toLowerCase()));
+          updates.additionalEmails = Array.from(allEmails).filter((e) => e !== existing.email.toLowerCase());
 
           set((state) => ({
             testerProfiles: state.testerProfiles.map((p) =>
-              p.email.toLowerCase() === email ? { ...p, ...updates } : p
+              p.id === existing.id ? { ...p, ...updates } : p
             ),
           }));
         } else {
-          // Create new profile
+          // Generate stable tester ID (TST-XXXXX)
+          const nextNum = get().testerProfiles.length + 1;
+          const testerId = `TST-${String(nextNum).padStart(5, '0')}`;
+
           const newProfile: TesterProfile = {
             id: crypto.randomUUID(),
+            testerId,
             email: email,
+            additionalEmails: profileData.additionalEmails || [],
             name: profileData.name || '',
             contactEmail: profileData.contactEmail || '',
             alternateEmail: profileData.alternateEmail || '',
@@ -878,10 +892,47 @@ export const useDeviceStore = create<DeviceStore>()(
         }
       },
 
-      getTesterProfile: (email) =>
-        get().testerProfiles.find((p) => p.email.toLowerCase() === email.toLowerCase().trim()),
+      getTesterProfile: (email) => {
+        const e = email.toLowerCase().trim();
+        return get().testerProfiles.find((p) =>
+          p.email.toLowerCase() === e ||
+          (p.additionalEmails || []).some((a) => a.toLowerCase() === e)
+        );
+      },
 
       getAllTesterProfiles: () => get().testerProfiles,
+
+      findDuplicateProfiles: (name, email) => {
+        const nameLower = name.toLowerCase().trim();
+        const emailLower = email.toLowerCase().trim();
+        return get().testerProfiles.filter((p) => {
+          if (p.email.toLowerCase() === emailLower) return false; // exact match is not a "duplicate" — it's the same
+          // Check if name matches closely
+          if (nameLower && p.name.toLowerCase() === nameLower) return true;
+          // Check if email appears in additional emails
+          if ((p.additionalEmails || []).some((e) => e.toLowerCase() === emailLower)) return true;
+          // Check if first+last name words overlap significantly
+          const nameWords = nameLower.split(/\s+/);
+          const profileWords = p.name.toLowerCase().split(/\s+/);
+          const overlap = nameWords.filter((w) => profileWords.includes(w) && w.length > 2);
+          if (overlap.length >= 2) return true;
+          return false;
+        });
+      },
+
+      mergeProfiles: (targetId, sourceEmail) => {
+        const target = get().testerProfiles.find((p) => p.id === targetId);
+        if (!target) return;
+        const email = sourceEmail.toLowerCase().trim();
+        // Add the source email to the target's additional emails
+        const additionalEmails = new Set([...(target.additionalEmails || []).map((e) => e.toLowerCase()), email]);
+        additionalEmails.delete(target.email.toLowerCase()); // don't duplicate primary
+        set((state) => ({
+          testerProfiles: state.testerProfiles.map((p) =>
+            p.id === targetId ? { ...p, additionalEmails: Array.from(additionalEmails), updatedAt: new Date().toISOString() } : p
+          ),
+        }));
+      },
 
       applyTesterProfile: (deviceId, email) => {
         const profile = get().getTesterProfile(email);

@@ -267,7 +267,9 @@ export interface Attachment {
 // ─── Feature: Tester Profiles ─────────────────────────────────────────────────
 export interface TesterProfile {
   id: string;
-  email: string; // primary key — the stable link across programs
+  testerId: string; // stable human-readable ID (e.g., "TST-00042") for cross-platform tracking
+  email: string; // primary email — the main link across programs
+  additionalEmails: string[]; // all known emails for this person (old emails, aliases, etc.)
   name: string;
   contactEmail: string;
   alternateEmail: string;

@@ -14,7 +14,7 @@ const tabs: { id: TabType; label: string }[] = [
   { id: 'testbeds', label: 'Programs' },
   { id: 'locations', label: 'Locations' },
   { id: 'people', label: 'People' },
-  { id: 'shipments', label: 'Shipments' },
+  { id: 'shipments', label: 'Device Ingestion & Returns' },
 ];
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {

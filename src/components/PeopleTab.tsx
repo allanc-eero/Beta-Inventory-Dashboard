@@ -15,7 +15,7 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 ];
 
 export default function PeopleTab() {
-  const { devices, people, addPerson, addOptOut, getOptOuts } = useDeviceStore();
+  const { devices, people, addPerson, addOptOut, getOptOuts, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
@@ -25,6 +25,8 @@ export default function PeopleTab() {
   const [optOutNotes, setOptOutNotes] = useState('');
   const [activeView, setActiveView] = useState<'active' | 'opted_out'>('active');
   const [viewDevice, setViewDevice] = useState<Device | null>(null);
+  const [duplicateMatches, setDuplicateMatches] = useState<any[]>([]);
+  const [pendingNewPerson, setPendingNewPerson] = useState<{ name: string; email: string; team: string } | null>(null);
 
   const optOuts = getOptOuts();
   const optedOutEmails = new Set(optOuts.map((o) => o.personEmail.toLowerCase()));
@@ -82,13 +84,37 @@ export default function PeopleTab() {
 
   const handleAdd = () => {
     if (!newPerson.name || !newPerson.email) return;
-    addPerson({
-      id: crypto.randomUUID(),
-      name: newPerson.name,
-      email: newPerson.email,
-      team: newPerson.team,
-      devices: [],
-    });
+
+    // Check for duplicate profiles
+    const duplicates = findDuplicateProfiles(newPerson.name, newPerson.email);
+    if (duplicates.length > 0) {
+      setDuplicateMatches(duplicates);
+      setPendingNewPerson(newPerson);
+      return;
+    }
+
+    // No duplicates — create new
+    addPerson({ id: crypto.randomUUID(), name: newPerson.name, email: newPerson.email, team: newPerson.team, devices: [] });
+    upsertTesterProfile({ email: newPerson.email, name: newPerson.name, programs: [] });
+    setNewPerson({ name: '', email: '', team: '' });
+    setShowAdd(false);
+  };
+
+  const handleMergeIntoExisting = (targetId: string) => {
+    if (!pendingNewPerson) return;
+    mergeProfiles(targetId, pendingNewPerson.email);
+    setDuplicateMatches([]);
+    setPendingNewPerson(null);
+    setNewPerson({ name: '', email: '', team: '' });
+    setShowAdd(false);
+  };
+
+  const handleCreateAnyway = () => {
+    if (!pendingNewPerson) return;
+    addPerson({ id: crypto.randomUUID(), name: pendingNewPerson.name, email: pendingNewPerson.email, team: pendingNewPerson.team, devices: [] });
+    upsertTesterProfile({ email: pendingNewPerson.email, name: pendingNewPerson.name, programs: [] });
+    setDuplicateMatches([]);
+    setPendingNewPerson(null);
     setNewPerson({ name: '', email: '', team: '' });
     setShowAdd(false);
   };
@@ -256,7 +282,7 @@ export default function PeopleTab() {
             )}
           </>
         ) : (
-          /* Person Detail View */
+          /* Person Detail View — Expanded Profile */
           <div className="space-y-4">
             <button
               onClick={() => setSelectedPerson(null)}
@@ -265,22 +291,95 @@ export default function PeopleTab() {
               ← All people
             </button>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">{selectedPerson}</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {selectedPersonDevices.length} device(s) · {selectedPersonDevices.filter((d) => d.status === 'online').length} online · {selectedPersonDevices.filter((d) => d.status === 'deactivated').length} archived
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowOptOut(true)}
-                  className="px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50"
-                >
-                  Record Opt-Out
-                </button>
-              </div>
-            </div>
+            {(() => {
+              const profile = getTesterProfile(selectedPerson || '');
+              const personName = profile?.name || selectedPersonDevices[0]?.assignedTo || selectedPerson;
+              const activePrograms = [...new Set(selectedPersonDevices.filter((d) => d.status !== 'deactivated').map((d) => d.program))];
+
+              return (
+                <>
+                  {/* Profile Header */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-green-700 font-bold text-lg">
+                            {(personName || '').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-gray-900">{personName}</h2>
+                          {profile?.testerId && (
+                            <p className="text-xs text-gray-400 font-mono mt-0.5">{profile.testerId}</p>
+                          )}
+                          <p className="text-sm text-gray-500 mt-1">
+                            {selectedPersonDevices.length} device(s) · {selectedPersonDevices.filter((d) => d.status === 'online').length} online · {selectedPersonDevices.filter((d) => d.status === 'deactivated').length} archived
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowOptOut(true)}
+                        className="px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50"
+                      >
+                        Record Opt-Out
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Profile Details — Two Column */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Contact & Identity */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">Contact & Identity</h4>
+                      <div className="space-y-2.5">
+                        <ProfileField label="PRIMARY EMAIL" value={profile?.email || selectedPerson || ''} />
+                        <ProfileField label="CONTACT EMAIL" value={profile?.contactEmail || ''} />
+                        <ProfileField label="ALTERNATE EMAIL" value={profile?.alternateEmail || ''} />
+                        {(profile?.additionalEmails || []).length > 0 && (
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">OTHER EMAILS</span>
+                            <div className="flex flex-wrap gap-1">
+                              {profile!.additionalEmails.map((e) => (
+                                <span key={e} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{e}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <ProfileField label="COUNTRY" value={profile?.country || selectedPersonDevices[0]?.country || ''} />
+                        <ProfileField label="LOCATION" value={profile?.location || selectedPersonDevices[0]?.location || ''} />
+                      </div>
+                    </div>
+
+                    {/* Programs & Network */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">Programs & Network</h4>
+                      <div className="space-y-2.5">
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ACTIVE PROGRAMS</span>
+                          <div className="flex flex-wrap gap-1">
+                            {activePrograms.length > 0 ? activePrograms.map((p) => (
+                              <span key={p} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">{p}</span>
+                            )) : <span className="text-sm text-gray-400">None</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ALL PROGRAMS</span>
+                          <div className="flex flex-wrap gap-1">
+                            {(profile?.programs || []).map((p) => (
+                              <span key={p} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <ProfileField label="NETWORK ID" value={profile?.networkId || ''} />
+                        <ProfileField label="ADMIN ID" value={profile?.adminId || ''} />
+                        <ProfileField label="INTERNET SPEED" value={profile?.internetSpeed || ''} />
+                        {profile?.testerId && <ProfileField label="TESTER ID" value={profile.testerId} />}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Opt-Out Form */}
             {showOptOut && (
@@ -308,6 +407,9 @@ export default function PeopleTab() {
 
             {/* Person's Devices Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <h4 className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+                Devices ({selectedPersonDevices.length})
+              </h4>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b">
@@ -341,8 +443,50 @@ export default function PeopleTab() {
         )}
       </div>
 
+      {/* Duplicate Detection Modal */}
+      {duplicateMatches.length > 0 && pendingNewPerson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setDuplicateMatches([]); setPendingNewPerson(null); }} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">⚠️ Possible Duplicate Detected</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              We found existing profiles that might be the same person as "<strong>{pendingNewPerson.name}</strong>" ({pendingNewPerson.email}). Would you like to merge into an existing profile or create a new one?
+            </p>
+            <div className="space-y-3 mb-6 max-h-48 overflow-y-auto">
+              {duplicateMatches.map((match) => (
+                <div key={match.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{match.name}</p>
+                    <p className="text-xs text-gray-500">{match.email} {match.testerId && `· ${match.testerId}`}</p>
+                  </div>
+                  <button
+                    onClick={() => handleMergeIntoExisting(match.id)}
+                    className="px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50"
+                  >
+                    Merge Into This Profile
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => { setDuplicateMatches([]); setPendingNewPerson(null); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={handleCreateAnyway} className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900">Create New Profile Anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Device Detail Panel */}
       {viewDevice && <DeviceDetailPanel device={viewDevice} onClose={() => setViewDevice(null)} />}
     </>
+  );
+}
+
+function ProfileField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">{label}</span>
+      <span className="text-sm text-gray-900">{value || '—'}</span>
+    </div>
   );
 }
