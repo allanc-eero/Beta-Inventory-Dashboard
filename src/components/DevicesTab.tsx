@@ -198,77 +198,90 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedDevices.size > 0}
-                    onChange={toggleSelectAll}
-                    className="rounded border-gray-300"
-                  />
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Serial Number</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Model</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Internal Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Phase</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Firmware</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Program</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Assigned To</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wider">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredDevices.map((device) => (
-                <tr
-                  key={device.id}
-                  className="hover:bg-blue-50/50 transition-colors cursor-pointer"
-                  onClick={() => setSelectedDevice(device)}
-                >
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedDevices.has(device.id)}
-                      onChange={() => toggleSelect(device.id)}
-                      className="rounded border-gray-300"
-                    />
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs font-medium text-blue-700">{device.serialNumber}</td>
-                  <td className="px-4 py-3">{device.model}</td>
-                  <td className="px-4 py-3 text-gray-600">{device.internalName}</td>
-                  <td className="px-4 py-3 text-gray-600">{device.revision || '—'}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{device.firmwareVersion || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                      {device.program}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{device.assignedTo || device.checkedOutTo || '—'}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={device.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Table — grouped by program */}
+      {(() => {
+        const grouped: Record<string, typeof filteredDevices> = {};
+        filteredDevices.forEach((d) => {
+          const prog = d.program || 'unassigned';
+          if (!grouped[prog]) grouped[prog] = [];
+          grouped[prog].push(d);
+        });
+        const programOrder = ['beta', 'dogfood', 'prq', 'pvt', 'evt', 'dvt', 'other', 'unassigned'];
+        const programs = programOrder.filter((p) => grouped[p]);
+        const missingProgram = grouped['unassigned'] || [];
 
-        {filteredDevices.length === 0 && (
-          <div className="p-12 text-center text-gray-500">
-            <Monitor size={48} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-medium">No devices found</p>
-            <p className="text-sm mt-1">Try adjusting your filters or add devices via Import</p>
-          </div>
-        )}
+        return (
+          <>
+            {/* Warning for devices missing program */}
+            {missingProgram.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-red-600">⚠️</span>
+                  <span className="text-xs font-semibold text-red-800">{missingProgram.length} device(s) have no program assigned</span>
+                </div>
+                <p className="text-xs text-red-700 mt-1">Update them in the device detail or re-import with the Program column.</p>
+              </div>
+            )}
 
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm text-gray-500">
-          Showing {filteredDevices.length} of {devices.length} devices
-        </div>
-      </div>
+            {programs.map((prog) => (
+              <div key={prog} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4">
+                <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
+                  <span className={`px-2.5 py-0.5 rounded text-xs font-semibold ${prog === 'unassigned' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {prog === 'unassigned' ? '⚠️ No Program' : prog.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-gray-400">{grouped[prog].length} device(s)</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="px-4 py-2 text-left w-8">
+                          <input type="checkbox" checked={grouped[prog].every((d) => selectedDevices.has(d.id))} onChange={() => { const ids = grouped[prog].map((d) => d.id); const allSelected = ids.every((id) => selectedDevices.has(id)); const next = new Set(selectedDevices); if (allSelected) { ids.forEach((id) => next.delete(id)); } else { ids.forEach((id) => next.add(id)); } setSelectedDevices(next); }} className="rounded border-gray-300" />
+                        </th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Serial Number</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Model</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Internal Name</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Phase</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Firmware</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Assigned To</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {grouped[prog].map((device) => (
+                        <tr key={device.id} className="hover:bg-blue-50/50 transition-colors cursor-pointer" onClick={() => setSelectedDevice(device)}>
+                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                            <input type="checkbox" checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} className="rounded border-gray-300" />
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-xs font-medium text-blue-700">{device.serialNumber}</td>
+                          <td className="px-4 py-2.5">{device.model}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{device.internalName}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{device.revision || '—'}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs">{device.firmwareVersion || '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{device.assignedTo || device.checkedOutTo || '—'}</td>
+                          <td className="px-4 py-2.5"><StatusBadge status={device.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+
+            {filteredDevices.length === 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center text-gray-500">
+                <Monitor size={48} className="mx-auto mb-3 text-gray-300" />
+                <p className="font-medium">No devices found</p>
+                <p className="text-sm mt-1">Try adjusting your filters or add devices via Import</p>
+              </div>
+            )}
+
+            <div className="px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-500">
+              Showing {filteredDevices.length} of {devices.length} devices
+            </div>
+          </>
+        );
+      })()}
 
       {/* Detail Panel */}
       {selectedDevice && (
