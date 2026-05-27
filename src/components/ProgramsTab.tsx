@@ -342,6 +342,7 @@ Device Management Team`
           const brickDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'brick_and_return');
           const returnDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'return');
           const archiveDevices = selectedDevices.filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive');
+          const previewTime = new Date().toLocaleString();
 
           // Group by region for the preview
           const brickByRegion: Record<string, Device[]> = {};
@@ -351,12 +352,33 @@ Device Management Team`
           const archiveByRegion: Record<string, Device[]> = {};
           archiveDevices.forEach((d) => { const r = d.country || 'Unknown'; if (!archiveByRegion[r]) archiveByRegion[r] = []; archiveByRegion[r].push(d); });
 
+          const exportPreviewCSV = () => {
+            const rows = [['Serial Number', 'Assigned To', 'Email', 'Region', 'Status', 'Action', 'Program']];
+            selectedDevices.forEach((d) => {
+              rows.push([d.serialNumber, d.assignedTo || '', d.assignedEmail || '', d.country || '', d.status, deviceActions[d.id] || 'archive', selectedProgram || '']);
+            });
+            const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `close-program-preview-${selectedProgram}-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
               <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreview(false)} />
               <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Preview: Close Program {PROGRAM_LABELS[selectedProgram]}</h2>
-                <p className="text-sm text-gray-500 mb-6">Review exactly what will happen before executing. Nothing has been changed yet.</p>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-bold text-gray-900">Preview: Close Program {PROGRAM_LABELS[selectedProgram]}</h2>
+                  <button onClick={exportPreviewCSV} className="text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 px-2.5 py-1 rounded-md hover:bg-blue-50">
+                    Export Preview (CSV)
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mb-1">Review exactly what will happen before executing. Nothing has been changed yet.</p>
+                <p className="text-xs text-gray-400 mb-6">Preview generated: {previewTime}</p>
 
                 {/* Brick & Return section */}
                 {brickDevices.length > 0 && (
@@ -424,6 +446,20 @@ Device Management Team`
                     </div>
                   </div>
                 </div>
+
+                {/* Batch processing option for bricking */}
+                {brickDevices.length > 10 && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6">
+                    <h3 className="text-xs font-semibold text-yellow-800 mb-1">⚡ Large batch detected — consider processing in stages</h3>
+                    <p className="text-xs text-yellow-700 mb-3">You're about to brick {brickDevices.length} devices. We recommend processing by region using the per-region buttons instead, so you can verify each batch before continuing.</p>
+                    <button
+                      onClick={() => setShowPreview(false)}
+                      className="text-xs font-medium text-yellow-800 border border-yellow-300 px-3 py-1.5 rounded-md hover:bg-yellow-100"
+                    >
+                      ← Go back and process by region instead
+                    </button>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex items-center justify-between">
