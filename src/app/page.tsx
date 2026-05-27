@@ -16,13 +16,18 @@ import NetworkSyncButton from '@/components/NetworkSyncButton';
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('devices');
   const [resetKey, setResetKey] = useState(0);
+  const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
 
   const handleSetActiveTab = (tab: TabType) => {
     setActiveTab(tab);
-    // Force remount of DevicesTab to close any open panels
     if (tab === 'devices') {
       setResetKey((k) => k + 1);
     }
+  };
+
+  const handleNavigateToPerson = (email: string) => {
+    setSelectedPersonEmail(email);
+    setActiveTab('people');
   };
 
   return (
@@ -36,10 +41,10 @@ export default function Home() {
             <NetworkSyncButton />
           </div>
           <div className="mt-6">
-            {activeTab === 'devices' && <DevicesTab key={resetKey} />}
+            {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
             {activeTab === 'testbeds' && <ProgramsTab />}
             {activeTab === 'locations' && <LocationsTab />}
-            {activeTab === 'people' && <PeopleTab />}
+            {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
             {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
           </div>
         </main>

@@ -8,7 +8,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import AddDeviceModal from './AddDeviceModal';
 import BulkReturnPanel from './BulkReturnPanel';
 
-export default function DevicesTab() {
+export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
   const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'all'>('all');
@@ -272,7 +272,7 @@ export default function DevicesTab() {
 
       {/* Detail Panel */}
       {selectedDevice && (
-        <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDevice(null)} />
+        <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDevice(null)} onNavigateToPerson={onNavigateToPerson} />
       )}
 
       {/* Add Device Modal */}

@@ -14,11 +14,11 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export default function PeopleTab() {
+export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
   const { devices, people, addPerson, addOptOut, getOptOuts, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<string | null>(initialSelectedPerson || null);
   const [newPerson, setNewPerson] = useState({ name: '', email: '', team: '' });
   const [showOptOut, setShowOptOut] = useState(false);
   const [optOutReason, setOptOutReason] = useState<OptOutReason>('no_longer_interested');

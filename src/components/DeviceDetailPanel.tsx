@@ -14,6 +14,7 @@ import AttachmentsPanel from './AttachmentsPanel';
 interface DeviceDetailPanelProps {
   device: Device;
   onClose: () => void;
+  onNavigateToPerson?: (email: string) => void;
 }
 
 // ─── Field Definitions (data-driven) ──────────────────────────────────────────
@@ -35,7 +36,6 @@ const DEVICE_FIELDS: FieldDef[] = [
 ];
 
 const ASSIGNMENT_FIELDS: FieldDef[] = [
-  { label: 'ASSIGNED TO', field: 'assignedTo' },
   { label: 'COUNTRY', field: 'country' },
   { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => d.network ? `https://insight.eero.com/networks/${d.network}` : undefined },
 ];
@@ -93,7 +93,7 @@ function exportDeviceCSV(device: Device) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function DeviceDetailPanel({ device: initialDevice, onClose }: DeviceDetailPanelProps) {
+export default function DeviceDetailPanel({ device: initialDevice, onClose, onNavigateToPerson }: DeviceDetailPanelProps) {
   const { devices, updateDevice, checkinDevice, addHistoryEntry } = useDeviceStore();
   const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
   const [isEditing, setIsEditing] = useState(false);
@@ -166,6 +166,24 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose }: De
           <div className="space-y-6">
             <SectionBlock title="ASSIGNMENT">
               <DetailField label="STATUS" value={statusInfo.label} editing={false} field="status" editData={editData} setEditData={setEditData} />
+              {/* Assigned To — clickable to navigate to person profile */}
+              {isEditing ? (
+                <DetailField label="ASSIGNED TO" value={device.assignedTo || device.checkedOutTo || ''} editing={true} field="assignedTo" editData={editData} setEditData={setEditData} />
+              ) : (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ASSIGNED TO</span>
+                  {(device.assignedTo || device.checkedOutTo) && onNavigateToPerson ? (
+                    <button
+                      onClick={() => onNavigateToPerson(device.assignedEmail || device.assignedTo || '')}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      {device.assignedTo || device.checkedOutTo} →
+                    </button>
+                  ) : (
+                    <span className="text-sm text-gray-900">{device.assignedTo || device.checkedOutTo || '—'}</span>
+                  )}
+                </div>
+              )}
               {renderFields(ASSIGNMENT_FIELDS)}
             </SectionBlock>
             <SectionBlock title="LOGISTICS">{renderFields(LOGISTICS_FIELDS)}</SectionBlock>
