@@ -438,6 +438,37 @@ Device Management Team`
                       ))}
                     </tbody>
                   </table>
+                  {/* Per-region process button */}
+                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                    <div className="text-xs text-gray-500">
+                      {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive').length} archive
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!confirm(`Process ${grouped[region].length} device(s) in ${region}? This will apply the selected actions to this region only.`)) return;
+                        grouped[region].forEach((device) => {
+                          const action = deviceActions[device.id] || 'archive';
+                          switch (action) {
+                            case 'return':
+                              updateDevice(device.id, { status: 'pending_return' as any, deactivated: false });
+                              addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'return_requested', user: 'Admin', description: `Return requested — region: ${region}. Program: ${selectedProgram}` });
+                              break;
+                            case 'brick_and_return':
+                              updateDevice(device.id, { status: 'deactivated', deactivated: true });
+                              addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'bricked', user: 'Admin', description: `Device bricked & deactivated — region: ${region}. Program: ${selectedProgram}` });
+                              break;
+                            case 'archive':
+                              updateDevice(device.id, { status: 'deactivated', deactivated: true });
+                              addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'program_closed', user: 'Admin', description: `Device archived — region: ${region}. Program: ${selectedProgram}` });
+                              break;
+                          }
+                        });
+                      }}
+                      className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    >
+                      Process {region} ({grouped[region].length} devices)
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
