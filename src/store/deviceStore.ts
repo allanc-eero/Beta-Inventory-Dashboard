@@ -111,6 +111,7 @@ interface DeviceStore {
   // ─── Opt-Out Tracking ─────────────────────────────────────────────────
   addOptOut: (record: OptOutRecord) => void;
   getOptOuts: () => OptOutRecord[];
+  removeOptOut: (personEmail: string) => void;
 
   // ─── Tester Profiles ──────────────────────────────────────────────────
   testerProfiles: TesterProfile[];
@@ -829,6 +830,11 @@ export const useDeviceStore = create<DeviceStore>()(
         set((state) => ({ optOutRecords: [...state.optOutRecords, record] })),
 
       getOptOuts: () => get().optOutRecords,
+
+      removeOptOut: (personEmail) =>
+        set((state) => ({
+          optOutRecords: state.optOutRecords.filter((r) => r.personEmail.toLowerCase() !== personEmail.toLowerCase()),
+        })),
 
       // ─── Tester Profiles ──────────────────────────────────────────────────
       upsertTesterProfile: (profileData) => {

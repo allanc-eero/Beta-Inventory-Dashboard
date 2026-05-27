@@ -15,7 +15,7 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 ];
 
 export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
-  const { devices, people, addPerson, addOptOut, getOptOuts, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
+  const { devices, people, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<string | null>(initialSelectedPerson || null);
@@ -273,6 +273,16 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         <p><span className="font-medium text-gray-700">Devices at opt-out:</span> {record.devicesAtOptOut.join(', ')}</p>
                       )}
                     </div>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Opt ${record.personName} back in? They will be moved back to the active testers list.`)) {
+                          removeOptOut(record.personEmail);
+                        }
+                      }}
+                      className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
+                    >
+                      ✓ Opt Back In
+                    </button>
                   </div>
                 )) : (
                   <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -373,8 +383,22 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                             ))}
                           </div>
                         </div>
-                        <ProfileField label="NETWORK ID" value={profile?.networkId || ''} />
-                        <ProfileField label="ADMIN ID" value={profile?.adminId || ''} />
+                        {profile?.networkId ? (
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
+                            <a href={`https://insight.eero.com/networks/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{profile.networkId} ↗</a>
+                          </div>
+                        ) : (
+                          <ProfileField label="INSIGHT NETWORK" value="" />
+                        )}
+                        {profile?.adminId ? (
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
+                            <a href={`https://admin.e2ro.com/users/${profile.adminId.replace(/^UID0*/, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{profile.adminId} ↗</a>
+                          </div>
+                        ) : (
+                          <ProfileField label="ADMIN ID" value="" />
+                        )}
                         <ProfileField label="INTERNET SPEED" value={profile?.internetSpeed || ''} />
                         {profile?.testerId && <ProfileField label="TESTER ID" value={profile.testerId} />}
                       </div>

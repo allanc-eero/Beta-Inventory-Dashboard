@@ -27,7 +27,7 @@ export default function SeedDataProvider({ children }: { children: React.ReactNo
           country: d.country || '',
           location: d.location || '',
           networkId: d.network || '',
-          adminId: d.adminId || '',
+          adminId: d.unitId || d.adminId || '',
           programs: [d.program],
         });
       });

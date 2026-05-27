@@ -86,10 +86,11 @@ function mapProgram(raw: string): Program {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ImportTab() {
-  const { addDevices, devices, clearAllData, updateDevice, upsertTesterProfile, getTesterProfile } = useDeviceStore();
+  const { addDevices, devices, clearAllData, updateDevice, upsertTesterProfile, getTesterProfile, getOptOuts } = useDeviceStore();
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [optOutWarnings, setOptOutWarnings] = useState<{ email: string; name: string; reason: string; date: string; notes: string }[]>([]);
 
   const processCSV = useCallback((file: File) => {
     setImporting(true);
@@ -102,6 +103,7 @@ export default function ImportTab() {
         const errors: string[] = [];
         let success = 0;
         const newDevices: Device[] = [];
+        const optOutWarningsCollector: { email: string; name: string; reason: string; date: string; notes: string }[] = [];
 
         results.data.forEach((row: any, index: number) => {
           try {
@@ -132,6 +134,21 @@ export default function ImportTab() {
 
             // Tester profile: auto-fill from known profile, then upsert
             const email = device.assignedEmail?.toLowerCase().trim();
+
+            // Check if this person has opted out
+            if (email) {
+              const optOuts = getOptOuts();
+              const optOutRecord = optOuts.find((o) => o.personEmail.toLowerCase() === email);
+              if (optOutRecord) {
+                optOutWarningsCollector.push({
+                  email,
+                  name: optOutRecord.personName,
+                  reason: optOutRecord.reason.replace(/_/g, ' '),
+                  date: new Date(optOutRecord.optOutDate).toLocaleDateString(),
+                  notes: optOutRecord.notes,
+                });
+              }
+            }
             if (email) {
               const profile = getTesterProfile(email);
               if (profile) {
@@ -152,7 +169,7 @@ export default function ImportTab() {
                 country: device.country || '',
                 location: device.location || '',
                 networkId: device.network || '',
-                adminId: device.adminId || '',
+                adminId: device.unitId || device.adminId || '',
                 internetSpeed: row['internet_speed'] || row['Internet Speed'] || '',
                 programs: device.program ? [device.program] : [],
               });
@@ -181,6 +198,7 @@ export default function ImportTab() {
 
         if (newDevices.length > 0) addDevices(newDevices);
         setResult({ success, failed: errors.length, errors });
+        if (optOutWarningsCollector.length > 0) setOptOutWarnings(optOutWarningsCollector);
         setImporting(false);
       },
       error: (error) => {
@@ -273,6 +291,37 @@ export default function ImportTab() {
               {result.errors.map((err, i) => <p key={i} className="text-xs text-red-600">{err}</p>)}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Opt-Out Warnings */}
+      {optOutWarnings.length > 0 && (
+        <div className="rounded-xl p-4 border bg-orange-50 border-orange-200">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle size={18} className="text-orange-600" />
+            <span className="font-medium text-orange-800">⚠️ {optOutWarnings.length} person(s) in this import previously opted out</span>
+          </div>
+          <p className="text-xs text-orange-700 mb-3">These people were added to the system but had previously opted out. Review their reasons below before proceeding.</p>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {optOutWarnings.map((w, i) => (
+              <div key={i} className="bg-white p-3 rounded-lg border border-orange-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-900">{w.name}</span>
+                  <span className="text-xs text-gray-500">{w.email}</span>
+                </div>
+                <div className="mt-1 text-xs text-gray-600">
+                  <span className="font-medium">Opted out:</span> {w.date} · <span className="font-medium">Reason:</span> {w.reason}
+                  {w.notes && <> · <span className="font-medium">Notes:</span> {w.notes}</>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setOptOutWarnings([])}
+            className="mt-3 text-xs text-orange-700 font-medium hover:text-orange-900"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
