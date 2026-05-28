@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
+import BulkReturnPanel from './BulkReturnPanel';
 
 type DeviceAction = 'return' | 'archive' | 'brick_and_return';
 
@@ -34,7 +35,7 @@ export default function ProgramsTab() {
   const [deviceActions, setDeviceActions] = useState<Record<string, DeviceAction>>({});
   const [processing, setProcessing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [regionPreview, setRegionPreview] = useState<string | null>(null);
+  const [bulkReturnDevices, setBulkReturnDevices] = useState<Device[] | null>(null);
   const [processResults, setProcessResults] = useState<{
     emailsSent: { email: string; deviceCount: number }[];
     devicesBricked: string[];
@@ -591,45 +592,16 @@ Device Management Team`
                       {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive').length} archive
                     </div>
                     <button
-                      onClick={() => setRegionPreview(region)}
+                      onClick={() => setBulkReturnDevices(grouped[region])}
                       className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
                     >
-                      Preview & Process {region} →
+                      Process {region} ({grouped[region].length} devices) →
                     </button>
                   </div>
                 </div>
               ))}
 
-              {/* Region Preview Modal */}
-              {regionPreview && grouped[regionPreview] && (
-                <RegionPreviewModal
-                  region={regionPreview}
-                  devices={grouped[regionPreview]}
-                  deviceActions={deviceActions}
-                  selectedProgram={selectedProgram!}
-                  onClose={() => setRegionPreview(null)}
-                  onConfirm={(regionDevs) => {
-                    regionDevs.forEach((device) => {
-                      const action = deviceActions[device.id] || 'archive';
-                      switch (action) {
-                        case 'return':
-                          updateDevice(device.id, { status: 'pending_return' as any, deactivated: false });
-                          addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'return_requested', user: 'Admin', description: `Return requested — region: ${regionPreview}. Program: ${selectedProgram}` });
-                          break;
-                        case 'brick_and_return':
-                          updateDevice(device.id, { status: 'deactivated', deactivated: true });
-                          addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'bricked', user: 'Admin', description: `Device bricked & deactivated — region: ${regionPreview}. Program: ${selectedProgram}` });
-                          break;
-                        case 'archive':
-                          updateDevice(device.id, { status: 'deactivated', deactivated: true });
-                          addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'program_closed', user: 'Admin', description: `Device archived — region: ${regionPreview}. Program: ${selectedProgram}` });
-                          break;
-                      }
-                    });
-                    setRegionPreview(null);
-                  }}
-                />
-              )}
+              {/* Region Preview Modal — replaced by BulkReturnPanel */}
             </div>
           );
         })()}
@@ -637,6 +609,9 @@ Device Management Team`
 
       {detailDevice && (
         <DeviceDetailPanel device={detailDevice} onClose={() => setDetailDevice(null)} />
+      )}
+      {bulkReturnDevices && (
+        <BulkReturnPanel devices={bulkReturnDevices} onClose={() => setBulkReturnDevices(null)} />
       )}
       </>
     );
@@ -777,68 +752,6 @@ Device Management Team`
       {detailDevice && (
         <DeviceDetailPanel device={detailDevice} onClose={() => setDetailDevice(null)} />
       )}
-    </div>
-  );
-}
-
-
-function RegionPreviewModal({ region, devices, deviceActions, selectedProgram, onClose, onConfirm }: {
-  region: string; devices: Device[]; deviceActions: Record<string, DeviceAction>; selectedProgram: string;
-  onClose: () => void; onConfirm: (devices: Device[]) => void;
-}) {
-  const rBrick = devices.filter((d) => deviceActions[d.id] === 'brick_and_return');
-  const rReturn = devices.filter((d) => deviceActions[d.id] === 'return');
-  const rArchive = devices.filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive');
-  const hasBrick = rBrick.length > 0;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[70vh] overflow-y-auto p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Preview: Process {region}</h2>
-        <p className="text-xs text-gray-400 mb-4">Generated: {new Date().toLocaleString()} · Only this region will be affected.</p>
-
-        {rBrick.length > 0 && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-xs font-semibold text-red-800 mb-2">🚨 BRICK & RETURN — {rBrick.length} device(s)</p>
-            <p className="text-xs text-red-600 mb-2">Permanently deactivated. Cannot be undone.</p>
-            <div className="flex flex-wrap gap-1">
-              {rBrick.map((d) => <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{d.serialNumber} ({d.assignedTo || '—'})</span>)}
-            </div>
-          </div>
-        )}
-
-        {rReturn.length > 0 && (
-          <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <p className="text-xs font-semibold text-orange-800 mb-2">📦 RETURN — {rReturn.length} device(s)</p>
-            <p className="text-xs text-orange-600 mb-2">Marked as pending return. Emails will be sent.</p>
-            <div className="flex flex-wrap gap-1">
-              {rReturn.map((d) => <span key={d.id} className="text-xs font-mono bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
-            </div>
-          </div>
-        )}
-
-        {rArchive.length > 0 && (
-          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-xs font-semibold text-gray-700 mb-2">📁 ARCHIVE — {rArchive.length} device(s)</p>
-            <div className="flex flex-wrap gap-1">
-              {rArchive.map((d) => <span key={d.id} className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mt-6">
-          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
-            ← Go Back
-          </button>
-          <button
-            onClick={() => onConfirm(devices)}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg ${hasBrick ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            Confirm & Process {region} ({devices.length} devices)
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
