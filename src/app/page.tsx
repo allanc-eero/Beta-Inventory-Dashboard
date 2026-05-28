@@ -13,6 +13,7 @@ import SeedDataProvider from '@/components/SeedDataProvider';
 import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
 import NetworkSyncButton from '@/components/NetworkSyncButton';
 import PendingReturnReminder from '@/components/PendingReturnReminder';
+import TodayBriefing from '@/components/TodayBriefing';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('devices');
@@ -55,11 +56,16 @@ export default function Home() {
         <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab} />
         <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-12">
           <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
-          <OverdueAlertsBanner />
-          <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
-          <div className="mt-4">
-            <NetworkSyncButton />
-          </div>
+          {activeTab === 'devices' && <TodayBriefing onNavigate={handleSetActiveTab} />}
+          {activeTab !== 'devices' && (
+            <>
+              <OverdueAlertsBanner />
+              <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
+              <div className="mt-4">
+                <NetworkSyncButton />
+              </div>
+            </>
+          )}
           <div className="mt-6">
             {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
             {activeTab === 'testbeds' && <ProgramsTab />}
