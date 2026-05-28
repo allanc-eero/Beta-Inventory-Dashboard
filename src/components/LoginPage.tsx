@@ -22,6 +22,17 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
           <div className="text-center mb-8">
+            {/* Logo mark */}
+            <div className="mx-auto w-16 h-16 mb-4">
+              <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="64" height="64" rx="16" fill="#2c3e7a"/>
+                <rect x="14" y="18" width="36" height="24" rx="4" stroke="white" strokeWidth="2.5" fill="none"/>
+                <circle cx="32" cy="30" r="6" stroke="white" strokeWidth="2" fill="none"/>
+                <path d="M26 30a6 6 0 0 1 12 0" stroke="white" strokeWidth="1.5" fill="none" opacity="0.5" transform="translate(0,-4) scale(1.5) translate(-10.5,-10)"/>
+                <rect x="28" y="44" width="8" height="3" rx="1.5" fill="white" opacity="0.7"/>
+                <circle cx="48" cy="20" r="4" fill="#4ade80" stroke="#2c3e7a" strokeWidth="1.5"/>
+              </svg>
+            </div>
             <h1 className="text-2xl font-bold text-gray-900">Beta Inventory Dashboard</h1>
             <p className="text-sm text-gray-500 mt-2">Sign in with your @eero.com email</p>
           </div>
