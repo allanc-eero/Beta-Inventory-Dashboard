@@ -223,7 +223,7 @@ export interface ClosedProgramRecord {
   closedAt: string;
   closedBy: string;
   totalDevices: number;
-  actions: { deviceId: string; serial: string; assignee: string; action: string }[];
+  actions: { deviceId: string; serial: string; assignee: string; action: string; region: string; processedAt: string }[];
 }
 
 // ─── Feature: Tester Opt-Out Tracking ─────────────────────────────────────────

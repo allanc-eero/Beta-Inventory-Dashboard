@@ -28,7 +28,7 @@ const PROGRAM_LABELS: Record<Program, string> = {
 };
 
 export default function ProgramsTab() {
-  const { devices, updateDevice, addHistoryEntry, addClosedProgram, getClosedPrograms } = useDeviceStore();
+  const { devices, updateDevice, addHistoryEntry, addClosedProgram, getClosedPrograms, addProcessedDevicesToProgram } = useDeviceStore();
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [closingProgram, setClosingProgram] = useState(false);
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
@@ -36,7 +36,6 @@ export default function ProgramsTab() {
   const [processing, setProcessing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [bulkReturnDevices, setBulkReturnDevices] = useState<Device[] | null>(null);
-  const [sessionProcessed, setSessionProcessed] = useState<{ serial: string; assignee: string; action: string; region: string }[]>([]);
   const [processResults, setProcessResults] = useState<{
     emailsSent: { email: string; deviceCount: number }[];
     devicesBricked: string[];
@@ -202,6 +201,8 @@ Device Management Team`
           serial: device?.serialNumber || '',
           assignee: device?.assignedEmail || device?.assignedTo || 'unassigned',
           action,
+          region: device?.country || 'Unknown',
+          processedAt: new Date().toISOString(),
         };
       }),
     });
@@ -311,32 +312,37 @@ Device Management Team`
           </div>
         </div>
 
-        {/* Already Processed This Session */}
-        {sessionProcessed.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-green-800">✓ Already Processed This Session</h3>
-              <span className="text-xs text-green-600 font-medium">{sessionProcessed.length} device(s) done</span>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-green-700 mb-2">
-              <span>{sessionProcessed.filter((d) => d.action === 'brick_and_return').length} bricked</span>
-              <span>{sessionProcessed.filter((d) => d.action === 'return').length} returned</span>
-              <span>{sessionProcessed.filter((d) => d.action === 'archive').length} archived</span>
-            </div>
-            <details className="text-xs">
-              <summary className="cursor-pointer text-green-700 font-medium hover:text-green-900">View processed devices</summary>
-              <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
-                {sessionProcessed.map((d, i) => (
-                  <div key={i} className="flex items-center justify-between p-1.5 bg-white rounded">
-                    <span className="font-mono">{d.serial}</span>
-                    <span className="text-gray-500">{d.assignee} · {d.region}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-xs ${d.action === 'brick_and_return' ? 'bg-red-100 text-red-700' : d.action === 'return' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{d.action.replace(/_/g, ' ')}</span>
-                  </div>
-                ))}
+        {/* Already Processed — persistent record */}
+        {(() => {
+          const programRecord = getClosedPrograms().find((cp) => cp.program === selectedProgram);
+          if (!programRecord || programRecord.actions.length === 0) return null;
+          const processed = programRecord.actions;
+          return (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-green-800">✓ Devices Already Processed</h3>
+                <span className="text-xs text-green-600 font-medium">{processed.length} device(s) done</span>
               </div>
-            </details>
-          </div>
-        )}
+              <div className="flex items-center gap-4 text-xs text-green-700 mb-2">
+                <span>{processed.filter((d) => d.action === 'brick_and_return').length} bricked</span>
+                <span>{processed.filter((d) => d.action === 'return').length} returned</span>
+                <span>{processed.filter((d) => d.action === 'archive').length} archived</span>
+              </div>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-green-700 font-medium hover:text-green-900">View processed devices</summary>
+                <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
+                  {processed.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between p-1.5 bg-white rounded">
+                      <span className="font-mono">{d.serial}</span>
+                      <span className="text-gray-500">{d.assignee} · {d.region}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-xs ${d.action === 'brick_and_return' ? 'bg-red-100 text-red-700' : d.action === 'return' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{d.action.replace(/_/g, ' ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          );
+        })()}
 
         {/* Bulk actions */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -638,21 +644,21 @@ Device Management Team`
       )}
       {bulkReturnDevices && (
         <BulkReturnPanel devices={bulkReturnDevices} onClose={() => {
-          // Track what was processed
+          // Track what was processed — save to persistent store
           const processed = bulkReturnDevices.filter((d) => {
             const current = devices.find((dev) => dev.id === d.id);
             return current && (current.status === 'deactivated' || current.status === 'pending_return');
           });
-          if (processed.length > 0) {
-            setSessionProcessed((prev) => [
-              ...prev,
-              ...processed.map((d) => ({
-                serial: d.serialNumber,
-                assignee: d.assignedTo || d.assignedEmail || '—',
-                action: devices.find((dev) => dev.id === d.id)?.status === 'deactivated' ? 'brick_and_return' : 'return',
-                region: d.country || 'Unknown',
-              })),
-            ]);
+          if (processed.length > 0 && selectedProgram) {
+            const now = new Date().toISOString();
+            addProcessedDevicesToProgram(selectedProgram, processed.map((d) => ({
+              deviceId: d.id,
+              serial: d.serialNumber,
+              assignee: d.assignedEmail || d.assignedTo || '—',
+              action: devices.find((dev) => dev.id === d.id)?.status === 'deactivated' ? 'brick_and_return' : 'return',
+              region: d.country || 'Unknown',
+              processedAt: now,
+            })));
           }
           setBulkReturnDevices(null);
         }} />

@@ -106,6 +106,7 @@ interface DeviceStore {
 
   // ─── Closed Programs ──────────────────────────────────────────────────
   addClosedProgram: (record: ClosedProgramRecord) => void;
+  addProcessedDevicesToProgram: (program: string, actions: ClosedProgramRecord['actions']) => void;
   getClosedPrograms: () => ClosedProgramRecord[];
 
   // ─── Opt-Out Tracking ─────────────────────────────────────────────────
@@ -822,6 +823,32 @@ export const useDeviceStore = create<DeviceStore>()(
       // ─── Closed Programs ──────────────────────────────────────────────────
       addClosedProgram: (record) =>
         set((state) => ({ closedPrograms: [...state.closedPrograms, record] })),
+
+      addProcessedDevicesToProgram: (program, actions) => {
+        const existing = get().closedPrograms.find((cp) => cp.program === program);
+        if (existing) {
+          // Append to existing record
+          set((state) => ({
+            closedPrograms: state.closedPrograms.map((cp) =>
+              cp.program === program
+                ? { ...cp, actions: [...cp.actions, ...actions], totalDevices: cp.totalDevices + actions.length }
+                : cp
+            ),
+          }));
+        } else {
+          // Create new record (program closure in progress)
+          set((state) => ({
+            closedPrograms: [...state.closedPrograms, {
+              id: crypto.randomUUID(),
+              program,
+              closedAt: new Date().toISOString(),
+              closedBy: 'Admin',
+              totalDevices: actions.length,
+              actions,
+            }],
+          }));
+        }
+      },
 
       getClosedPrograms: () => get().closedPrograms,
 
