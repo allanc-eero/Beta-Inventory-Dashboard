@@ -2,6 +2,15 @@
 
 ## Priority 1: Need Soon
 
+### 0. Email System — Replace mailto: with Real Email Integration
+- [ ] The current email system uses `mailto:` links — no delivery confirmation, no threading, no proof of delivery
+- [ ] Logging "email sent" gives false confidence — you only know the mail client opened, not that it was delivered
+- [ ] Integrate with `beta-teams@eero.com` via API (Amazon SES, SMTP relay, or Salesforce email API)
+- [ ] Add delivery status tracking: sent, delivered, opened, bounced
+- [ ] Thread follow-up reminders under the original email
+- [ ] Store sent email content server-side for audit trail (not just in localStorage)
+- **Why:** If this goes to production, you need proof that testers were actually contacted. A mailto: link is a demo convenience, not a production email system. Without real delivery tracking, you can't escalate with confidence ("we emailed them 3 times and they never responded").
+
 ### 1. User Authentication / Login
 - [ ] Add login system so each team member has their own account
 - [ ] JIRA tickets, audit trail, and deactivation records show the actual user who performed the action
