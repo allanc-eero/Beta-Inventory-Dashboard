@@ -344,15 +344,34 @@ Device Management Team`
           );
         })()}
 
-        {/* Bulk actions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        {/* Program-wide actions */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">Program-Wide Actions</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Use these buttons to apply the same action to <strong>every device</strong> in this program across all regions. If you need different actions per region, skip this and use the per-region buttons below instead.
+          </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium text-gray-700">Set all remaining to:</span>
-            <button onClick={() => handleSetAllActions('brick_and_return')} className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-800 border border-red-300 rounded-lg hover:bg-red-200">Brick & Return</button>
-            <button onClick={() => handleSetAllActions('archive')} className="px-3 py-1.5 text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100">Archive</button>
+            <button
+              onClick={() => handleSetAllActions('brick_and_return')}
+              className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Brick & Return All Devices
+            </button>
+            <button
+              onClick={() => handleSetAllActions('archive')}
+              className="px-4 py-2 text-sm font-medium bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Archive All Devices
+            </button>
+            <button
+              onClick={() => handleSetAllActions('return')}
+              className="px-4 py-2 text-sm font-medium bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              Return All Devices
+            </button>
           </div>
 
-          {/* Summary counts + Preview button */}
+          {/* Status bar */}
           <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100">
             <div className="flex items-center gap-3 text-xs">
               <span className="text-red-700 font-medium">{actionCounts.return} return</span>
