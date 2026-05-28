@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Carrier, Shipment, Device, ShipmentStatus, DeviceStatus } from '@/types';
 import * as XLSX from 'xlsx';
+import { useAuthStore } from '@/store/authStore';
 
 const CARRIERS: Carrier[] = ['UPS', 'USPS', 'FedEx', 'DHL', 'Other'];
 
@@ -80,6 +81,7 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
 
 export default function ShipmentsTab({ showPendingReturns }: { showPendingReturns?: boolean }) {
   const { devices, addDevice, updateDevice, addShipment, markShipmentDelivered, getAllShipments, addHistoryEntry } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const [activeView, setActiveView] = useState<'upload' | 'history' | 'pending_returns'>(showPendingReturns ? 'pending_returns' : 'upload');
   const [pasteInput, setPasteInput] = useState('');
   const [carrier, setCarrier] = useState<Carrier>('DHL');
@@ -525,22 +527,26 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => {
-                                updateDevice(d.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
-                                addHistoryEntry({
-                                  id: crypto.randomUUID(),
-                                  deviceId: d.id,
-                                  timestamp: new Date().toISOString(),
-                                  action: 'return_confirmed',
-                                  user: 'Admin',
-                                  description: 'Device return confirmed. Removed from pending returns and marked as deactivated.',
-                                });
-                              }}
-                              className="px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
-                            >
-                              ✓ Confirm Received
-                            </button>
+                            {canEdit() ? (
+                              <button
+                                onClick={() => {
+                                  updateDevice(d.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
+                                  addHistoryEntry({
+                                    id: crypto.randomUUID(),
+                                    deviceId: d.id,
+                                    timestamp: new Date().toISOString(),
+                                    action: 'return_confirmed',
+                                    user: 'Admin',
+                                    description: 'Device return confirmed. Removed from pending returns and marked as deactivated.',
+                                  });
+                                }}
+                                className="px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
+                              >
+                                ✓ Confirm Received
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400">View only</span>
+                            )}
                           </td>
                         </tr>
                       );

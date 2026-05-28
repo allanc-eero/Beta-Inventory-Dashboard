@@ -5,6 +5,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import BulkReturnPanel from './BulkReturnPanel';
+import { useAuthStore } from '@/store/authStore';
 
 type DeviceAction = 'return' | 'archive' | 'brick_and_return';
 
@@ -29,6 +30,7 @@ const PROGRAM_LABELS: Record<Program, string> = {
 
 export default function ProgramsTab() {
   const { devices, updateDevice, addHistoryEntry, addClosedProgram, getClosedPrograms, addProcessedDevicesToProgram } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [closingProgram, setClosingProgram] = useState(false);
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
@@ -754,12 +756,14 @@ Device Management Team`
               <p className="text-xs text-gray-400 mb-3">{prog.deactivatedCount} deactivated</p>
             )}
 
-            <button
-              onClick={() => handleStartClose(prog.name)}
-              className="w-full py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              {hasProgress ? 'Continue Processing →' : 'Close Program →'}
-            </button>
+            {canEdit() && (
+              <button
+                onClick={() => handleStartClose(prog.name)}
+                className="w-full py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                {hasProgress ? 'Continue Processing →' : 'Close Program →'}
+              </button>
+            )}
           </div>
           );
         })}
