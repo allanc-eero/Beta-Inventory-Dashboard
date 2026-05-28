@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import { Wifi } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuthStore();
@@ -22,21 +23,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
           <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 mb-4">
-              <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Router body — rounded pill shape like an eero */}
-                <ellipse cx="32" cy="42" rx="22" ry="10" fill="#2c3e7a"/>
-                <ellipse cx="32" cy="40" rx="22" ry="10" fill="#3b5198"/>
-                {/* WiFi signal arcs */}
-                <path d="M32 12a20 20 0 0 1 14 5.8" stroke="#2c3e7a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                <path d="M32 12a20 20 0 0 0-14 5.8" stroke="#2c3e7a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                <path d="M32 20a12 12 0 0 1 8.5 3.5" stroke="#2c3e7a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                <path d="M32 20a12 12 0 0 0-8.5 3.5" stroke="#2c3e7a" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                {/* Center dot */}
-                <circle cx="32" cy="28" r="3" fill="#2c3e7a"/>
-                {/* LED indicator */}
-                <circle cx="32" cy="40" r="2" fill="#4ade80"/>
-              </svg>
+            <div className="mx-auto mb-4">
+              <Wifi size={48} className="mx-auto text-[#2c3e7a]" strokeWidth={1.5} />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Beta Inventory Dashboard</h1>
             <p className="text-sm text-gray-500 mt-2">Sign in with your @eero.com email</p>
