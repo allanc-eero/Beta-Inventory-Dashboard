@@ -22,9 +22,17 @@ export default function Home() {
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { isLoggedIn } = useAuthStore();
+  const { isLoggedIn, currentUser } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Reset to Devices tab whenever user changes (login/logout)
+  useEffect(() => {
+    if (currentUser) {
+      setActiveTab('devices');
+      setResetKey((k) => k + 1);
+    }
+  }, [currentUser?.email]);
 
   const handleSetActiveTab = (tab: TabType) => {
     setActiveTab(tab);
