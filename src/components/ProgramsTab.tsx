@@ -688,7 +688,16 @@ Device Management Team`
 
   // ─── Main Programs View ─────────────────────────────────────────────
   const closedPrograms = getClosedPrograms();
-  const closedProgramNames = new Set(closedPrograms.map((cp) => cp.program));
+
+  // A program is only "fully archived" when ALL its devices are deactivated/pending_return
+  const fullyArchivedPrograms = new Set(
+    closedPrograms
+      .filter((cp) => {
+        const programDevices = devices.filter((d) => d.program === cp.program);
+        return programDevices.length > 0 && programDevices.every((d) => d.status === 'deactivated' || d.status === 'pending_return');
+      })
+      .map((cp) => cp.program)
+  );
 
   return (
     <div className="space-y-6">
@@ -696,13 +705,22 @@ Device Management Team`
         <h2 className="text-lg font-bold text-gray-900">Programs</h2>
       </div>
 
-      {/* Active program cards */}
+      {/* Active program cards — includes programs with partial processing */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {programs.filter((p) => !closedProgramNames.has(p.name)).map((prog) => (
+        {programs.filter((p) => !fullyArchivedPrograms.has(p.name)).map((prog) => {
+          const programRecord = closedPrograms.find((cp) => cp.program === prog.name);
+          const processedCount = programRecord?.actions.length || 0;
+          const hasProgress = processedCount > 0;
+
+          return (
           <div key={prog.name} className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-gray-900">{prog.label}</h3>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>
+              {hasProgress ? (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">In Progress</span>
+              ) : (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">
@@ -720,7 +738,19 @@ Device Management Team`
               </div>
             </div>
 
-            {prog.deactivatedCount > 0 && (
+            {/* Progress indicator when partially processed */}
+            {hasProgress && (
+              <div className="mb-3 p-2 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3 text-xs text-gray-600">
+                  <span className="font-medium">{processedCount} processed</span>
+                  <span>{programRecord!.actions.filter((a) => a.action === 'brick_and_return').length} bricked</span>
+                  <span>{programRecord!.actions.filter((a) => a.action === 'archive').length} archived</span>
+                  <span>{programRecord!.actions.filter((a) => a.action === 'return').length} returned</span>
+                </div>
+              </div>
+            )}
+
+            {prog.deactivatedCount > 0 && !hasProgress && (
               <p className="text-xs text-gray-400 mb-3">{prog.deactivatedCount} deactivated</p>
             )}
 
@@ -728,24 +758,26 @@ Device Management Team`
               onClick={() => handleStartClose(prog.name)}
               className="w-full py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
-              Close Program →
+              {hasProgress ? 'Continue Processing →' : 'Close Program →'}
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
-      {programs.filter((p) => !closedProgramNames.has(p.name)).length === 0 && closedPrograms.length === 0 && (
+      {programs.filter((p) => !fullyArchivedPrograms.has(p.name)).length === 0 && closedPrograms.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <p className="text-gray-400 text-sm">No active programs with devices</p>
         </div>
       )}
 
       {/* Archived/Closed programs */}
-      {closedPrograms.length > 0 && (
+      {/* Archived/Closed programs — only fully processed ones */}
+      {closedPrograms.filter((cp) => fullyArchivedPrograms.has(cp.program)).length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Archived Programs</h3>
           <div className="space-y-3">
-            {closedPrograms.map((cp) => (
+            {closedPrograms.filter((cp) => fullyArchivedPrograms.has(cp.program)).map((cp) => (
               <div key={cp.id} className="bg-white rounded-xl border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
