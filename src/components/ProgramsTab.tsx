@@ -70,12 +70,8 @@ export default function ProgramsTab() {
   const handleStartClose = (program: Program) => {
     setSelectedProgram(program);
     setClosingProgram(true);
-    // Default all devices to 'archive'
-    const actions: Record<string, DeviceAction> = {};
-    devices
-      .filter((d) => d.program === program && d.status !== 'deactivated')
-      .forEach((d) => { actions[d.id] = 'archive'; });
-    setDeviceActions(actions);
+    // Start with no actions selected — user must explicitly choose
+    setDeviceActions({});
   };
 
   const handleSetAllActions = (action: DeviceAction) => {
@@ -343,7 +339,7 @@ Device Management Team`
         {showPreview && (() => {
           const brickDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'brick_and_return');
           const returnDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'return');
-          const archiveDevices = selectedDevices.filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive');
+          const archiveDevices = selectedDevices.filter((d) => deviceActions[d.id] === 'archive');
           const previewTime = new Date().toLocaleString();
 
           // Group by region for the preview
@@ -573,10 +569,11 @@ Device Management Team`
                           </td>
                           <td className="px-4 py-2.5">
                             <select
-                              value={deviceActions[device.id] || 'archive'}
+                              value={deviceActions[device.id] || ''}
                               onChange={(e) => setDeviceActions({ ...deviceActions, [device.id]: e.target.value as DeviceAction })}
-                              className="px-2 py-1 text-xs border border-gray-200 rounded-md"
+                              className={`px-2 py-1 text-xs border rounded-md ${deviceActions[device.id] ? 'border-gray-200' : 'border-orange-300 bg-orange-50'}`}
                             >
+                              <option value="" disabled>Select action...</option>
                               <option value="return">Return to eero</option>
                               <option value="brick_and_return">Brick & Return</option>
                               <option value="archive">Archive</option>
@@ -589,7 +586,7 @@ Device Management Team`
                   {/* Per-region process button */}
                   <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                     <div className="text-xs text-gray-500">
-                      {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => !deviceActions[d.id] || deviceActions[d.id] === 'archive').length} archive
+                      {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => deviceActions[d.id] === 'archive').length} archive · {grouped[region].filter((d) => !deviceActions[d.id]).length} unset
                     </div>
                     <button
                       onClick={() => setBulkReturnDevices(grouped[region])}
