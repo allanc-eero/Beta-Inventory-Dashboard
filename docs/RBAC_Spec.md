@@ -1,51 +1,70 @@
 # RBAC Specification — Role-Based Access Control
 
-## Roles
+## Roles (Simplified — 3 Active Roles)
 
 | Role | Count | Description |
 |------|-------|-------------|
-| **Super Admin** | 1 (you) | Full platform control. Code changes, UI modifications, user management, all destructive actions. |
-| **Admin** | 2 | Can brick devices, archive devices, close programs, send return emails, process regions. Cannot modify code/UI or manage other admins. |
-| **Operator** | 2 | Day-to-day management. Upload shipments, add devices, run network sync, edit device details, manage tester profiles, send emails. Cannot brick, close programs, or manage users. |
-| **Viewer** | Unlimited | Read-only. Can see all devices, programs, people, history. Cannot make any changes. |
+| **Super Admin** | 1 | Full platform control. Code changes, UI modifications, user management, all destructive actions. |
+| **Admin** | 1 | Can brick devices, archive devices, close programs, upload shipments, edit devices, send return emails, process regions. Cannot manage users or modify code/UI. |
+| **Viewer** | Unlimited | Read-only. Can see all devices, programs, people, history. Can export CSVs. Cannot make any changes. |
 
-Testers: Not included in this phase. Future consideration.
+**Operator role:** Reserved for future use. Can be activated when someone joins who needs edit access but should NOT brick/archive. Not currently assigned.
+
+**Tester role:** Not included in this phase. Future consideration.
+
+
+## User Roster
+
+| Email | Role | Status |
+|-------|------|--------|
+| allanc@eero.com | Super Admin | Active |
+| haley.swanson@eero.com | Admin | Active |
+| aaron@eero.com | Viewer | Active |
+| deep@eero.com | Viewer | Active |
+| josht@eero.com | Viewer | Active |
+| lalitha@eero.com | Viewer | Active |
+| melanie.thorum@eero.com | Viewer | Active |
+| shelby@eero.com | Viewer | Active |
+| vrabago@eero.com | Viewer | Active |
+| diego.kim@eero.com | Viewer | Active |
+| john.pelebo@eero.com | Viewer | Active |
+| layton.hill@eero.com | Viewer | Active |
+| philip.rivera@eero.com | Viewer | Active |
 
 
 ## Permissions Matrix
 
-| Action | Super Admin | Admin | Operator | Viewer |
-|--------|:-----------:|:-----:|:--------:|:------:|
-| View all devices | ✓ | ✓ | ✓ | ✓ |
-| View all programs | ✓ | ✓ | ✓ | ✓ |
-| View all people/profiles | ✓ | ✓ | ✓ | ✓ |
-| View device detail | ✓ | ✓ | ✓ | ✓ |
-| View device timeline | ✓ | ✓ | ✓ | ✓ |
-| View pending returns | ✓ | ✓ | ✓ | ✓ |
-| Search | ✓ | ✓ | ✓ | ✓ |
-| Export CSV | ✓ | ✓ | ✓ | ✓ |
-| Click Insight/Admin links | ✓ | ✓ | ✓ | ✓ |
-| | | | | |
-| Add device | ✓ | ✓ | ✓ | ✗ |
-| Edit device details | ✓ | ✓ | ✓ | ✗ |
-| Upload shipments/allocations | ✓ | ✓ | ✓ | ✗ |
-| Import CSV | ✓ | ✓ | ✓ | ✗ |
-| Run network sync | ✓ | ✓ | ✓ | ✗ |
-| Add/edit tester profiles | ✓ | ✓ | ✓ | ✗ |
-| Send return emails | ✓ | ✓ | ✓ | ✗ |
-| Send follow-up reminders | ✓ | ✓ | ✓ | ✗ |
-| Confirm device received | ✓ | ✓ | ✓ | ✗ |
-| Record opt-out / opt-in | ✓ | ✓ | ✓ | ✗ |
-| | | | | |
-| Brick devices | ✓ | ✓ | ✗ | ✗ |
-| Archive devices | ✓ | ✓ | ✗ | ✗ |
-| Close/process programs | ✓ | ✓ | ✗ | ✗ |
-| Process region (brick/archive) | ✓ | ✓ | ✗ | ✗ |
-| Bulk return (with brick option) | ✓ | ✓ | ✗ | ✗ |
-| | | | | |
-| Manage users (add/disable/change roles) | ✓ | ✗ | ✗ | ✗ |
-| Clear all data | ✓ | ✗ | ✗ | ✗ |
-| Modify platform code/UI | ✓ | ✗ | ✗ | ✗ |
+| Action | Super Admin | Admin | Viewer |
+|--------|:-----------:|:-----:|:------:|
+| View all devices | ✓ | ✓ | ✓ |
+| View all programs | ✓ | ✓ | ✓ |
+| View all people/profiles | ✓ | ✓ | ✓ |
+| View device detail | ✓ | ✓ | ✓ |
+| View device timeline | ✓ | ✓ | ✓ |
+| View pending returns | ✓ | ✓ | ✓ |
+| Search | ✓ | ✓ | ✓ |
+| Export CSV | ✓ | ✓ | ✓ |
+| Click Insight/Admin links | ✓ | ✓ | ✓ |
+| | | | |
+| Add device | ✓ | ✓ | ✗ |
+| Edit device details | ✓ | ✓ | ✗ |
+| Upload shipments/allocations | ✓ | ✓ | ✗ |
+| Import CSV | ✓ | ✓ | ✗ |
+| Run network sync | ✓ | ✓ | ✗ |
+| Add/edit tester profiles | ✓ | ✓ | ✗ |
+| Send return emails | ✓ | ✓ | ✗ |
+| Send follow-up reminders | ✓ | ✓ | ✗ |
+| Confirm device received | ✓ | ✓ | ✗ |
+| Record opt-out / opt-in | ✓ | ✓ | ✗ |
+| Brick devices | ✓ | ✓ | ✗ |
+| Archive devices | ✓ | ✓ | ✗ |
+| Close/process programs | ✓ | ✓ | ✗ |
+| Process region (brick/archive) | ✓ | ✓ | ✗ |
+| Bulk return (with brick option) | ✓ | ✓ | ✗ |
+| | | | |
+| Manage users (add/disable/change roles) | ✓ | ✗ | ✗ |
+| Clear all data | ✓ | ✗ | ✗ |
+| Modify platform code/UI | ✓ | ✗ | ✗ |
 
 
 ## Authentication
@@ -70,42 +89,29 @@ Testers: Not included in this phase. Future consideration.
 
 ### Viewer sees:
 - All tabs visible (Devices, Programs, People, Device Ingestion & Returns, Locations)
-- All data visible (devices, profiles, history, programs)
+- All data visible (devices, profiles, history, programs, pending returns)
+- All links clickable (Insight, Admin, serial numbers, tester names)
+- Export/download buttons work (CSV exports)
 - No "Add Device" button
 - No "Close Program" button
 - No "Brick & Return" / "Archive" buttons
 - No "Return selected" button
 - No edit buttons on device detail
 - No "Upload Allocation" form
-- Export buttons still work (CSV downloads)
-- A subtle "View Only" badge in the nav bar
-
-### Operator sees:
-- Everything Viewer sees, plus:
-- "Add Device" button
-- "Upload Allocation" form
-- "Edit details" on device panel
-- "Return selected" button (opens Bulk Return — but brick checkbox is disabled/hidden)
-- "Send Reminder" buttons
-- "Confirm Received" buttons
-- Network Sync button
-- Import CSV functionality
-- Cannot see: "Brick & Return" option, "Close Program" button, "Archive selected" button
+- No "Confirm Received" button
+- A subtle "View Only" badge in the nav bar next to their name
 
 ### Admin sees:
-- Everything Operator sees, plus:
-- "Brick & Return" option in all flows
-- "Close Program" button on programs
-- "Archive selected" button
-- Per-region "Process" buttons
-- "Brick Device" button on overdue escalation
-- Full preview/diff modal with "Confirm & Execute"
+- Everything — full access to all features
+- All buttons active
+- Can brick, archive, close programs, upload, edit, send emails
+- Cannot see: User management panel (Super Admin only)
 
 ### Super Admin sees:
 - Everything Admin sees, plus:
 - User management panel (add users, assign roles, disable accounts)
 - "Clear All Data" button
-- Access to platform settings
+- Platform settings
 
 
 ## Audit Trail
@@ -130,14 +136,15 @@ Example: `"shkahma@eero.com bricked device GGC54MX36114004L — region: Australi
 | Re-hire / return | Super Admin re-enables account |
 
 
-## What I Need From You to Implement
+## Adding Users in the Future
 
-1. **Your @eero.com email** — to set as Super Admin
-2. **The 2 Admin emails** — people who can brick/archive
-3. **The 2 Operator emails** — people who manage day-to-day
-4. **Any initial Viewer emails** — or we can add them later
+Super Admin (allanc@eero.com) can add new users at any time through the User Management panel:
+1. Enter their @eero.com email
+2. Select role (Admin or Viewer)
+3. They receive a login invitation email
+4. They're immediately active once they verify
 
-That's all. Once I have those 5-6 emails, I can build the auth system with the roles pre-configured.
+To promote a Viewer to Admin, or add the Operator role later, Super Admin changes their role in the panel — takes effect immediately.
 
 
 ## Implementation Plan
