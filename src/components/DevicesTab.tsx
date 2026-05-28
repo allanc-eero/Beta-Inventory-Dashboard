@@ -7,9 +7,11 @@ import { Search, Plus, Monitor } from 'lucide-react';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import AddDeviceModal from './AddDeviceModal';
 import BulkReturnPanel from './BulkReturnPanel';
+import { useAuthStore } from '@/store/authStore';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
   const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'all'>('all');
   const [programFilter, setProgramFilter] = useState<Program | 'all'>('all');
@@ -102,17 +104,19 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
           ))}
         </select>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={16} />
-          Add Device
-        </button>
+        {canEdit() && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={16} />
+            Add Device
+          </button>
+        )}
       </div>
 
-      {/* Device actions */}
-      {selectedDevices.size === 1 && (
+      {/* Device actions — hidden for viewers */}
+      {canEdit() && selectedDevices.size === 1 && (
         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 p-3 rounded-lg sticky top-14 z-20">
           <span className="text-sm font-medium text-blue-800">
             1 device selected
@@ -157,7 +161,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
           </button>
         </div>
       )}
-      {selectedDevices.size > 1 && (
+      {canEdit() && selectedDevices.size > 1 && (
         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 p-3 rounded-lg sticky top-14 z-20">
           <span className="text-sm font-medium text-blue-800">
             {selectedDevices.size} device(s) selected

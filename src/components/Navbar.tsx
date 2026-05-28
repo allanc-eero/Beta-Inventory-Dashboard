@@ -3,6 +3,7 @@
 import { TabType } from '@/types';
 import { useState, useEffect } from 'react';
 import SearchModal from './SearchModal';
+import { useAuthStore } from '@/store/authStore';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -19,6 +20,7 @@ const tabs: { id: TabType; label: string }[] = [
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const { currentUser, logout, canEdit } = useAuthStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,10 +92,22 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
                 </svg>
               </button>
 
-              {/* User avatar */}
-              <button className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-medium hover:bg-white/30 transition-all">
-                A
-              </button>
+              {/* User info + logout */}
+              {currentUser && (
+                <div className="flex items-center gap-2">
+                  {!canEdit() && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-yellow-400/20 text-yellow-200 rounded font-medium">VIEW ONLY</span>
+                  )}
+                  <span className="text-xs text-white/70">{currentUser.name}</span>
+                  <button
+                    onClick={logout}
+                    className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-medium hover:bg-white/30 transition-all"
+                    title="Sign out"
+                  >
+                    {currentUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

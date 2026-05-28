@@ -14,12 +14,15 @@ import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
 import NetworkSyncButton from '@/components/NetworkSyncButton';
 import PendingReturnReminder from '@/components/PendingReturnReminder';
 import TodayBriefing from '@/components/TodayBriefing';
+import LoginPage from '@/components/LoginPage';
+import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('devices');
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const { isLoggedIn } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -48,6 +51,11 @@ export default function Home() {
         </div>
       </div>
     );
+  }
+
+  // Auth gate — show login if not authenticated
+  if (!isLoggedIn()) {
+    return <LoginPage />;
   }
 
   return (
