@@ -36,6 +36,7 @@ export default function ProgramsTab() {
   const [processing, setProcessing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [bulkReturnDevices, setBulkReturnDevices] = useState<Device[] | null>(null);
+  const [sessionProcessed, setSessionProcessed] = useState<{ serial: string; assignee: string; action: string; region: string }[]>([]);
   const [processResults, setProcessResults] = useState<{
     emailsSent: { email: string; deviceCount: number }[];
     devicesBricked: string[];
@@ -310,10 +311,37 @@ Device Management Team`
           </div>
         </div>
 
+        {/* Already Processed This Session */}
+        {sessionProcessed.length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-green-800">✓ Already Processed This Session</h3>
+              <span className="text-xs text-green-600 font-medium">{sessionProcessed.length} device(s) done</span>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-green-700 mb-2">
+              <span>{sessionProcessed.filter((d) => d.action === 'brick_and_return').length} bricked</span>
+              <span>{sessionProcessed.filter((d) => d.action === 'return').length} returned</span>
+              <span>{sessionProcessed.filter((d) => d.action === 'archive').length} archived</span>
+            </div>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-green-700 font-medium hover:text-green-900">View processed devices</summary>
+              <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
+                {sessionProcessed.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between p-1.5 bg-white rounded">
+                    <span className="font-mono">{d.serial}</span>
+                    <span className="text-gray-500">{d.assignee} · {d.region}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${d.action === 'brick_and_return' ? 'bg-red-100 text-red-700' : d.action === 'return' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{d.action.replace(/_/g, ' ')}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
+        )}
+
         {/* Bulk actions */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium text-gray-700">Set all to:</span>
+            <span className="text-sm font-medium text-gray-700">Set all remaining to:</span>
             <button onClick={() => handleSetAllActions('brick_and_return')} className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-800 border border-red-300 rounded-lg hover:bg-red-200">Brick & Return</button>
             <button onClick={() => handleSetAllActions('archive')} className="px-3 py-1.5 text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100">Archive</button>
           </div>
@@ -324,11 +352,12 @@ Device Management Team`
               <span className="text-red-700 font-medium">{actionCounts.return} return</span>
               <span className="text-red-800 font-medium">{actionCounts.brick_and_return} brick & return</span>
               <span className="text-gray-600 font-medium">{actionCounts.archive} archive</span>
+              {Object.keys(deviceActions).length === 0 && <span className="text-orange-600 font-medium">No actions selected yet</span>}
             </div>
             <button
               onClick={() => setShowPreview(true)}
-              disabled={processing}
-              className="ml-auto px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              disabled={processing || Object.keys(deviceActions).length === 0}
+              className="ml-auto px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Preview Changes →
             </button>
@@ -608,7 +637,25 @@ Device Management Team`
         <DeviceDetailPanel device={detailDevice} onClose={() => setDetailDevice(null)} />
       )}
       {bulkReturnDevices && (
-        <BulkReturnPanel devices={bulkReturnDevices} onClose={() => setBulkReturnDevices(null)} />
+        <BulkReturnPanel devices={bulkReturnDevices} onClose={() => {
+          // Track what was processed
+          const processed = bulkReturnDevices.filter((d) => {
+            const current = devices.find((dev) => dev.id === d.id);
+            return current && (current.status === 'deactivated' || current.status === 'pending_return');
+          });
+          if (processed.length > 0) {
+            setSessionProcessed((prev) => [
+              ...prev,
+              ...processed.map((d) => ({
+                serial: d.serialNumber,
+                assignee: d.assignedTo || d.assignedEmail || '—',
+                action: devices.find((dev) => dev.id === d.id)?.status === 'deactivated' ? 'brick_and_return' : 'return',
+                region: d.country || 'Unknown',
+              })),
+            ]);
+          }
+          setBulkReturnDevices(null);
+        }} />
       )}
       </>
     );
