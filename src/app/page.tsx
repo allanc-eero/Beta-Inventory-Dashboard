@@ -22,7 +22,7 @@ export default function Home() {
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { isLoggedIn, currentUser } = useAuthStore();
+  const { isLoggedIn, currentUser, canEdit } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -72,7 +72,15 @@ export default function Home() {
         <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab} />
         <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-12">
           <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
-          {activeTab === 'devices' && <TodayBriefing onNavigate={handleSetActiveTab} />}
+          {activeTab === 'devices' && canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
+          {activeTab === 'devices' && !canEdit() && (
+            <>
+              <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
+              <div className="mt-4">
+                <NetworkSyncButton />
+              </div>
+            </>
+          )}
           {activeTab !== 'devices' && (
             <>
               <OverdueAlertsBanner />
