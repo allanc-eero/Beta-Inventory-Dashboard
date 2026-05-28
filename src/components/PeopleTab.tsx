@@ -5,6 +5,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Search, Plus, Monitor } from 'lucide-react';
 import { OptOutReason, Device } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
+import { useAuthStore } from '@/store/authStore';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
   { value: 'no_longer_interested', label: 'No longer interested in testing' },
@@ -16,6 +17,7 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 
 export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
   const { devices, people, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<string | null>(initialSelectedPerson || null);
@@ -171,13 +173,15 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                 Opted Out ({optOuts.length})
               </button>
             </div>
-            <button
-              onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-            >
-              <Plus size={16} />
-              Add Person
-            </button>
+            {canEdit() && (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+              >
+                <Plus size={16} />
+                Add Person
+              </button>
+            )}
           </div>
         </div>
 
@@ -273,16 +277,18 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         <p><span className="font-medium text-gray-700">Devices at opt-out:</span> {record.devicesAtOptOut.join(', ')}</p>
                       )}
                     </div>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Opt ${record.personName} back in? They will be moved back to the active testers list.`)) {
-                          removeOptOut(record.personEmail);
-                        }
-                      }}
-                      className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
-                    >
-                      ✓ Opt Back In
-                    </button>
+                    {canEdit() && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Opt ${record.personName} back in? They will be moved back to the active testers list.`)) {
+                            removeOptOut(record.personEmail);
+                          }
+                        }}
+                        className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
+                      >
+                        ✓ Opt Back In
+                      </button>
+                    )}
                   </div>
                 )) : (
                   <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -330,12 +336,14 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setShowOptOut(true)}
-                        className="px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50"
-                      >
-                        Record Opt-Out
-                      </button>
+                      {canEdit() && (
+                        <button
+                          onClick={() => setShowOptOut(true)}
+                          className="px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50"
+                        >
+                          Record Opt-Out
+                        </button>
+                      )}
                     </div>
                   </div>
 

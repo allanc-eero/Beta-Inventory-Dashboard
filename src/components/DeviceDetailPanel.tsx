@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Device, DeviceStatus } from '@/types';
 import { ExternalLink, RefreshCw, Edit2, Clock, Download } from 'lucide-react';
 import { useDeviceStore } from '@/store/deviceStore';
+import { useAuthStore } from '@/store/authStore';
 import FirmwarePanel from './FirmwarePanel';
 import HealthPanel from './HealthPanel';
 import DeviceTimeline from './DeviceTimeline';
@@ -95,6 +96,7 @@ function exportDeviceCSV(device: Device) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DeviceDetailPanel({ device: initialDevice, onClose, onNavigateToPerson }: DeviceDetailPanelProps) {
   const { devices, updateDevice, addHistoryEntry, getTesterProfile } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(device);
@@ -143,10 +145,12 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
             <ActionButton onClick={() => exportDeviceCSV(device)} icon={<Download size={14} />} label="Export" />
             <ActionButton icon={<ExternalLink size={13} />} label="Admin panel" />
             <ActionButton icon={<RefreshCw size={14} />} label="Refresh from admin" />
-            <button onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-              <Edit2 size={14} /> Edit details
-            </button>
-            {device.status !== 'deactivated' && (
+            {canEdit() && (
+              <button onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                <Edit2 size={14} /> Edit details
+              </button>
+            )}
+            {canEdit() && device.status !== 'deactivated' && (
               <button onClick={() => setShowDeactivateModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
                 Return to eero
               </button>
