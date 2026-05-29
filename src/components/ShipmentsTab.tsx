@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Carrier, Shipment, Device, ShipmentStatus, DeviceStatus } from '@/types';
 import * as XLSX from 'xlsx';
@@ -96,6 +96,19 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
   const allShipments = getAllShipments();
   const pendingReturnDevices = devices.filter((d) => d.status === 'pending_return');
+
+  // Detect program from filename
+  const detectedProgram = useMemo(() => {
+    if (!fileName) return '';
+    const lower = fileName.toLowerCase();
+    if (lower.includes('beta')) return 'beta';
+    if (lower.includes('dogfood') || lower.includes('dog food') || lower.includes('dog_food')) return 'dogfood';
+    if (lower.includes('prq')) return 'prq';
+    if (lower.includes('pvt')) return 'pvt';
+    if (lower.includes('evt')) return 'evt';
+    if (lower.includes('dvt')) return 'dvt';
+    return '';
+  }, [fileName]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -341,6 +354,17 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 <div>
                   <p className="text-sm font-medium text-gray-900">📄 {fileName}</p>
                   <p className="text-xs text-green-600 mt-1">✓ File loaded — {parsedRows.length} row(s) parsed</p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFileName('');
+                      setParsedRows([]);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="mt-2 text-xs text-red-600 hover:text-red-800 font-medium"
+                  >
+                    ✕ Cancel upload
+                  </button>
                 </div>
               ) : (
                 <div>
@@ -349,6 +373,21 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 </div>
               )}
             </div>
+
+            {/* Program detection from filename */}
+            {fileName && detectedProgram && detectedProgram !== program && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                <p className="text-xs text-blue-800">
+                  This looks like a <strong>{detectedProgram.toUpperCase()}</strong> allocation based on the filename. Currently set to <strong>{program.toUpperCase()}</strong>.
+                </p>
+                <button
+                  onClick={() => setProgram(detectedProgram)}
+                  className="px-3 py-1 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-100"
+                >
+                  Switch to {detectedProgram.toUpperCase()}
+                </button>
+              </div>
+            )}
 
             {/* Shipment metadata */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
