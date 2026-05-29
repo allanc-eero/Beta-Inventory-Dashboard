@@ -45,6 +45,7 @@ const COLUMN_MAP: [keyof Device, string[]][] = [
   ['dueDate', ['due_date', 'Due Date', 'ETA', 'eta']],
   ['notes', ['notes', 'Notes']],
   ['testbedName', ['testbed_name', 'Testbed', 'Network Group', 'network_group']],
+  ['product', ['product', 'Product', 'product_name', 'Product Name', 'Codename']],
 ];
 
 function resolveColumn(row: any, aliases: string[]): string {

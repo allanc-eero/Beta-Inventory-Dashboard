@@ -68,6 +68,7 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
       adminLocation: '',
       network: profile?.networkId || '',
       program: formData.program,
+      product: '',
       assetTag: '',
       poExpensify: '',
       accountingId: '',

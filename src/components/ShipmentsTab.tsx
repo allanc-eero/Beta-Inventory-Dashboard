@@ -91,13 +91,14 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [successMsg, setSuccessMsg] = useState('');
   const [program, setProgram] = useState('beta');
+  const [productName, setProductName] = useState('');
   const [fileName, setFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allShipments = getAllShipments();
   const pendingReturnDevices = devices.filter((d) => d.status === 'pending_return');
 
-  // Detect program from filename
+  // Detect program and product from filename
   const detectedProgram = useMemo(() => {
     if (!fileName) return '';
     const lower = fileName.toLowerCase();
@@ -109,6 +110,20 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     if (lower.includes('dvt')) return 'dvt';
     return '';
   }, [fileName]);
+
+  const detectedProduct = useMemo(() => {
+    if (!fileName) return '';
+    const lower = fileName.toLowerCase();
+    // Known product names — grows as new ones are used
+    const knownProducts = [...new Set(devices.map((d) => d.product).filter(Boolean))];
+    for (const p of knownProducts) {
+      if (lower.includes(p.toLowerCase())) return p;
+    }
+    // Common product names to detect
+    if (lower.includes('foghorn')) return 'Foghorn';
+    if (lower.includes('merci')) return 'Merci';
+    return '';
+  }, [fileName, devices]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,6 +196,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             leg2Date: shipDate,
             shipmentStatus: 'in_transit_to_tester' as ShipmentStatus,
             program: program as Device['program'],
+            product: productName,
           });
           updatedDevices++;
         } else {
@@ -211,6 +227,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             adminLocation: '',
             network: '',
             program: program as Device['program'],
+            product: productName,
             assetTag: '',
             poExpensify: '',
             accountingId: '',
@@ -374,11 +391,11 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
               )}
             </div>
 
-            {/* Program detection from filename */}
+            {/* Program/Product detection from filename */}
             {fileName && detectedProgram && detectedProgram !== program && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                 <p className="text-xs text-blue-800">
-                  This looks like a <strong>{detectedProgram.toUpperCase()}</strong> allocation based on the filename. Currently set to <strong>{program.toUpperCase()}</strong>.
+                  Detected phase: <strong>{detectedProgram.toUpperCase()}</strong> from filename. Currently set to <strong>{program.toUpperCase()}</strong>.
                 </p>
                 <button
                   onClick={() => setProgram(detectedProgram)}
@@ -388,9 +405,22 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 </button>
               </div>
             )}
+            {fileName && detectedProduct && detectedProduct !== productName && (
+              <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between">
+                <p className="text-xs text-purple-800">
+                  Detected product: <strong>{detectedProduct}</strong> from filename.{productName ? ` Currently set to "${productName}".` : ' No product set yet.'}
+                </p>
+                <button
+                  onClick={() => setProductName(detectedProduct)}
+                  className="px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-md hover:bg-purple-100"
+                >
+                  Set to {detectedProduct}
+                </button>
+              </div>
+            )}
 
             {/* Shipment metadata */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Carrier</label>
                 <select
@@ -421,7 +451,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Program</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Phase</label>
                 <select
                   value={program}
                   onChange={(e) => setProgram(e.target.value)}
@@ -435,6 +465,22 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                   <option value="dvt">DVT</option>
                   <option value="other">Other</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Product</label>
+                <input
+                  type="text"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  list="product-suggestions"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  placeholder="e.g. Foghorn, Merci"
+                />
+                <datalist id="product-suggestions">
+                  {[...new Set(devices.map((d) => d.product).filter(Boolean))].map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
               </div>
             </div>
 

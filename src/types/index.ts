@@ -53,6 +53,7 @@ export interface Device {
   adminLocation: string;
   network: string;
   program: Program;
+  product: string; // free text — e.g., "Foghorn", "Merci"
   // Logistics
   assetTag: string;
   poExpensify: string;
