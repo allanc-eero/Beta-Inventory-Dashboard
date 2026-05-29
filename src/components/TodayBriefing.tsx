@@ -23,7 +23,7 @@ interface TodayBriefingProps {
 }
 
 export default function TodayBriefing({ onNavigate }: TodayBriefingProps) {
-  const { devices, getOptOuts } = useDeviceStore();
+  const { devices, getOptOuts, deviceHistory } = useDeviceStore();
 
   const briefing = useMemo(() => {
     const now = Date.now();
@@ -175,6 +175,47 @@ export default function TodayBriefing({ onNavigate }: TodayBriefingProps) {
         <span>{devices.filter((d) => d.status === 'not_online').length} offline</span>
         <span>{new Set(devices.map((d) => d.country).filter(Boolean)).size} countries</span>
       </div>
+
+      {/* Activity Feed — last 3 months */}
+      {(() => {
+        const threeMonthsAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+        const recentActivity = deviceHistory
+          .filter((h) => new Date(h.timestamp).getTime() > threeMonthsAgo)
+          .filter((h) => ['bricked', 'deactivated', 'return_requested', 'return_confirmed', 'email_sent', 'reminder_sent', 'program_closed', 'created', 'shipped_to_tester'].includes(h.action))
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, 20);
+
+        if (recentActivity.length === 0) return null;
+
+        const actionIcons: Record<string, string> = {
+          bricked: '🚨', deactivated: '📁', return_requested: '📦', return_confirmed: '✓',
+          email_sent: '📧', reminder_sent: '⏰', program_closed: '📋', created: '➕', shipped_to_tester: '🚚',
+        };
+
+        return (
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Recent Activity</h3>
+            <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-50 max-h-64 overflow-y-auto">
+              {recentActivity.map((entry) => {
+                const device = devices.find((d) => d.id === entry.deviceId);
+                return (
+                  <div key={entry.id} className="px-4 py-2.5 flex items-start gap-3">
+                    <span className="text-sm mt-0.5">{actionIcons[entry.action] || '•'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-700 truncate">{entry.description}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {device?.serialNumber && <span className="font-mono">{device.serialNumber} · </span>}
+                        {new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {entry.user !== 'System' && <span> · {entry.user}</span>}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

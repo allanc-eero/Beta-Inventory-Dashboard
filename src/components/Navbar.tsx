@@ -20,6 +20,7 @@ const tabs: { id: TabType; label: string }[] = [
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const { currentUser, logout, canEdit } = useAuthStore();
 
   useEffect(() => {
@@ -75,20 +76,34 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
                 <kbd className="hidden sm:inline-flex items-center px-1 py-0.5 bg-white/10 rounded text-[10px]">⌘K</kbd>
               </button>
 
-              {/* User info + logout */}
+              {/* User info + dropdown */}
               {currentUser && (
-                <div className="flex items-center gap-2">
+                <div className="relative flex items-center gap-2">
                   {!canEdit() && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-yellow-400/20 text-yellow-200 rounded font-medium">VIEW ONLY</span>
                   )}
                   <span className="text-xs text-white/70">{currentUser.name}</span>
                   <button
-                    onClick={logout}
+                    onClick={() => setShowUserMenu(!showUserMenu)}
                     className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-medium hover:bg-white/30 transition-all"
-                    title="Sign out"
                   >
                     {currentUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                   </button>
+                  {showUserMenu && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
+                        <p className="text-xs text-gray-500">{currentUser.email}</p>
+                        <p className="text-xs text-gray-400 capitalize mt-0.5">{currentUser.role.replace('_', ' ')}</p>
+                      </div>
+                      <button
+                        onClick={() => { setShowUserMenu(false); logout(); }}
+                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
