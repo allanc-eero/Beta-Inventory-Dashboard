@@ -1,3 +1,9 @@
-Serial Number,SKU,Config,Country,Location,Tester Name,Tester Email,Contact Email,Tracking Number,Sales Order,ETA,Status,Network ID,Unit ID,Network Group,Program,Region,Internet Speed,Firmware Version,Notes
-GGC54MX36114004L,NR-ME21115,EB5,Australia,"Kew, VIC",Shakeel Ahmad,shkahma@amazon.com,shkahma@amazon.com,5374120861,SO-497036,4/8/2026,Delivered,17001087,UID0002961227,Kunka,beta,AUS,2 GB - 4 GB,,Device online ready for testing
-,,,,,,,,,,,,,,,,,,,[Add rows below]
+Serial Number,Tester Email,Tracking Number,Program,Country,Config
+GGC54MX36114004L,shkahma@amazon.com,5374120861,beta,Australia,EB5
+GGC54MX36114003G,jonesaws@amazon.com,5374120850,beta,Australia,EB5
+,,,,,
+INSTRUCTIONS:,,,,,
+"Required columns: Serial Number, Tester Email, Tracking Number",,,,,
+"Optional columns: Program (defaults to beta), Country (auto-fills from profile), Config (hardware phase)",,,,,
+"Everything else auto-fills: Name, location, contact email, network ID — from tester profiles",,,,,
+"After upload: daily API sync fills in firmware, MAC, online status automatically",,,,,
