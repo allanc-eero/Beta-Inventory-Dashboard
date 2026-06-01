@@ -1,9 +1,3 @@
-Serial Number,Tester Email,Tracking Number,Program,Country,Config
-GGC54MX36114004L,shkahma@amazon.com,5374120861,beta,Australia,EB5
-GGC54MX36114003G,jonesaws@amazon.com,5374120850,beta,Australia,EB5
-,,,,,
-INSTRUCTIONS:,,,,,
-"Required columns: Serial Number, Tester Email, Tracking Number",,,,,
-"Optional columns: Program (defaults to beta), Country (auto-fills from profile), Config (hardware phase)",,,,,
-"Everything else auto-fills: Name, location, contact email, network ID — from tester profiles",,,,,
-"After upload: daily API sync fills in firmware, MAC, online status automatically",,,,,
+First Name,Last Name,Product,Phase,Email,Tracking,Serial Number,Insight Network Link
+Shakeel,Ahmad,Merci,Beta,shkahma@amazon.com,5374120861,GGC54MX36114004L,https://insight.eero.com/networks/17001087
+Mark,Jones,Merci,Beta,jonesaws@amazon.com,5374120850,GGC54MX36114003G,https://insight.eero.com/networks/14148818

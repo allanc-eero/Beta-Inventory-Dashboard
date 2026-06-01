@@ -20,6 +20,10 @@ interface ParsedRow {
   name: string;
   tracking: string;
   alias: string;
+  email: string;
+  networkId: string;
+  rowProduct: string;
+  rowPhase: string;
   serials: string[];
 }
 
@@ -75,7 +79,7 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
 
     if (serials.length === 0) return null;
 
-    return { name, tracking, alias, serials };
+    return { name, tracking, alias, email: '', networkId: '', rowProduct: '', rowPhase: '', serials };
   }).filter(Boolean) as ParsedRow[];
 }
 
@@ -141,12 +145,30 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
       // Map Excel rows to ParsedRows
       const rows: ParsedRow[] = jsonData.map((row) => {
-        // Find columns by common header names
-        const name = row['ShipTo'] || row['Name'] || row['name'] || row['Ship To'] || '';
-        const tracking = row['TrackingNumber'] || row['Tracking'] || row['tracking'] || row['Tracking Number'] || '';
+        // Name: combine First Name + Last Name, or fall back to ShipTo/Name
+        const firstName = row['First Name'] || row['first_name'] || row['FirstName'] || '';
+        const lastName = row['Last Name'] || row['last_name'] || row['LastName'] || '';
+        const name = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (row['ShipTo'] || row['Name'] || row['name'] || row['Ship To'] || '');
+
+        // Tracking
+        const tracking = row['Tracking'] || row['TrackingLink'] || row['TrackingNumber'] || row['Tracking Number'] || row['tracking'] || '';
+
+        // Email
+        const email = row['Email'] || row['email'] || row['Alias'] || row['alias'] || '';
         const alias = row['Alias'] || row['alias'] || row['Login'] || '';
 
-        // Collect all DSN/Serial columns
+        // Product & Phase from row (overrides filename detection if present)
+        const rowProduct = row['Product'] || row['product'] || row['Product Name'] || '';
+        const rowPhase = row['Phase'] || row['phase'] || row['Program'] || row['program'] || '';
+
+        // Insight Network Link — extract network ID from URL
+        const insightLink = row['Insight Network Link'] || row['Network Link'] || row['Insight'] || row['Network ID'] || row['network_id'] || '';
+        let networkId = insightLink;
+        // If it's a URL like https://insight.eero.com/networks/17001087, extract the ID
+        const networkMatch = insightLink.match(/networks\/(\d+)/);
+        if (networkMatch) networkId = networkMatch[1];
+
+        // Collect all Serial columns
         const serials: string[] = [];
         Object.keys(row).forEach((key) => {
           if ((key.toLowerCase().includes('dsn') || key.toLowerCase().includes('serial')) && row[key]) {
@@ -158,8 +180,17 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         });
 
         if (serials.length === 0) return null;
-        return { name: String(name), tracking: String(tracking), alias: String(alias), serials };
+        return { name: String(name), tracking: String(tracking), alias: String(alias), email: String(email), networkId: String(networkId), rowProduct: String(rowProduct), rowPhase: String(rowPhase), serials };
       }).filter(Boolean) as ParsedRow[];
+
+      // Auto-set product and phase from first row if available
+      if (rows.length > 0) {
+        if (rows[0].rowProduct && !productName) setProductName(rows[0].rowProduct);
+        if (rows[0].rowPhase) {
+          const phase = rows[0].rowPhase.toLowerCase();
+          if (['beta', 'dogfood', 'prq', 'pvt', 'evt', 'dvt'].includes(phase)) setProgram(phase);
+        }
+      }
 
       setParsedRows(rows);
       setPasteInput('');
@@ -189,8 +220,9 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           // Update existing device with assignment + tracking + program
           updateDevice(existing.id, {
             assignedTo: row.name,
-            assignedEmail: row.alias ? `${row.alias}@amazon.com` : '',
+            assignedEmail: row.email || (row.alias ? `${row.alias}@amazon.com` : ''),
             checkedOutTo: row.name,
+            network: row.networkId || undefined,
             leg2Tracking: row.tracking,
             leg2Carrier: carrier,
             leg2Date: shipDate,
@@ -220,12 +252,12 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             firmwareVersion: '',
             status: 'not_online',
             assignedTo: row.name,
-            assignedEmail: row.alias ? `${row.alias}@amazon.com` : '',
+            assignedEmail: row.email || (row.alias ? `${row.alias}@amazon.com` : ''),
             contactEmail: '',
             alternateEmail: '',
             location: '',
             adminLocation: '',
-            network: '',
+            network: row.networkId || '',
             program: program as Device['program'],
             product: productName,
             assetTag: '',
