@@ -151,7 +151,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         const name = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (row['ShipTo'] || row['Name'] || row['name'] || row['Ship To'] || '');
 
         // Tracking
-        const tracking = row['Tracking'] || row['TrackingLink'] || row['TrackingNumber'] || row['Tracking Number'] || row['tracking'] || '';
+        const tracking = row['Tracking'] || row['TrackingLink'] || row['TrackingNumber'] || row['Tracking Number'] || row['tracking'] || row['Link'] || '';
 
         // Email
         const email = row['Email'] || row['email'] || row['Alias'] || row['alias'] || '';
@@ -161,13 +161,20 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         const rowProduct = row['Product'] || row['product'] || row['Product Name'] || '';
         const rowPhase = row['Phase'] || row['phase'] || row['Program'] || row['program'] || '';
 
-        // Insight Network Link — extract network ID from URL
+        // Insight Network Link — extract network ID from URL or use as-is if numeric
         const insightLinkRaw = row['Insight Network Link'] || row['Network Link'] || row['Insight'] || row['Network ID'] || row['network_id'] || '';
-        const insightLink = String(insightLinkRaw);
-        let networkId = insightLink;
-        // If it's a URL like https://insight.eero.com/networks/17001087, extract the ID
-        const networkMatch = insightLink.match(/networks\/(\d+)/);
-        if (networkMatch) networkId = networkMatch[1];
+        const insightLink = String(insightLinkRaw).trim();
+        let networkId = '';
+        if (insightLink && insightLink !== 'no network' && insightLink !== 'No Network') {
+          // If it's a URL, extract the network ID
+          const networkMatch = insightLink.match(/networks\/(\d+)/);
+          if (networkMatch) {
+            networkId = networkMatch[1];
+          } else if (/^\d+$/.test(insightLink)) {
+            // Plain number — use as-is
+            networkId = insightLink;
+          }
+        }
 
         // Collect all Serial columns
         const serials: string[] = [];
@@ -184,12 +191,15 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         return { name: String(name), tracking: String(tracking), alias: String(alias), email: String(email), networkId: String(networkId), rowProduct: String(rowProduct), rowPhase: String(rowPhase), serials };
       }).filter(Boolean) as ParsedRow[];
 
-      // Auto-set product and phase from first row if available
+      // Auto-set product and phase from spreadsheet data
       if (rows.length > 0) {
-        if (rows[0].rowProduct && !productName) setProductName(rows[0].rowProduct);
-        if (rows[0].rowPhase) {
-          const phase = rows[0].rowPhase.toLowerCase();
-          if (['beta', 'dogfood', 'prq', 'pvt', 'evt', 'dvt'].includes(phase)) setProgram(phase);
+        const firstRowPhase = rows[0].rowPhase?.toLowerCase().trim();
+        const firstRowProduct = rows[0].rowProduct?.trim();
+        if (firstRowPhase && ['beta', 'dogfood', 'prq', 'pvt', 'evt', 'dvt'].includes(firstRowPhase)) {
+          setProgram(firstRowPhase);
+        }
+        if (firstRowProduct) {
+          setProductName(firstRowProduct);
         }
       }
 
