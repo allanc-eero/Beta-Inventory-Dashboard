@@ -162,7 +162,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         const rowPhase = row['Phase'] || row['phase'] || row['Program'] || row['program'] || '';
 
         // Insight Network Link — extract network ID from URL
-        const insightLink = row['Insight Network Link'] || row['Network Link'] || row['Insight'] || row['Network ID'] || row['network_id'] || '';
+        const insightLinkRaw = row['Insight Network Link'] || row['Network Link'] || row['Insight'] || row['Network ID'] || row['network_id'] || '';
+        const insightLink = String(insightLinkRaw);
         let networkId = insightLink;
         // If it's a URL like https://insight.eero.com/networks/17001087, extract the ID
         const networkMatch = insightLink.match(/networks\/(\d+)/);
