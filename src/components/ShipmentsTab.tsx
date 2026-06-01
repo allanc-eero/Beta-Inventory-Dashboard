@@ -24,6 +24,8 @@ interface ParsedRow {
   networkId: string;
   rowProduct: string;
   rowPhase: string;
+  country: string;
+  address: string;
   serials: string[];
 }
 
@@ -79,7 +81,7 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
 
     if (serials.length === 0) return null;
 
-    return { name, tracking, alias, email: '', networkId: '', rowProduct: '', rowPhase: '', serials };
+    return { name, tracking, alias, email: '', networkId: '', rowProduct: '', rowPhase: '', country: '', address: '', serials };
   }).filter(Boolean) as ParsedRow[];
 }
 
@@ -161,6 +163,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         const rowProduct = row['Product'] || row['product'] || row['Product Name'] || '';
         const rowPhase = row['Phase'] || row['phase'] || row['Program'] || row['program'] || '';
 
+        // Address & Country
+        const country = row['Country'] || row['country'] || '';
+        const address = row['Address'] || row['address'] || row['Location'] || row['location'] || '';
+
         // Insight Network Link — extract network ID from URL or use as-is if numeric
         const insightLinkRaw = row['Insight Network Link'] || row['Network Link'] || row['Insight'] || row['Network ID'] || row['network_id'] || '';
         const insightLink = String(insightLinkRaw).trim();
@@ -188,7 +194,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         });
 
         if (serials.length === 0) return null;
-        return { name: String(name), tracking: String(tracking), alias: String(alias), email: String(email), networkId: String(networkId), rowProduct: String(rowProduct), rowPhase: String(rowPhase), serials };
+        return { name: String(name), tracking: String(tracking), alias: String(alias), email: String(email), networkId: String(networkId), rowProduct: String(rowProduct), rowPhase: String(rowPhase), country: String(country), address: String(address), serials };
       }).filter(Boolean) as ParsedRow[];
 
       // Auto-set product and phase from spreadsheet data
@@ -256,7 +262,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             internalName: `${productName || row.rowProduct || ''} ${program.toUpperCase()}`.trim(),
             sku: '',
             partNumber: '',
-            country: '',
+            country: row.country || '',
             adminId: '',
             unitId: '',
             deactivated: false,
@@ -266,7 +272,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             assignedEmail: row.email || (row.alias ? `${row.alias}@amazon.com` : ''),
             contactEmail: '',
             alternateEmail: '',
-            location: '',
+            location: row.address || '',
             adminLocation: '',
             network: row.networkId || '',
             program: program as Device['program'],
