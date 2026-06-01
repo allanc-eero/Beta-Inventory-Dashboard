@@ -2,100 +2,120 @@ Beta Inventory Dashboard — Project Overview
 
 What Is This?
 
-The Beta Inventory Dashboard is a web-based tool built to manage the full lifecycle of eero hardware devices that get shipped to testers across beta, dogfood, and other testing programs. It replaces the manual spreadsheet tracking process with a centralized platform where you can see every device, who has it, what program it belongs to, and whether it's online or not.
+The Beta Inventory Dashboard is a web-based tool built to manage the full lifecycle of eero hardware devices that get shipped to testers across beta, dogfood, PVT, EVT, DVT, and other testing programs. It replaces the manual spreadsheet tracking process with a centralized platform where you can see every device, who has it, what program it belongs to, and whether it's online or not.
 
-It runs locally in a browser — no server or cloud setup required. All data persists in the browser's local storage.
-
-
-The Problem It Solves
-
-Before this tool, device tracking lived in spreadsheets. When someone emailed asking "where's my device?" or a program ended and 77 devices needed to be returned, the team had to dig through multiple tabs, cross-reference tracking numbers, and manually send emails. There was no single view of who had what, which devices were online, or which testers had participated in previous programs.
-
-This dashboard gives the team one place to:
-- See all devices and their current status at a glance
-- Look up any tester and see exactly what devices they have
-- Import new program allocations from a CSV and have everything auto-populate
-- Close out programs with one workflow (archive, brick, or return devices)
-- Track shipments across both legs (warehouse to FC, FC to tester)
-- Link directly to eero's admin and Insight dashboards from any device
+It runs locally in a browser with role-based access control. All data persists in the browser's local storage.
 
 
-What You'll See in the Demo
+Who Can Access It
 
-Dashboard Stats — The top row shows live counts: total devices, online, not online, countries, programs, people, and overdue devices.
+| Role | People | What they can do |
+|------|--------|-----------------|
+| Super Admin | allanc@eero.com | Everything — manage users, brick, archive, edit, upload |
+| Admin | haley.swanson@eero.com | Brick, archive, close programs, upload, edit, send emails |
+| Viewer | 11 team members | View all data, export CSVs. Cannot make changes. |
 
-Devices Tab — A searchable, filterable table of all devices. Click any serial number to open the full device detail panel showing hardware info, assignment, logistics, contact emails, and a device timeline. You can edit fields inline, export device info as a CSV, and click the Admin ID or Network ID to jump directly to eero's admin or Insight dashboards.
-
-Programs Tab — Shows active programs with device counts (total/online/offline). The "Close Program" workflow lets you decide what happens to each device: archive it, brick it via the Partner API, or mark it for return. After processing, the system generates return emails and saves the full history. Archived programs remain viewable with clickable serial numbers that trace back to the tester's profile.
-
-People Tab — A directory of all testers derived from device assignments. Search by name or email. Click a person to see all their devices, statuses, and history. You can record opt-outs with reasons. This is where you go when someone emails asking about their device.
-
-Import — Drag and drop a CSV to import devices. The system matches columns flexibly (supports multiple naming conventions), upserts by serial number (updates existing devices, adds new ones), and auto-creates tester profiles. If a tester is already known from a previous program, their country, location, contact email, network ID, and other stable info auto-fills onto the new device.
-
-Shipments Tab — Track device shipments across two legs with carrier and tracking info.
-
-Network Sync — A button that (in production) polls the eero Partner API to detect which devices have come online, automatically updating their status.
-
-
-Key Feature: Tester Profiles
-
-This is the biggest workflow improvement. The system maintains a persistent profile for each tester, keyed by their email address. The profile stores their name, country, location, contact email, alternate email, network ID, and admin ID.
-
-When a new program launches and you import a spreadsheet with new serial numbers, you only need to provide the serial number and the tester's email. The system recognizes the email, pulls their profile, and auto-fills everything else. No more re-entering the same tester info across programs.
-
-Profiles are created and updated automatically every time data is imported.
-
-
-Key Feature: Clickable Links to eero Systems
-
-Throughout the app, Admin IDs and Network IDs are clickable links:
-- Admin ID opens https://admin.e2ro.com/users/{id}
-- Network ID opens https://insight.eero.com/networks/{id}
-
-This means you can go from the dashboard directly into eero's internal tools without copying and pasting IDs.
+Login is via @eero.com email. Viewers see a "VIEW ONLY" badge and all action buttons are hidden.
 
 
 How Data Gets In
 
-There are three ways to get device data into the system:
+Upload an Excel file (.xlsx) or CSV to the Device Ingestion & Returns tab. The system reads these columns:
 
-1. CSV Import — The primary method. Use the template in docs/Device_Intake_Template.csv. Core columns needed: Serial Number, Tester Email, Program, SKU/Config. Everything else either auto-fills from tester profiles or can be added later.
+| Column | Required? | What it does |
+|--------|-----------|-------------|
+| First Name | Yes | Combined with Last Name for "Assigned To" |
+| Last Name | Yes | Combined with First Name |
+| Product | Yes | e.g., "Foghorn" — the hardware product |
+| Phase | Yes | e.g., "PVT" — the testing stage |
+| Email | Yes | Links to tester profile, auto-fills known info |
+| Tracking | Yes | Shipment tracking number |
+| Serial Number | Yes | Creates the device |
+| Insight Network Link | Optional | Extracts network ID for Insight links |
+| Address | Optional | Tester's location |
+| Country | Optional | Used for region grouping |
 
-2. Add Device Modal — Manual entry for one-off additions. Type a known email and the system auto-fills from their profile.
+The filename is also read: "Foghorn PVT.xlsx" auto-sets Product = Foghorn, Phase = PVT.
 
-3. Seed Data — The demo ships with pre-loaded Australian beta tester data so you can explore the interface immediately.
+Product is a free-text field — type any product name and it becomes available for future uploads. Phase is a fixed set: Beta, Dogfood, PVT, EVT, DVT, PRQ, Other.
+
+
+What You See When You Log In
+
+Admins see the "Today Briefing" — a prioritized action list:
+- Overdue devices (2+ weeks pending return)
+- Devices needing follow-up reminders (1 week)
+- Programs partially closed
+- Pending returns
+- Recent opt-outs
+- Devices that came online
+- Activity feed (last 3 months of actions)
+
+Viewers see stat cards: total devices, online, offline, countries.
+
+
+Key Features
+
+Devices Tab — Grouped by program (e.g., "Foghorn PVT · 15 devices"). Searchable, filterable by status and phase. Click any serial to see full device detail with editable fields, Insight/Admin links, return status, and device timeline.
+
+Programs Tab — Shows active programs with device counts. "Close Program" flow lets you process by region or all at once. Full Bulk Return workflow with editable emails grouped by region, preview before execution, and persistent tracking of what's been processed.
+
+People Tab — Tester profiles with stable Tester IDs (TST-XXXXX). Shows all emails, programs, devices, network IDs, admin IDs. Duplicate detection when adding new people. Opt-out tracking with reasons.
+
+Device Ingestion & Returns — Upload allocations, track pending returns, confirm device receipt. Drag-and-drop file upload with auto-detection of product/phase from filename.
+
+Tester Profiles — Persistent per-person records keyed by email. When a tester joins a new program, their country, location, contact email, network ID, and admin ID auto-fill from their profile. No re-entry needed.
 
 
 How a Program Closes
 
-1. Go to Programs tab
-2. Click "Close Program" on the active program
-3. For each device, choose: Archive, Brick & Return, or Return to eero
-4. Click "Close Program & Process"
-5. The system deactivates devices, generates return emails, and saves the full record
-6. The program moves to "Archived Programs" with all serial numbers still clickable
+1. Go to Programs → click "Close Program" (or "Continue Processing" if partially done)
+2. Choose per-device actions: Brick & Return, Archive, or Return to eero
+3. Use program-wide buttons for all devices, or per-region buttons for targeted processing
+4. Each action opens the full Bulk Return flow: emails, preview, confirmation
+5. Processed devices are tracked persistently — visible even after navigating away
+6. Program only moves to "Archived" when every device is accounted for
 
 
-Tech Summary (for context)
+Return & Escalation Flow
 
-- Built with Next.js (React) and TypeScript
-- Styled with Tailwind CSS
-- State managed with Zustand (persists to localStorage)
-- CSV parsing via PapaParse
-- No backend server or database — runs entirely in the browser
-- To run: npm install, then npm run dev, open http://localhost:3000
+1. Return email sent → device marked as "Pending Return" (not deactivated)
+2. Week 1: yellow reminder prompt appears on device detail
+3. Week 2: red escalation — "Contact directly or brick"
+4. Overdue stat card turns red, links to Pending Returns tab
+5. Daily login popup reminds admin of outstanding items
+6. "Confirm Device Received" button → marks as deactivated (only way to deactivate besides bricking)
 
 
-Current Status
+Guardrails
 
-This is a working prototype/demo. The core workflows are functional:
-- Device CRUD and detail views
-- CSV import with upsert and profile auto-fill
-- Program close workflow with email generation
-- People lookup and opt-out tracking
-- Clickable links to eero admin/Insight
+- Every destructive action (brick, archive, close program) goes through a Preview modal showing exactly what will happen
+- Large batches (10+ devices) get a warning recommending per-region processing
+- Viewers cannot see or access any action buttons
+- All emails sent from beta-teams@eero.com (linked to Salesforce)
+- Full audit trail on every device showing who did what and when
 
-What's stubbed (would need real integration for production):
-- Partner API calls (network sync, device bricking) — the UI flow works but doesn't hit real endpoints without an API token
-- Multi-user access — currently single-user, browser-local
-- Server-side persistence — would need a database for team-wide use
+
+External Links
+
+- Admin ID → https://admin.e2ro.com/users/{id}
+- Insight Network → https://insight.eero.com/networks/{id}
+- Clickable throughout the app (device detail, tester profiles)
+
+
+Tech Summary
+
+- Next.js 14 (React) + TypeScript
+- Tailwind CSS
+- Zustand (state management, persists to localStorage)
+- PapaParse (CSV), XLSX (Excel parsing)
+- No backend server — runs entirely in browser
+- To run: npm install → npm run dev → http://localhost:3000
+
+
+Current Limitations
+
+- Data is browser-local (localStorage). No multi-user sync.
+- Email uses mailto: links — no delivery confirmation (production needs SES/SMTP)
+- Partner API calls are simulated — network sync, bricking don't hit real endpoints without a token
+- Admin ID / Network ID auto-population requires production API integration
