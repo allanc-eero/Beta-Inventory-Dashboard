@@ -172,6 +172,12 @@ All features currently run with simulated API calls (setTimeout delays). When la
 - [ ] **Network Status Sync** — Replace `fetchOnlineDevicesFromAPI()` in `NetworkSyncButton.tsx` with real `fetch()` calls to:
   - `GET /2.2/organizations/self/networks/administered`
   - `GET /2.2/networks/:id/eeros` (check `status === 'green'`)
+- [ ] **Auto-populate Admin ID & Network ID on sync** — When the sync discovers a device online:
+  - Extract `network_id` and `unit_id` (UID) from the API response for each eero
+  - Save to the device record (`network`, `unitId` fields)
+  - Update the tester profile with these IDs so they carry forward to future programs
+  - This is how new testers get their Insight/Admin links populated automatically — no manual entry needed
+  - API response fields to extract: `url` (network URL), `serial`, `model_number`, `id` (eero ID)
 - [ ] **Device Bricking** — Replace `setTimeout` in `DeactivateDeviceModal.tsx` and `BulkReturnPanel.tsx` with:
   - `POST /2.2/eeros/:id/activation_state` with `{ "active": false }`
 - [ ] **Firmware Push** — Replace `setTimeout` in `FirmwarePanel.tsx` with:
