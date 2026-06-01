@@ -79,7 +79,7 @@ export default function ProgramsTab() {
 
   const handleSetAllActions = (action: DeviceAction) => {
     const updated: Record<string, DeviceAction> = {};
-    Object.keys(deviceActions).forEach((id) => { updated[id] = action; });
+    selectedDevices.forEach((d) => { updated[d.id] = action; });
     setDeviceActions(updated);
   };
 
