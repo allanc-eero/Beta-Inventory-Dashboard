@@ -253,7 +253,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             revisionNotes: '',
             hardwareConfig: '',
             mac: '',
-            internalName: '',
+            internalName: `${productName || row.rowProduct || ''} ${program.toUpperCase()}`.trim(),
             sku: '',
             partNumber: '',
             country: '',
