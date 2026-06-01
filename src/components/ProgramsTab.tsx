@@ -355,19 +355,19 @@ Device Management Team`
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => handleSetAllActions('brick_and_return')}
+              onClick={() => { handleSetAllActions('brick_and_return'); setBulkReturnDevices(selectedDevices); }}
               className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Brick & Return All Devices
             </button>
             <button
-              onClick={() => handleSetAllActions('archive')}
+              onClick={() => { handleSetAllActions('archive'); setBulkReturnDevices(selectedDevices); }}
               className="px-4 py-2 text-sm font-medium bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
             >
               Archive All Devices
             </button>
             <button
-              onClick={() => handleSetAllActions('return')}
+              onClick={() => { handleSetAllActions('return'); setBulkReturnDevices(selectedDevices); }}
               className="px-4 py-2 text-sm font-medium bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
             >
               Return All Devices
