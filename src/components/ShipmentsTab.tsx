@@ -247,7 +247,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           const newDevice: Device = {
             id: crypto.randomUUID(),
             serialNumber: serial,
-            model: 'eero Max 7',
+            model: '',
             manufacturer: 'eero',
             revision: '',
             revisionNotes: '',

@@ -52,9 +52,10 @@ export default function ProgramsTab() {
     return programNames
       .map((name) => {
         const programDevices = devices.filter((d) => d.program === name);
+        const product = programDevices.find((d) => d.product)?.product || '';
         return {
           name,
-          label: PROGRAM_LABELS[name],
+          label: product ? `${product} ${PROGRAM_LABELS[name]}` : PROGRAM_LABELS[name],
           deviceCount: programDevices.length,
           onlineCount: programDevices.filter((d) => d.status === 'online').length,
           offlineCount: programDevices.filter((d) => d.status === 'not_online').length,

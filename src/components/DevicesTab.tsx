@@ -223,7 +223,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
               <div key={prog} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4">
                 <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
                   <span className={`px-2.5 py-0.5 rounded text-xs font-semibold ${prog === 'unassigned' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {prog === 'unassigned' ? '⚠️ No Program' : prog.toUpperCase()}
+                    {prog === 'unassigned' ? '⚠️ No Program' : `${grouped[prog][0]?.product ? grouped[prog][0].product + ' ' : ''}${prog.toUpperCase()}`}
                   </span>
                   <span className="text-xs text-gray-400">{grouped[prog].length} device(s)</span>
                 </div>
@@ -252,7 +252,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
                           <td className="px-4 py-2.5 font-mono text-xs font-medium text-blue-700">{device.serialNumber}</td>
                           <td className="px-4 py-2.5">{device.model}</td>
                           <td className="px-4 py-2.5 text-gray-600">{device.internalName}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{device.revision || '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{device.program?.toUpperCase() || '—'}</td>
                           <td className="px-4 py-2.5 font-mono text-xs">{device.firmwareVersion || '—'}</td>
                           <td className="px-4 py-2.5 text-gray-600">{device.assignedTo || device.checkedOutTo || '—'}</td>
                           <td className="px-4 py-2.5"><StatusBadge status={device.status} /></td>
