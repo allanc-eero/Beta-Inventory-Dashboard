@@ -15,23 +15,16 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'all'>('all');
   const [programFilter, setProgramFilter] = useState<Program | 'all'>('all');
-  const [modelFilter, setModelFilter] = useState('all');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkReturn, setShowBulkReturn] = useState(false);
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
-
-  const models = useMemo(() => {
-    const m = new Set(devices.map((d) => d.model).filter(Boolean));
-    return Array.from(m).sort();
-  }, [devices]);
 
   const filteredDevices = useMemo(() => {
     return devices.filter((d) => {
       const matchesSearch =
         !search ||
         d.serialNumber.toLowerCase().includes(search.toLowerCase()) ||
-        d.model.toLowerCase().includes(search.toLowerCase()) ||
         d.internalName.toLowerCase().includes(search.toLowerCase()) ||
         d.assignedTo?.toLowerCase().includes(search.toLowerCase()) ||
         d.assignedEmail?.toLowerCase().includes(search.toLowerCase()) ||
@@ -39,11 +32,10 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
 
       const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
       const matchesProgram = programFilter === 'all' || d.program === programFilter;
-      const matchesModel = modelFilter === 'all' || d.model === modelFilter;
 
-      return matchesSearch && matchesStatus && matchesProgram && matchesModel;
+      return matchesSearch && matchesStatus && matchesProgram;
     });
-  }, [devices, search, statusFilter, programFilter, modelFilter]);
+  }, [devices, search, statusFilter, programFilter]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedDevices);
@@ -91,17 +83,6 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
           <option value="evt">EVT</option>
           <option value="dvt">DVT</option>
           <option value="other">Other</option>
-        </select>
-
-        <select
-          value={modelFilter}
-          onChange={(e) => setModelFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All Models</option>
-          {models.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
         </select>
 
         {canEdit() && (
@@ -235,7 +216,6 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
                           <input type="checkbox" checked={grouped[prog].every((d) => selectedDevices.has(d.id))} onChange={() => { const ids = grouped[prog].map((d) => d.id); const allSelected = ids.every((id) => selectedDevices.has(id)); const next = new Set(selectedDevices); if (allSelected) { ids.forEach((id) => next.delete(id)); } else { ids.forEach((id) => next.add(id)); } setSelectedDevices(next); }} className="rounded border-gray-300" />
                         </th>
                         <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Serial Number</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Model</th>
                         <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Internal Name</th>
                         <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Phase</th>
                         <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Firmware</th>
@@ -250,7 +230,6 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
                             <input type="checkbox" checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} className="rounded border-gray-300" />
                           </td>
                           <td className="px-4 py-2.5 font-mono text-xs font-medium text-blue-700">{device.serialNumber}</td>
-                          <td className="px-4 py-2.5">{device.model}</td>
                           <td className="px-4 py-2.5 text-gray-600">{device.internalName}</td>
                           <td className="px-4 py-2.5 text-gray-600">{device.program?.toUpperCase() || '—'}</td>
                           <td className="px-4 py-2.5 font-mono text-xs">{device.firmwareVersion || '—'}</td>
