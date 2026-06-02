@@ -193,7 +193,7 @@ Device Management Team`);
 
         // Open email (only for first tester to avoid popup blocking)
         if (email === Object.keys(groupedByAssignee)[0]) {
-          window.open(`mailto:${email}?from=beta-teams@eero.com&subject=${subject}&body=${body}`, '_self');
+          window.open(`mailto:${email}?from=beta-team@eero.com&subject=${subject}&body=${body}`, '_self');
         }
 
         // Generate shipping label for this tester
@@ -425,7 +425,7 @@ Device Management Team`);
           <div className="bg-white rounded-xl border border-blue-200 p-6 mb-8">
             <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">📧 Emails to Testers — Grouped by Region</h3>
             <p className="text-xs text-gray-500 mb-2">
-              Emails are grouped by region since return instructions differ per country. Edit each region's template independently. Sent from: <strong>beta-teams@eero.com</strong>
+              Emails are grouped by region since return instructions differ per country. Edit each region's template independently. Sent from: <strong>beta-team@eero.com</strong>
             </p>
 
             <div className="mb-4">
@@ -470,7 +470,7 @@ Device Management Team`);
                           <span className="text-sm font-semibold text-gray-700">📍 {region}</span>
                           <span className="text-xs text-gray-400">{regionEmails[region].length} tester(s) · {regionEmails[region].reduce((sum, t) => sum + t.devices.length, 0)} device(s)</span>
                         </div>
-                        <span className="text-xs text-gray-400">From: beta-teams@eero.com</span>
+                        <span className="text-xs text-gray-400">From: beta-team@eero.com</span>
                       </div>
 
                       <div className="divide-y divide-gray-100">
@@ -617,7 +617,7 @@ Device Management Team`);
 
                 {requiresReturn && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-xs font-medium text-blue-800">{assigneeCount} return email(s) will be sent (grouped by region, from beta-teams@eero.com)</p>
+                    <p className="text-xs font-medium text-blue-800">{assigneeCount} return email(s) will be sent (grouped by region, from beta-team@eero.com)</p>
                   </div>
                 )}
               </div>

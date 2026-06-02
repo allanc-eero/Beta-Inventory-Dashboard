@@ -187,6 +187,21 @@ export interface JiraTicket {
   url?: string;
 }
 
+// ─── Feature: Salesforce Cases ────────────────────────────────────────────────
+export interface SalesforceCase {
+  id: string;
+  caseNumber: string; // e.g., "00123456"
+  deviceSerial: string; // linked via shake-report device serial
+  subject: string;
+  status: 'New' | 'Open' | 'In Progress' | 'Escalated' | 'Closed';
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  createdAt: string;
+  closedAt?: string;
+  jiraTicketKey?: string; // linked JIRA ticket if escalated
+  reporterEmail?: string;
+  description?: string;
+}
+
 // ─── Feature: Deactivation Workflow ───────────────────────────────────────────
 export interface DeactivationRecord {
   id: string;

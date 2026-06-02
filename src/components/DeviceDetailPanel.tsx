@@ -11,6 +11,7 @@ import DeviceTimeline from './DeviceTimeline';
 import JiraPanel from './JiraPanel';
 import DeactivateDeviceModal from './DeactivateDeviceModal';
 import AttachmentsPanel from './AttachmentsPanel';
+import SalesforcePanel from './SalesforcePanel';
 
 interface DeviceDetailPanelProps {
   device: Device;
@@ -240,7 +241,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
                               const testerName = device.assignedTo || 'Team Member';
                               const subject = encodeURIComponent(`[Follow-up] Please return your eero device — ${device.serialNumber}`);
                               const body = encodeURIComponent(`Hi ${testerName},\n\nThis is a friendly follow-up. We sent a return request on ${new Date(device.returnEmailSentAt!).toLocaleDateString()} for your eero device (${device.serialNumber}).\n\nPlease return it at your earliest convenience. If you've already shipped it, reply with the tracking number.\n\nThank you,\nDevice Management Team`);
-                              window.open(`mailto:${device.assignedEmail}?from=beta-teams@eero.com&subject=${subject}&body=${body}`, '_self');
+                              window.open(`mailto:${device.assignedEmail}?from=beta-team@eero.com&subject=${subject}&body=${body}`, '_self');
                               updateDevice(device.id, { returnReminderSentAt: new Date().toISOString(), returnEmailCount: (device.returnEmailCount || 1) + 1 });
                               addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'reminder_sent', user: 'Admin', description: `Week 1 follow-up reminder sent to ${device.assignedEmail}` });
                             }}
@@ -260,7 +261,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
                                 const testerName = device.assignedTo || 'Team Member';
                                 const subject = encodeURIComponent(`[URGENT] eero device return overdue — ${device.serialNumber}`);
                                 const body = encodeURIComponent(`Hi ${testerName},\n\nThis is an urgent follow-up. Your eero device (${device.serialNumber}) was requested for return on ${new Date(device.returnEmailSentAt!).toLocaleDateString()} — over 2 weeks ago.\n\nPlease return this device immediately or contact us to discuss. If we don't hear back, the device may be remotely deactivated.\n\nThank you,\nDevice Management Team`);
-                                window.open(`mailto:${device.assignedEmail}?from=beta-teams@eero.com&subject=${subject}&body=${body}`, '_self');
+                                window.open(`mailto:${device.assignedEmail}?from=beta-team@eero.com&subject=${subject}&body=${body}`, '_self');
                                 updateDevice(device.id, { returnReminderSentAt: new Date().toISOString(), returnEmailCount: (device.returnEmailCount || 1) + 1 });
                                 addHistoryEntry({ id: crypto.randomUUID(), deviceId: device.id, timestamp: new Date().toISOString(), action: 'reminder_sent', user: 'Admin', description: `Week 2 URGENT reminder sent to ${device.assignedEmail}` });
                               }}
@@ -317,10 +318,11 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
         )}
 
         {/* Feature panels */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
           <FirmwarePanel deviceId={device.id} />
           <HealthPanel deviceId={device.id} />
           <JiraPanel deviceId={device.id} />
+          <SalesforcePanel deviceId={device.id} deviceSerial={device.serialNumber} />
           <AttachmentsPanel deviceId={device.id} />
         </div>
 

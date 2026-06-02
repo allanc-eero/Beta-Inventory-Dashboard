@@ -188,6 +188,11 @@ All features currently run with simulated API calls (setTimeout delays). When la
 
 ### External Service Integrations
 - [ ] **JIRA API** — Replace local `createJiraTicket()` with actual JIRA REST API calls to create real tickets
+- [ ] **Salesforce API** — Connect to Salesforce to pull cases linked to device serial numbers
+  - Query cases by `Device Serial Number` field in Salesforce
+  - Display case number, status, subject, priority, date on device detail panel
+  - Shake-to-report tickets from testers arrive in SF first, then escalate to JIRA if serious
+  - API endpoint: Salesforce REST API (`/services/data/vXX.0/query?q=SELECT...FROM Case WHERE Device_Serial__c='...'`)
 - [ ] **Email Service** — Replace `mailto:` links with server-side email sending (Amazon SES or SendGrid)
 - [ ] **Shipping Labels** — Replace HTML label generation with actual carrier API (UPS/FedEx) for pre-paid labels
 
