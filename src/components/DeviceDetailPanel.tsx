@@ -39,7 +39,7 @@ const DEVICE_FIELDS: FieldDef[] = [
 
 const ASSIGNMENT_FIELDS: FieldDef[] = [
   { label: 'COUNTRY', field: 'country' },
-  { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => d.network ? `https://insight.eero.com/networks/${d.network}` : undefined },
+  { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => d.network ? `https://insight.eero.com/eeros/${d.network}` : undefined },
 ];
 
 const LOGISTICS_FIELDS: FieldDef[] = [

@@ -394,7 +394,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         {profile?.networkId ? (
                           <div className="flex items-baseline gap-3">
                             <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
-                            <a href={`https://insight.eero.com/networks/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{profile.networkId} ↗</a>
+                            <a href={`https://insight.eero.com/eeros/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{profile.networkId} ↗</a>
                           </div>
                         ) : (
                           <ProfileField label="INSIGHT NETWORK" value="" />
