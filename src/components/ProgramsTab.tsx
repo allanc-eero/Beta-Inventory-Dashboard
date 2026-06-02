@@ -347,7 +347,8 @@ Device Management Team`
           );
         })()}
 
-        {/* Program-wide actions */}
+        {/* Program-wide actions — admin only */}
+        {canEdit() && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-1">Program-Wide Actions</h3>
           <p className="text-xs text-gray-500 mb-4">
@@ -391,6 +392,7 @@ Device Management Team`
             </button>
           </div>
         </div>
+        )}
 
         {/* Dry Run Preview Modal */}
         {showPreview && (() => {
@@ -640,18 +642,20 @@ Device Management Team`
                       ))}
                     </tbody>
                   </table>
-                  {/* Per-region process button */}
-                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                    <div className="text-xs text-gray-500">
-                      {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => deviceActions[d.id] === 'archive').length} archive · {grouped[region].filter((d) => !deviceActions[d.id]).length} unset
+                  {/* Per-region process button — admin only */}
+                  {canEdit() && (
+                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                      <div className="text-xs text-gray-500">
+                        {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => deviceActions[d.id] === 'archive').length} archive · {grouped[region].filter((d) => !deviceActions[d.id]).length} unset
+                      </div>
+                      <button
+                        onClick={() => setBulkReturnDevices(grouped[region])}
+                        className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                      >
+                        Process {region} ({grouped[region].length} devices) →
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setBulkReturnDevices(grouped[region])}
-                      className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                    >
-                      Process {region} ({grouped[region].length} devices) →
-                    </button>
-                  </div>
+                  )}
                 </div>
               ))}
 
@@ -757,14 +761,12 @@ Device Management Team`
               <p className="text-xs text-gray-400 mb-3">{prog.deactivatedCount} deactivated</p>
             )}
 
-            {canEdit() && (
-              <button
-                onClick={() => handleStartClose(prog.name)}
-                className="w-full py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                {hasProgress ? 'Continue Processing →' : 'Close Program →'}
-              </button>
-            )}
+            <button
+              onClick={() => handleStartClose(prog.name)}
+              className="w-full py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              {canEdit() ? (hasProgress ? 'Continue Processing →' : 'Close Program →') : 'View Program Details →'}
+            </button>
           </div>
           );
         })}
