@@ -11,7 +11,7 @@ interface BulkReturnPanelProps {
 
 export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelProps) {
   const { updateDevice, addHistoryEntry, createJiraTicket } = useDeviceStore();
-  const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'>('returned_to_eero');
+  const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost' | 'defective_international' | 'end_of_program_international'>('returned_to_eero');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [brickDevices, setBrickDevices] = useState(false);
@@ -38,11 +38,31 @@ If you have any questions, please reply to this email.
 
 Thank you,
 Device Management Team`);
+
+  const INTERNATIONAL_TEMPLATE = `Hi {name},
+
+We need you to return {count} eero device(s).
+
+Devices to return:
+{devices}
+
+Please follow these steps:
+1. Disconnect all devices from power and your network
+2. Pack them securely
+3. Check device tracker for more instructions
+
+Please return within 7 business days.
+
+If you have any questions, please reply to this email.
+
+Thank you,
+Device Management Team`;
   const [perTesterEmails, setPerTesterEmails] = useState<Record<string, string>>({});
   const [perTesterSubjects, setPerTesterSubjects] = useState<Record<string, string>>({});
 
-  const requiresReturn = reason === 'defective' || reason === 'end_of_program';
-  const willBrick = reason === 'lost' || (reason === 'end_of_program' && brickDevices);
+  const requiresReturn = reason === 'defective' || reason === 'end_of_program' || reason === 'defective_international' || reason === 'end_of_program_international';
+  const willBrick = reason === 'lost' || ((reason === 'end_of_program' || reason === 'end_of_program_international') && brickDevices);
+  const isInternational = reason === 'defective_international' || reason === 'end_of_program_international';
 
   // Group devices by assignee for email/label generation (deduplicated by serial)
   const groupedByAssignee = useMemo(() => {
@@ -77,18 +97,19 @@ Device Management Team`);
 
   // Initialize per-tester emails from template when groups are ready
   useEffect(() => {
+    const template = isInternational ? INTERNATIONAL_TEMPLATE : emailBody;
     const emails: Record<string, string> = {};
     Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
       if (email === 'unassigned') return;
       const testerName = assigneeDevices[0].assignedTo || assigneeDevices[0].checkedOutTo || 'Team Member';
-      const deviceList = assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model})`).join('\n');
-      emails[email] = emailBody
+      const deviceList = assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model || d.product || ''})`.trim()).join('\n');
+      emails[email] = template
         .replace(/\{name\}/g, testerName)
         .replace(/\{devices\}/g, deviceList)
         .replace(/\{count\}/g, String(assigneeDevices.length));
     });
     setPerTesterEmails(emails);
-  }, []); // Only on mount
+  }, [reason]); // Re-initialize when reason changes
 
   // Lock body scroll
   useEffect(() => {
@@ -376,7 +397,9 @@ Device Management Team`);
                 >
                   <option value="returned_to_eero">Returned to eero</option>
                   <option value="defective">Defective / Hardware issue</option>
+                  <option value="defective_international">Defective / Hardware issue (International)</option>
                   <option value="end_of_program">End of program phase</option>
+                  <option value="end_of_program_international">End of program phase (International)</option>
                   <option value="lost">Lost / Unrecoverable</option>
                 </select>
               </div>
@@ -391,7 +414,7 @@ Device Management Team`);
               </div>
             </div>
             {/* Brick option for end of program */}
-            {reason === 'end_of_program' && (
+            {(reason === 'end_of_program' || reason === 'end_of_program_international') && (
               <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 <label className="flex items-start gap-2">
                   <input
