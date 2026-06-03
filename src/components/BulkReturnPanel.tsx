@@ -32,12 +32,12 @@ Please follow these steps:
 3. Print the attached return shipping label
 4. Drop off at any UPS or FedEx location
 
-Please return within 7 business days.
+It is very important you return the prototype before {deadline}. If you are unable to accommodate the return by this date, please let us know immediately.
 
 If you have any questions, please reply to this email.
 
 Thank you,
-Device Management Team`);
+Beta Team`);
 
   const INTERNATIONAL_TEMPLATE = `Hi {name},
 
@@ -62,7 +62,7 @@ Please follow these steps:
    E.) Then select "end of Beta program/Recall" for why you are returning
    F.) Then, check the 2 boxes and select "Continue"
 
-It is very important you return the prototype before [Date]. If you are unable to accommodate the return by this date, please let us know immediately.
+It is very important you return the prototype before {deadline}. If you are unable to accommodate the return by this date, please let us know immediately.
 
 If you have questions about the return of your hardware, please do not hesitate to reach out via Slack or to beta-team@eero.com.
 
@@ -109,6 +109,7 @@ Beta Team`;
   // Initialize per-tester emails from template when groups are ready
   useEffect(() => {
     const template = isInternational ? INTERNATIONAL_TEMPLATE : emailBody;
+    const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     const emails: Record<string, string> = {};
     Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
       if (email === 'unassigned') return;
@@ -117,7 +118,8 @@ Beta Team`;
       emails[email] = template
         .replace(/\{name\}/g, testerName)
         .replace(/\{devices\}/g, deviceList)
-        .replace(/\{count\}/g, String(assigneeDevices.length));
+        .replace(/\{count\}/g, String(assigneeDevices.length))
+        .replace(/\{deadline\}/g, deadline);
     });
     setPerTesterEmails(emails);
   }, [reason]); // Re-initialize when reason changes
