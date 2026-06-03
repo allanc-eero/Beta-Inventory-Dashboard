@@ -47,16 +47,27 @@ Devices to return:
 {devices}
 
 Please follow these steps:
-1. Disconnect all devices from power and your network
+
+1. Remove devices from the network then disconnect from power
 2. Pack them securely
-3. Check device tracker for more instructions
+3. Check device tracker for more instructions:
 
-Please return within 7 business days.
+   A.) Go to this link: https://termination-returns-emea.re-teck.com/recycling/home
+   B.) After you click "Get Started" you will navigate the page to find "Eero/Wifi Router" and enter the number of eero units you are returning
+   C.) Then select "Continue"
+   D.) You will complete the next form with:
+       - The DSN information of the eero devices you are returning (The serial number)
+       - Your shipping information
+       - Amazon Alias
+   E.) Then select "end of Beta program/Recall" for why you are returning
+   F.) Then, check the 2 boxes and select "Continue"
 
-If you have any questions, please reply to this email.
+It is very important you return the prototype before [Date]. If you are unable to accommodate the return by this date, please let us know immediately.
+
+If you have questions about the return of your hardware, please do not hesitate to reach out via Slack or to beta-team@eero.com.
 
 Thank you,
-Device Management Team`;
+Beta Team`;
   const [perTesterEmails, setPerTesterEmails] = useState<Record<string, string>>({});
   const [perTesterSubjects, setPerTesterSubjects] = useState<Record<string, string>>({});
 
