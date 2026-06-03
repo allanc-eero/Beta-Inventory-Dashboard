@@ -52,10 +52,19 @@ export const useAuthStore = create<AuthStore>()(
 
       login: (email) => {
         const e = email.toLowerCase().trim();
+        if (!e.endsWith('@eero.com')) return { success: false, error: 'Only @eero.com accounts can access this tool.' };
+
+        // Check if they're in the elevated roster
         const user = get().users.find((u) => u.email.toLowerCase() === e);
-        if (!user) return { success: false, error: 'Email not found. Contact your admin for access.' };
-        if (user.status === 'disabled') return { success: false, error: 'Account disabled. Contact your admin.' };
-        set({ currentUser: user });
+        if (user) {
+          if (user.status === 'disabled') return { success: false, error: 'Account disabled. Contact your admin.' };
+          set({ currentUser: user });
+          return { success: true };
+        }
+
+        // Any @eero.com email not in the roster gets Viewer access automatically
+        const viewerUser: User = { email: e, role: 'viewer', name: e.split('@')[0], status: 'active' };
+        set({ currentUser: viewerUser });
         return { success: true };
       },
 

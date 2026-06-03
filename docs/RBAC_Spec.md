@@ -13,7 +13,15 @@
 **Tester role:** Not included in this phase. Future consideration.
 
 
-## User Roster
+## Access Rules
+
+- **Any @eero.com email can log in** — they automatically get Viewer access (read-only)
+- **Only the people listed below have elevated access** — Admin or Super Admin
+- **No pre-registration needed for Viewers** — if you have an @eero.com email, you can see the data
+- **To get Admin access, Super Admin must explicitly grant it**
+
+
+## User Roster (Elevated Access Only)
 
 | Email | Role | Status |
 |-------|------|--------|
@@ -23,13 +31,8 @@
 | melanie.thorum@eero.com | Admin | Active |
 | shelby@eero.com | Admin | Active |
 | vrabago@eero.com | Admin | Active |
-| aaron@eero.com | Viewer | Active |
-| deep@eero.com | Viewer | Active |
-| lalitha@eero.com | Viewer | Active |
-| diego.kim@eero.com | Viewer | Active |
-| john.pelebo@eero.com | Viewer | Active |
-| layton.hill@eero.com | Viewer | Active |
-| philip.rivera@eero.com | Viewer | Active |
+
+**Everyone else with an @eero.com account = Viewer (automatic, no setup needed)**
 
 
 ## Permissions Matrix
