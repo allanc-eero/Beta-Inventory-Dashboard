@@ -5,7 +5,7 @@
 | Role | Count | Description |
 |------|-------|-------------|
 | **Super Admin** | 1 | Full platform control. Code changes, UI modifications, user management, all destructive actions. |
-| **Admin** | 1 | Can brick devices, archive devices, close programs, upload shipments, edit devices, send return emails, process regions. Cannot manage users or modify code/UI. |
+| **Admin** | 5 | Can brick devices, archive devices, close programs, upload shipments, edit devices, send return emails, process regions. Cannot manage users or modify code/UI. |
 | **Viewer** | Unlimited | Read-only. Can see all devices, programs, people, history. Can export CSVs. Cannot make any changes. |
 
 **Operator role:** Reserved for future use. Can be activated when someone joins who needs edit access but should NOT brick/archive. Not currently assigned.
@@ -19,13 +19,13 @@
 |-------|------|--------|
 | allanc@eero.com | Super Admin | Active |
 | haley.swanson@eero.com | Admin | Active |
+| josht@eero.com | Admin | Active |
+| melanie.thorum@eero.com | Admin | Active |
+| shelby@eero.com | Admin | Active |
+| vrabago@eero.com | Admin | Active |
 | aaron@eero.com | Viewer | Active |
 | deep@eero.com | Viewer | Active |
-| josht@eero.com | Viewer | Active |
 | lalitha@eero.com | Viewer | Active |
-| melanie.thorum@eero.com | Viewer | Active |
-| shelby@eero.com | Viewer | Active |
-| vrabago@eero.com | Viewer | Active |
 | diego.kim@eero.com | Viewer | Active |
 | john.pelebo@eero.com | Viewer | Active |
 | layton.hill@eero.com | Viewer | Active |
