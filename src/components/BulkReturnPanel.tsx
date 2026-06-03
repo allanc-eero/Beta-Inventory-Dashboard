@@ -11,7 +11,7 @@ interface BulkReturnPanelProps {
 
 export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelProps) {
   const { updateDevice, addHistoryEntry, createJiraTicket } = useDeviceStore();
-  const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost' | 'defective_international' | 'end_of_program_international'>('returned_to_eero');
+  const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'>('returned_to_eero');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [brickDevices, setBrickDevices] = useState(false);
@@ -30,7 +30,7 @@ Please follow these steps:
 1. Disconnect all devices from power and your network
 2. Pack them securely
 3. Print the attached return shipping label
-4. Drop off at any UPS or FedEx location
+4. Drop off at any Parcel Transportation location
 
 It is very important you return the prototype before {deadline}. If you are unable to accommodate the return by this date, please let us know immediately.
 
@@ -71,9 +71,8 @@ Beta Team`;
   const [perTesterEmails, setPerTesterEmails] = useState<Record<string, string>>({});
   const [perTesterSubjects, setPerTesterSubjects] = useState<Record<string, string>>({});
 
-  const requiresReturn = reason === 'defective' || reason === 'end_of_program' || reason === 'defective_international' || reason === 'end_of_program_international';
-  const willBrick = reason === 'lost' || ((reason === 'end_of_program' || reason === 'end_of_program_international') && brickDevices);
-  const isInternational = reason === 'defective_international' || reason === 'end_of_program_international';
+  const requiresReturn = reason === 'defective' || reason === 'end_of_program';
+  const willBrick = reason === 'lost' || (reason === 'end_of_program' && brickDevices);
 
   // Group devices by assignee for email/label generation (deduplicated by serial)
   const groupedByAssignee = useMemo(() => {
@@ -106,14 +105,21 @@ Beta Team`;
     });
   }, [devices]);
 
-  // Initialize per-tester emails from template when groups are ready
+  // Helper: determine if a tester is US/Canada (domestic) or international
+  const isDomestic = (country: string) => {
+    const c = country.toLowerCase().trim();
+    return c === 'united states' || c === 'us' || c === 'usa' || c === 'canada' || c === 'ca';
+  };
+
+  // Initialize per-tester emails — auto-select template based on tester's country
   useEffect(() => {
-    const template = isInternational ? INTERNATIONAL_TEMPLATE : emailBody;
     const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     const emails: Record<string, string> = {};
     Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
       if (email === 'unassigned') return;
       const testerName = assigneeDevices[0].assignedTo || assigneeDevices[0].checkedOutTo || 'Team Member';
+      const testerCountry = assigneeDevices[0].country || '';
+      const template = isDomestic(testerCountry) ? emailBody : INTERNATIONAL_TEMPLATE;
       const deviceList = assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model || d.product || ''})`.trim()).join('\n');
       emails[email] = template
         .replace(/\{name\}/g, testerName)
@@ -410,9 +416,7 @@ Beta Team`;
                 >
                   <option value="returned_to_eero">Returned to eero</option>
                   <option value="defective">Defective / Hardware issue</option>
-                  <option value="defective_international">Defective / Hardware issue (International)</option>
                   <option value="end_of_program">End of program phase</option>
-                  <option value="end_of_program_international">End of program phase (International)</option>
                   <option value="lost">Lost / Unrecoverable</option>
                 </select>
               </div>
@@ -427,7 +431,7 @@ Beta Team`;
               </div>
             </div>
             {/* Brick option for end of program */}
-            {(reason === 'end_of_program' || reason === 'end_of_program_international') && (
+            {reason === 'end_of_program' && (
               <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 <label className="flex items-start gap-2">
                   <input
