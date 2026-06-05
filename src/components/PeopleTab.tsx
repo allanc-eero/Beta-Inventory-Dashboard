@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Search, Plus, Monitor } from 'lucide-react';
-import { OptOutReason, Device } from '@/types';
+import { OptOutReason, OptOutRecord, Device } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import OptOutChecklistPanel from './OptOutChecklistPanel';
+import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
@@ -30,6 +31,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const [viewDevice, setViewDevice] = useState<Device | null>(null);
   const [duplicateMatches, setDuplicateMatches] = useState<any[]>([]);
   const [pendingNewPerson, setPendingNewPerson] = useState<{ name: string; email: string; team: string } | null>(null);
+  const [optBackInRecord, setOptBackInRecord] = useState<OptOutRecord | null>(null);
 
   const optOuts = getOptOuts();
   const optedOutEmails = new Set(optOuts.map((o) => o.personEmail.toLowerCase()));
@@ -282,11 +284,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       <>
                         <OptOutChecklistPanel record={record} />
                         <button
-                          onClick={() => {
-                            if (confirm(`Opt ${record.personName} back in? They will be moved back to the active testers list.`)) {
-                              removeOptOut(record.personEmail);
-                            }
-                          }}
+                          onClick={() => setOptBackInRecord(record)}
                           className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
                         >
                           ✓ Opt Back In
@@ -517,6 +515,15 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
 
       {/* Device Detail Panel */}
       {viewDevice && <DeviceDetailPanel device={viewDevice} onClose={() => setViewDevice(null)} />}
+
+      {/* Opt Back In Checklist */}
+      {optBackInRecord && (
+        <OptBackInChecklistPanel
+          record={optBackInRecord}
+          onComplete={() => setOptBackInRecord(null)}
+          onCancel={() => setOptBackInRecord(null)}
+        />
+      )}
     </>
   );
 }
