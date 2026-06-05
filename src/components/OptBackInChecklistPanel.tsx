@@ -17,16 +17,29 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
   const { currentUser } = useAuthStore();
 
   const [adminReAdded, setAdminReAdded] = useState(false);
-  const [qualtricsReAdded, setQualtricsReAdded] = useState(false);
+  const [qualtricsStatus, setQualtricsStatus] = useState('');
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
 
   const profile = getTesterProfile(record.personEmail);
   const networkId = profile?.networkId || '';
   const adminId = profile?.adminId || '';
 
-  const allDone = adminReAdded && qualtricsReAdded;
+  const allDone = adminReAdded;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    // Auto-trigger Qualtrics opt-back-in
+    try {
+      const res = await fetch('/api/qualtrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'optBackIn', email: record.personEmail }),
+      });
+      const data = await res.json();
+      setQualtricsStatus(data.success ? '✓ Re-subscribed in Qualtrics' : `⚠ ${data.error?.slice(0, 80) || 'Manual action needed'}`);
+    } catch {
+      setQualtricsStatus('⚠ API call failed');
+    }
+
     removeOptOut(record.personEmail);
     setShowCompleteNotice(true);
     setTimeout(() => {
@@ -44,15 +57,6 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
       onCheck: () => setAdminReAdded(true),
       link: adminId ? `https://admin.e2ro.com/users/${adminId.replace(/^UID0*/, '')}` : networkId ? `https://insight.eero.com/eeros/${networkId}` : undefined,
       linkLabel: adminId ? 'Open in Admin' : networkId ? 'Open in Insight' : undefined,
-    },
-    {
-      key: 'qualtrics',
-      label: 'Re-add to Qualtrics mailing list',
-      description: 'Add them back to the beta survey distribution list so they receive future testing surveys',
-      done: qualtricsReAdded,
-      onCheck: () => setQualtricsReAdded(true),
-      link: 'https://eero.qualtrics.com/iq-directory/#/POOL_3sny2vgjzeCmn1m/contacts',
-      linkLabel: 'Open Qualtrics Directory',
     },
   ];
 
@@ -114,6 +118,17 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
               )}
             </div>
           ))}
+          {/* Qualtrics — automated */}
+          <div className="flex items-start gap-3 p-3 rounded-lg border bg-blue-50 border-blue-100">
+            <div className="flex-shrink-0 mt-0.5 text-blue-500">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-blue-800 font-medium">Qualtrics re-subscribe</p>
+              <p className="text-xs text-blue-600">Handled automatically when you confirm</p>
+              {qualtricsStatus && <p className={`text-xs mt-1 font-medium ${qualtricsStatus.startsWith('✓') ? 'text-green-600' : 'text-orange-600'}`}>{qualtricsStatus}</p>}
+            </div>
+          </div>
         </div>
 
         {/* Actions */}
@@ -129,7 +144,7 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
             disabled={!allDone}
             className="px-5 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {allDone ? 'Confirm Opt Back In ✓' : `Complete ${steps.filter((s) => !s.done).length} step(s) first`}
+            {allDone ? 'Confirm Opt Back In ✓' : 'Complete admin step first'}
           </button>
         </div>
       </div>
