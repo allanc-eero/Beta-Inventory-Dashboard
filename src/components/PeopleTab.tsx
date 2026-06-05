@@ -439,7 +439,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                     <textarea value={optOutNotes} onChange={(e) => setOptOutNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none h-20" placeholder="Additional context..." />
                   </div>
 
-                  {/* Offboarding checklist — must complete before confirming */}
+                  {/* Offboarding checklist — manual steps only */}
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Offboarding Steps (required)</h5>
                     <div className="space-y-2.5">
@@ -452,53 +452,50 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/eeros/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
                       <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
-                        <input type="checkbox" checked={optOutQualtricsDone} onChange={async (e) => {
-                          if (e.target.checked) {
-                            setOptOutQualtricsDone(true);
-                            // Auto-trigger Qualtrics API opt-out
-                            try {
-                              const person = derivedPeople.find((p) => p.email.toLowerCase() === selectedPerson?.toLowerCase() || p.name.toLowerCase() === selectedPerson?.toLowerCase());
-                              if (person?.email) {
-                                const res = await fetch('/api/qualtrics', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ action: 'optOut', email: person.email, reason: optOutReason, optOutDate: new Date().toISOString(), recordedBy: currentUser?.name || 'Admin' }),
-                                });
-                                const data = await res.json();
-                                if (data.success) {
-                                  setOptOutQualtricsStatus('✓ Auto-opted out via API');
-                                } else {
-                                  setOptOutQualtricsStatus(data.error ? `⚠ API: ${data.error.slice(0, 60)}` : '⚠ Manual action needed');
-                                }
-                              }
-                            } catch { setOptOutQualtricsStatus('⚠ API call failed — do it manually'); }
-                          } else { setOptOutQualtricsDone(false); setOptOutQualtricsStatus(''); }
-                        }} className="rounded border-gray-300 mt-0.5" />
-                        <div className="flex-1">
-                          <span className="text-sm text-gray-900 font-medium">Removed/flagged in Qualtrics</span>
-                          <p className="text-xs text-gray-500">Marked as opted out so they won't receive future surveys</p>
-                          {optOutQualtricsStatus && <p className={`text-xs mt-0.5 ${optOutQualtricsStatus.startsWith('✓') ? 'text-green-600' : 'text-orange-600'}`}>{optOutQualtricsStatus}</p>}
-                        </div>
-                        <a href="https://eero.qualtrics.com/iq-directory/#/POOL_3sny2vgjzeCmn1m/contacts" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Qualtrics ↗</a>
-                      </label>
-                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
                         <input type="checkbox" checked={optOutDevicesDone} onChange={(e) => setOptOutDevicesDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
                         <div className="flex-1">
                           <span className="text-sm text-gray-900 font-medium">Devices offboarded</span>
                           <p className="text-xs text-gray-500">All devices returned, deactivated, or reassigned</p>
                         </div>
                       </label>
+                      {/* Qualtrics — automated, shown as status */}
+                      <div className="flex items-start gap-3 p-2 rounded-lg bg-blue-50 border border-blue-100">
+                        <div className="flex-shrink-0 mt-0.5 text-blue-500">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </div>
+                        <div className="flex-1">
+                          <span className="text-sm text-blue-800 font-medium">Qualtrics opt-out</span>
+                          <p className="text-xs text-blue-600">Handled automatically when you confirm — no action needed</p>
+                          {optOutQualtricsStatus && <p className={`text-xs mt-1 font-medium ${optOutQualtricsStatus.startsWith('✓') ? 'text-green-600' : 'text-orange-600'}`}>{optOutQualtricsStatus}</p>}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-2">
                     <button onClick={() => { setShowOptOut(false); setOptOutAdminDone(false); setOptOutQualtricsDone(false); setOptOutQualtricsStatus(''); setOptOutDevicesDone(false); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
                     <button
-                      onClick={handleOptOut}
-                      disabled={!optOutAdminDone || !optOutQualtricsDone || !optOutDevicesDone}
+                      onClick={async () => {
+                        // Auto-trigger Qualtrics opt-out
+                        try {
+                          const person = derivedPeople.find((p) => p.email.toLowerCase() === selectedPerson?.toLowerCase() || p.name.toLowerCase() === selectedPerson?.toLowerCase());
+                          if (person?.email) {
+                            const res = await fetch('/api/qualtrics', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'optOut', email: person.email, reason: optOutReason, optOutDate: new Date().toISOString(), recordedBy: currentUser?.name || 'Admin' }),
+                            });
+                            const data = await res.json();
+                            setOptOutQualtricsStatus(data.success ? '✓ Opted out of Qualtrics directory' : `⚠ ${data.error?.slice(0, 80) || 'Manual action needed'}`);
+                          }
+                        } catch { setOptOutQualtricsStatus('⚠ API call failed'); }
+                        // Proceed with opt-out regardless
+                        handleOptOut();
+                      }}
+                      disabled={!optOutAdminDone || !optOutDevicesDone}
                       className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {optOutAdminDone && optOutQualtricsDone && optOutDevicesDone ? 'Confirm Opt-Out' : `Complete ${3 - [optOutAdminDone, optOutQualtricsDone, optOutDevicesDone].filter(Boolean).length} step(s) first`}
+                      {optOutAdminDone && optOutDevicesDone ? 'Confirm Opt-Out' : `Complete ${2 - [optOutAdminDone, optOutDevicesDone].filter(Boolean).length} step(s) first`}
                     </button>
                   </div>
                 </div>
