@@ -7,9 +7,9 @@ import {
   ServiceOrderStatus,
   ServiceOrderType,
   ServiceOrderPriority,
-  Carrier,
 } from '@/types';
 import { Kanban, Plus, ExternalLink, User, MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { REGIONS } from '@/constants';
 
 const columns: { id: ServiceOrderStatus; label: string }[] = [
   { id: 'intake', label: 'INTAKE' },
@@ -44,14 +44,6 @@ const priorityColors: Record<ServiceOrderPriority, string> = {
   P4: 'bg-blue-400 text-white',
   P5: 'bg-gray-400 text-white',
 };
-
-const statusFilterOptions: { id: ServiceOrderStatus | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'intake', label: 'Open' },
-  { id: 'in_progress', label: 'In Progress' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'on_hold', label: 'On Hold' },
-];
 
 function getTimeInColumn(columnEnteredAt: string): string {
   const now = new Date().getTime();

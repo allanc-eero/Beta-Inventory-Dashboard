@@ -1,0 +1,58 @@
+{
+  "mcpServers": {
+    "builder-mcp": {
+      "command": "builder-mcp",
+      "args": [
+        "--include-tools=ReadInternalWebsites,InternalCodeSearch,TicketingReadActions,InternalSearch,SkillsTool"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": []
+    },
+    "eero-api": {
+      "command": "eero",
+      "description": "MCP server for eero APIs (read-only, prod)",
+      "args": ["mcp", "api", "--prod"],
+      "disabled": false,
+      "autoApprove": [
+        "user_GetEventsFromStream",
+        "user_GetEero",
+        "admin_GetLogUrls"
+      ]
+    },
+    "slack": {
+      "command": "eero",
+      "args": ["mcp", "slack"],
+      "env": {
+        "AWS_PROFILE": "eero-token-vending"
+      },
+      "disabled": false
+    },
+    "atlassian": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.atlassian.com/v1/mcp"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "getAccessibleAtlassianResources",
+        "getJiraIssue",
+        "searchJiraIssuesUsingJql",
+        "search",
+        "fetch"
+      ],
+      "disabledTools": [
+        "addCommentToJiraIssue",
+        "transitionJiraIssue",
+        "createJiraIssue",
+        "editJiraIssue",
+        "updateConfluencePage",
+        "createConfluenceFooterComment",
+        "createConfluenceInlineComment",
+        "createConfluencePage"
+      ]
+    }
+  }
+}

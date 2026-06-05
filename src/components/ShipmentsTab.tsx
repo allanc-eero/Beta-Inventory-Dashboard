@@ -8,16 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
 import { createJiraIssue } from '@/services/jiraService';
-
-const CARRIERS: Carrier[] = ['UPS', 'USPS', 'FedEx', 'DHL', 'Other'];
-
-const TRACKING_URLS: Record<string, string> = {
-  UPS: 'https://www.ups.com/track?tracknum=',
-  USPS: 'https://tools.usps.com/go/TrackConfirmAction?tLabels=',
-  FedEx: 'https://www.fedex.com/fedextrack/?trknbr=',
-  DHL: 'https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=',
-  Other: '',
-};
+import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY } from '@/constants';
 
 interface ParsedRow {
   name: string;
@@ -377,11 +368,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     // Direction-based logic: populate the correct Packages tab
     const uniqueTrackingNumbers = [...new Set(parsedRows.map((r) => r.tracking).filter(Boolean))];
     const now = new Date().toISOString();
-    const epicMap: Record<string, string> = {
-      beta: 'BETA-SHIPMENTS', dogfood: 'DOGFOOD-SHIPMENTS', prq: 'PRQ-SHIPMENTS',
-      pvt: 'PVT-SHIPMENTS', evt: 'EVT-SHIPMENTS', dvt: 'DVT-SHIPMENTS', other: 'GENERAL-SHIPMENTS',
-    };
-    const epicKey = epicMap[program] || 'GENERAL-SHIPMENTS';
+    const epicKey = EPIC_MAP[program] || 'GENERAL-SHIPMENTS';
 
     if (shipDirection === 'incoming') {
       // ─── INCOMING: Create Inbound Package entries (one per tester/tracking) ───

@@ -4,14 +4,9 @@ import { useState } from 'react';
 import { usePackagesStore } from '@/store/packagesStore';
 import { OutboundPackage, OutboundPackageStatus, Carrier } from '@/types';
 import { Send, Plus, CheckCircle, XCircle, Copy, Truck } from 'lucide-react';
+import { CARRIER_COLORS, REGIONS } from '@/constants';
 
-const carrierColors: Record<Carrier, string> = {
-  DHL: 'bg-yellow-500 text-white',
-  FedEx: 'bg-purple-600 text-white',
-  UPS: 'bg-amber-700 text-white',
-  USPS: 'bg-blue-600 text-white',
-  Other: 'bg-gray-500 text-white',
-};
+const carrierColors = CARRIER_COLORS;
 
 const statusColors: Record<OutboundPackageStatus, string> = {
   open: 'bg-green-100 text-green-700 border-green-200',
