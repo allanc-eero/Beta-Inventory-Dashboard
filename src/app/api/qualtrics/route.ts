@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 const QUALTRICS_BASE_URL = process.env.QUALTRICS_BASE_URL!;
 const QUALTRICS_API_TOKEN = process.env.QUALTRICS_API_TOKEN!;
 const QUALTRICS_DIRECTORY_ID = process.env.QUALTRICS_DIRECTORY_ID!;
-const QUALTRICS_MAILING_LIST_ID = process.env.QUALTRICS_MAILING_LIST_ID!;
 
 const headers = {
   'X-API-TOKEN': QUALTRICS_API_TOKEN,
@@ -18,12 +17,14 @@ export async function POST(request: NextRequest) {
 
     if (action === 'optOut') {
       return await optOutContact(body);
+    } else if (action === 'optBackIn') {
+      return await optBackInContact(body);
     } else if (action === 'findContact') {
       return await findContact(body);
     } else if (action === 'listDirectories') {
       return await listDirectories();
     } else {
-      return NextResponse.json({ error: 'Unknown action. Use: optOut, findContact, listDirectories' }, { status: 400 });
+      return NextResponse.json({ error: 'Unknown action. Use: optOut, optBackIn, findContact, listDirectories' }, { status: 400 });
     }
   } catch (error: any) {
     console.error('[Qualtrics API Error]', error);
@@ -105,6 +106,7 @@ async function optOutContact(body: any) {
       method: 'PUT',
       headers,
       body: JSON.stringify({
+        directoryUnsubscribed: true,
         embeddedData: {
           beta_opted_out: 'true',
           beta_opt_out_date: optOutDate || new Date().toISOString(),
@@ -120,22 +122,69 @@ async function optOutContact(body: any) {
     return NextResponse.json({ success: false, error: err }, { status: updateRes.status });
   }
 
-  // Also try to unsubscribe from the mailing list if configured
-  if (QUALTRICS_MAILING_LIST_ID && QUALTRICS_MAILING_LIST_ID !== 'CG_placeholder') {
-    try {
-      await fetch(
-        `${QUALTRICS_BASE_URL}/directories/${QUALTRICS_DIRECTORY_ID}/mailinglists/${QUALTRICS_MAILING_LIST_ID}/contacts/${targetContactId}`,
-        { method: 'DELETE', headers }
-      );
-    } catch {
-      // Non-fatal — embedded data update is the important part
+  return NextResponse.json({
+    success: true,
+    contactId: targetContactId,
+    message: `Contact ${email} opted out of directory and flagged in Qualtrics`,
+  });
+}
+
+// ─── Opt-Back-In Contact ──────────────────────────────────────────────────────
+// Re-subscribes a contact to the directory (reverses opt-out)
+async function optBackInContact(body: any) {
+  const { email, contactId } = body;
+
+  let targetContactId = contactId;
+
+  if (!targetContactId && email) {
+    const searchRes = await fetch(
+      `${QUALTRICS_BASE_URL}/directories/${QUALTRICS_DIRECTORY_ID}/contacts/search`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ filter: { filterType: 'email', comparison: 'eq', value: email } }),
+      }
+    );
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const elements = searchData.result?.elements || [];
+      if (elements.length > 0) {
+        targetContactId = elements[0].id;
+      }
     }
+  }
+
+  if (!targetContactId) {
+    return NextResponse.json({
+      success: false,
+      error: `Contact not found in Qualtrics directory for email: ${email}`,
+    });
+  }
+
+  const updateRes = await fetch(
+    `${QUALTRICS_BASE_URL}/directories/${QUALTRICS_DIRECTORY_ID}/contacts/${targetContactId}`,
+    {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        directoryUnsubscribed: false,
+        embeddedData: {
+          beta_opted_out: 'false',
+          beta_opt_back_in_date: new Date().toISOString(),
+        },
+      }),
+    }
+  );
+
+  if (!updateRes.ok) {
+    const err = await updateRes.text();
+    return NextResponse.json({ success: false, error: err }, { status: updateRes.status });
   }
 
   return NextResponse.json({
     success: true,
     contactId: targetContactId,
-    message: `Contact ${email} marked as opted out in Qualtrics`,
+    message: `Contact ${email} re-subscribed to directory (opted back in)`,
   });
 }
 
