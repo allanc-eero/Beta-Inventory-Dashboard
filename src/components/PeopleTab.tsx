@@ -5,7 +5,6 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Search, Plus, Monitor } from 'lucide-react';
 import { OptOutReason, OptOutRecord, Device } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
-import OptOutChecklistPanel from './OptOutChecklistPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,6 +26,9 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const [showOptOut, setShowOptOut] = useState(false);
   const [optOutReason, setOptOutReason] = useState<OptOutReason>('no_longer_interested');
   const [optOutNotes, setOptOutNotes] = useState('');
+  const [optOutAdminDone, setOptOutAdminDone] = useState(false);
+  const [optOutQualtricsDone, setOptOutQualtricsDone] = useState(false);
+  const [optOutDevicesDone, setOptOutDevicesDone] = useState(false);
   const [activeView, setActiveView] = useState<'active' | 'opted_out'>('active');
   const [viewDevice, setViewDevice] = useState<Device | null>(null);
   const [duplicateMatches, setDuplicateMatches] = useState<any[]>([]);
@@ -145,6 +147,9 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
     setShowOptOut(false);
     setOptOutReason('no_longer_interested');
     setOptOutNotes('');
+    setOptOutAdminDone(false);
+    setOptOutQualtricsDone(false);
+    setOptOutDevicesDone(false);
     setSelectedPerson(null);
   };
 
@@ -281,15 +286,12 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       )}
                     </div>
                     {canEdit() && (
-                      <>
-                        <OptOutChecklistPanel record={record} />
-                        <button
-                          onClick={() => setOptBackInRecord(record)}
-                          className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
-                        >
-                          ✓ Opt Back In
-                        </button>
-                      </>
+                      <button
+                        onClick={() => setOptBackInRecord(record)}
+                        className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
+                      >
+                        ✓ Opt Back In
+                      </button>
                     )}
                   </div>
                 )) : (
@@ -422,8 +424,8 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
             {showOptOut && (
               <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-5">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">Record Tester Opt-Out</h4>
-                <p className="text-xs text-gray-500 mb-4">This person will be moved to the "Opted Out" list. Their data and device history are preserved.</p>
-                <div className="space-y-3">
+                <p className="text-xs text-gray-500 mb-4">Complete all offboarding steps below, then confirm. This person will be moved to the "Opted Out" list.</p>
+                <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Reason</label>
                     <select value={optOutReason} onChange={(e) => setOptOutReason(e.target.value as OptOutReason)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
@@ -434,9 +436,46 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                     <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
                     <textarea value={optOutNotes} onChange={(e) => setOptOutNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none h-20" placeholder="Additional context..." />
                   </div>
+
+                  {/* Offboarding checklist — must complete before confirming */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Offboarding Steps (required)</h5>
+                    <div className="space-y-2.5">
+                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
+                        <input type="checkbox" checked={optOutAdminDone} onChange={(e) => setOptOutAdminDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-900 font-medium">Removed from eero Admin</span>
+                          <p className="text-xs text-gray-500">Reverted to default user role in admin panel</p>
+                        </div>
+                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/eeros/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
+                      </label>
+                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
+                        <input type="checkbox" checked={optOutQualtricsDone} onChange={(e) => setOptOutQualtricsDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-900 font-medium">Removed/flagged in Qualtrics</span>
+                          <p className="text-xs text-gray-500">Marked as opted out so they won't receive future surveys</p>
+                        </div>
+                        <a href="https://eero.qualtrics.com/iq-directory/#/POOL_3sny2vgjzeCmn1m/contacts" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Qualtrics ↗</a>
+                      </label>
+                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
+                        <input type="checkbox" checked={optOutDevicesDone} onChange={(e) => setOptOutDevicesDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
+                        <div className="flex-1">
+                          <span className="text-sm text-gray-900 font-medium">Devices offboarded</span>
+                          <p className="text-xs text-gray-500">All devices returned, deactivated, or reassigned</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setShowOptOut(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                    <button onClick={handleOptOut} className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700">Confirm Opt-Out</button>
+                    <button onClick={() => { setShowOptOut(false); setOptOutAdminDone(false); setOptOutQualtricsDone(false); setOptOutDevicesDone(false); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button
+                      onClick={handleOptOut}
+                      disabled={!optOutAdminDone || !optOutQualtricsDone || !optOutDevicesDone}
+                      className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {optOutAdminDone && optOutQualtricsDone && optOutDevicesDone ? 'Confirm Opt-Out' : `Complete ${3 - [optOutAdminDone, optOutQualtricsDone, optOutDevicesDone].filter(Boolean).length} step(s) first`}
+                    </button>
                   </div>
                 </div>
               </div>
