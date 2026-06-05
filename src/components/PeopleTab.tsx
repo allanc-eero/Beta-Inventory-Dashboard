@@ -5,6 +5,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Search, Plus, Monitor } from 'lucide-react';
 import { OptOutReason, Device } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
+import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
@@ -278,16 +279,19 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       )}
                     </div>
                     {canEdit() && (
-                      <button
-                        onClick={() => {
-                          if (confirm(`Opt ${record.personName} back in? They will be moved back to the active testers list.`)) {
-                            removeOptOut(record.personEmail);
-                          }
-                        }}
-                        className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
-                      >
-                        ✓ Opt Back In
-                      </button>
+                      <>
+                        <OptOutChecklistPanel record={record} />
+                        <button
+                          onClick={() => {
+                            if (confirm(`Opt ${record.personName} back in? They will be moved back to the active testers list.`)) {
+                              removeOptOut(record.personEmail);
+                            }
+                          }}
+                          className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
+                        >
+                          ✓ Opt Back In
+                        </button>
+                      </>
                     )}
                   </div>
                 )) : (

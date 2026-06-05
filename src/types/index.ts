@@ -323,6 +323,22 @@ export interface OptOutRecord {
   recordedBy: string;
   program: string;
   devicesAtOptOut: string[]; // serial numbers they had
+  // Offboarding checklist
+  checklist?: OptOutChecklist;
+}
+
+export interface OptOutChecklist {
+  adminRemoved: boolean;
+  adminRemovedAt?: string;
+  adminRemovedBy?: string;
+  qualtricsRemoved: boolean;
+  qualtricsRemovedAt?: string;
+  qualtricsRemovedBy?: string;
+  devicesOffboarded: boolean;
+  devicesOffboardedAt?: string;
+  devicesOffboardedBy?: string;
+  allCompleted: boolean;
+  completedAt?: string;
 }
 
 export interface SyncMetadata {

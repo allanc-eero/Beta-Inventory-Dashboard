@@ -113,6 +113,7 @@ interface DeviceStore {
   addOptOut: (record: OptOutRecord) => void;
   getOptOuts: () => OptOutRecord[];
   removeOptOut: (personEmail: string) => void;
+  updateOptOutChecklist: (id: string, field: keyof import('@/types').OptOutChecklist, user: string) => void;
 
   // ─── Tester Profiles ──────────────────────────────────────────────────
   testerProfiles: TesterProfile[];
@@ -861,6 +862,24 @@ export const useDeviceStore = create<DeviceStore>()(
       removeOptOut: (personEmail) =>
         set((state) => ({
           optOutRecords: state.optOutRecords.filter((r) => r.personEmail.toLowerCase() !== personEmail.toLowerCase()),
+        })),
+
+      updateOptOutChecklist: (id, field, user) =>
+        set((state) => ({
+          optOutRecords: state.optOutRecords.map((r) => {
+            if (r.id !== id) return r;
+            const now = new Date().toISOString();
+            const checklist = r.checklist || {
+              adminRemoved: false, qualtricsRemoved: false, devicesOffboarded: false, allCompleted: false,
+            };
+            const updated = { ...checklist };
+            if (field === 'adminRemoved') { updated.adminRemoved = true; updated.adminRemovedAt = now; updated.adminRemovedBy = user; }
+            if (field === 'qualtricsRemoved') { updated.qualtricsRemoved = true; updated.qualtricsRemovedAt = now; updated.qualtricsRemovedBy = user; }
+            if (field === 'devicesOffboarded') { updated.devicesOffboarded = true; updated.devicesOffboardedAt = now; updated.devicesOffboardedBy = user; }
+            updated.allCompleted = updated.adminRemoved && updated.qualtricsRemoved && updated.devicesOffboarded;
+            if (updated.allCompleted && !updated.completedAt) updated.completedAt = now;
+            return { ...r, checklist: updated };
+          }),
         })),
 
       // ─── Tester Profiles ──────────────────────────────────────────────────
