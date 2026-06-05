@@ -18,7 +18,7 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 
 export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
   const { devices, people, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
-  const { canEdit } = useAuthStore();
+  const { canEdit, currentUser } = useAuthStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<string | null>(initialSelectedPerson || null);
@@ -28,6 +28,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const [optOutNotes, setOptOutNotes] = useState('');
   const [optOutAdminDone, setOptOutAdminDone] = useState(false);
   const [optOutQualtricsDone, setOptOutQualtricsDone] = useState(false);
+  const [optOutQualtricsStatus, setOptOutQualtricsStatus] = useState('');
   const [optOutDevicesDone, setOptOutDevicesDone] = useState(false);
   const [activeView, setActiveView] = useState<'active' | 'opted_out'>('active');
   const [viewDevice, setViewDevice] = useState<Device | null>(null);
@@ -149,6 +150,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
     setOptOutNotes('');
     setOptOutAdminDone(false);
     setOptOutQualtricsDone(false);
+    setOptOutQualtricsStatus('');
     setOptOutDevicesDone(false);
     setSelectedPerson(null);
   };
@@ -450,10 +452,32 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/eeros/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
                       <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
-                        <input type="checkbox" checked={optOutQualtricsDone} onChange={(e) => setOptOutQualtricsDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
+                        <input type="checkbox" checked={optOutQualtricsDone} onChange={async (e) => {
+                          if (e.target.checked) {
+                            setOptOutQualtricsDone(true);
+                            // Auto-trigger Qualtrics API opt-out
+                            try {
+                              const person = derivedPeople.find((p) => p.email.toLowerCase() === selectedPerson?.toLowerCase() || p.name.toLowerCase() === selectedPerson?.toLowerCase());
+                              if (person?.email) {
+                                const res = await fetch('/api/qualtrics', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ action: 'optOut', email: person.email, reason: optOutReason, optOutDate: new Date().toISOString(), recordedBy: currentUser?.name || 'Admin' }),
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                  setOptOutQualtricsStatus('✓ Auto-opted out via API');
+                                } else {
+                                  setOptOutQualtricsStatus(data.error ? `⚠ API: ${data.error.slice(0, 60)}` : '⚠ Manual action needed');
+                                }
+                              }
+                            } catch { setOptOutQualtricsStatus('⚠ API call failed — do it manually'); }
+                          } else { setOptOutQualtricsDone(false); setOptOutQualtricsStatus(''); }
+                        }} className="rounded border-gray-300 mt-0.5" />
                         <div className="flex-1">
                           <span className="text-sm text-gray-900 font-medium">Removed/flagged in Qualtrics</span>
                           <p className="text-xs text-gray-500">Marked as opted out so they won't receive future surveys</p>
+                          {optOutQualtricsStatus && <p className={`text-xs mt-0.5 ${optOutQualtricsStatus.startsWith('✓') ? 'text-green-600' : 'text-orange-600'}`}>{optOutQualtricsStatus}</p>}
                         </div>
                         <a href="https://eero.qualtrics.com/iq-directory/#/POOL_3sny2vgjzeCmn1m/contacts" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Qualtrics ↗</a>
                       </label>
@@ -468,7 +492,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                   </div>
 
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => { setShowOptOut(false); setOptOutAdminDone(false); setOptOutQualtricsDone(false); setOptOutDevicesDone(false); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button onClick={() => { setShowOptOut(false); setOptOutAdminDone(false); setOptOutQualtricsDone(false); setOptOutQualtricsStatus(''); setOptOutDevicesDone(false); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
                     <button
                       onClick={handleOptOut}
                       disabled={!optOutAdminDone || !optOutQualtricsDone || !optOutDevicesDone}
