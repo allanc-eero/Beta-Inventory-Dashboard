@@ -5,6 +5,9 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Carrier, Shipment, Device, ShipmentStatus, DeviceStatus } from '@/types';
 import * as XLSX from 'xlsx';
 import { useAuthStore } from '@/store/authStore';
+import { usePackagesStore } from '@/store/packagesStore';
+import JiraToast from './JiraToast';
+import { createJiraIssue } from '@/services/jiraService';
 
 const CARRIERS: Carrier[] = ['UPS', 'USPS', 'FedEx', 'DHL', 'Other'];
 
@@ -86,8 +89,9 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
 }
 
 export default function ShipmentsTab({ showPendingReturns }: { showPendingReturns?: boolean }) {
-  const { devices, addDevice, updateDevice, addShipment, markShipmentDelivered, getAllShipments, addHistoryEntry } = useDeviceStore();
+  const { devices, addDevice, updateDevice, addShipment, markShipmentDelivered, getAllShipments, addHistoryEntry, createJiraTicket } = useDeviceStore();
   const { canEdit } = useAuthStore();
+  const { addInboundPackage, addOutboundPackage, addServiceOrder } = usePackagesStore();
   const [activeView, setActiveView] = useState<'upload' | 'history' | 'pending_returns'>(showPendingReturns ? 'pending_returns' : 'upload');
   const [pasteInput, setPasteInput] = useState('');
   const [carrier, setCarrier] = useState<Carrier>('DHL');
@@ -99,6 +103,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
   const [program, setProgram] = useState('beta');
   const [productName, setProductName] = useState('');
   const [fileName, setFileName] = useState('');
+  const [shipDirection, setShipDirection] = useState<'outgoing' | 'incoming'>('outgoing');
+  const [jiraToast, setJiraToast] = useState<{ ticketKey: string; summary: string; epicKey: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allShipments = getAllShipments();
@@ -146,14 +152,24 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
       const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' });
 
       // Map Excel rows to ParsedRows
+      // Debug: log column headers for troubleshooting
+      if (jsonData.length > 0) {
+        console.log('[Upload] Detected columns:', Object.keys(jsonData[0]));
+        console.log('[Upload] First row sample:', jsonData[0]);
+      }
       const rows: ParsedRow[] = jsonData.map((row) => {
         // Name: combine First Name + Last Name, or fall back to ShipTo/Name
         const firstName = row['First Name'] || row['first_name'] || row['FirstName'] || '';
         const lastName = row['Last Name'] || row['last_name'] || row['LastName'] || '';
         const name = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (row['ShipTo'] || row['Name'] || row['name'] || row['Ship To'] || '');
 
-        // Tracking
-        const tracking = row['Tracking'] || row['TrackingLink'] || row['TrackingNumber'] || row['Tracking Number'] || row['tracking'] || row['Link'] || '';
+        // Tracking — handle URL tracking links (extract number) or plain tracking numbers
+        let tracking = String(row['Tracking'] || row['TrackingLink'] || row['Tracking Link'] || row['TrackingNumber'] || row['Tracking Number'] || row['tracking'] || row['Link'] || '');
+        // If tracking is a URL, try to extract the tracking number from it
+        if (tracking && tracking.startsWith('http')) {
+          const trackMatch = tracking.match(/[?&](?:tracknum|tLabels|trknbr|tracking-id)=([A-Z0-9]+)/i);
+          if (trackMatch) tracking = trackMatch[1];
+        }
 
         // Email
         const email = row['Email'] || row['email'] || row['Alias'] || row['alias'] || '';
@@ -182,16 +198,31 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           }
         }
 
-        // Collect all Serial columns
+        // Collect all Serial columns — broad matching for column names
         const serials: string[] = [];
         Object.keys(row).forEach((key) => {
-          if ((key.toLowerCase().includes('dsn') || key.toLowerCase().includes('serial')) && row[key]) {
-            const val = String(row[key]).trim();
-            if (val && /^[A-Z0-9]{10,}$/i.test(val)) {
+          const keyLower = key.toLowerCase();
+          const isSerialColumn = keyLower.includes('dsn') || keyLower.includes('serial') || keyLower.includes('sn') || keyLower.includes('mac') || keyLower.includes('device id') || keyLower.includes('device_id') || keyLower.includes('imei') || keyLower.includes('unit');
+          if (isSerialColumn && row[key]) {
+            const val = String(row[key]).trim().replace(/\s+/g, ''); // strip spaces from serial values
+            if (val && /^[A-Z0-9]{8,}$/i.test(val)) {
               serials.push(val.toUpperCase());
             }
           }
         });
+
+        // Fallback: if no serials found by column name, check ALL columns for serial-shaped values (16+ alphanumeric)
+        if (serials.length === 0) {
+          Object.keys(row).forEach((key) => {
+            if (row[key]) {
+              const val = String(row[key]).trim().replace(/\s+/g, '');
+              // Looks like a serial: 12+ alphanumeric chars, starts with letters
+              if (/^[A-Z]{2,}[A-Z0-9]{10,}$/i.test(val) && val.length >= 12) {
+                serials.push(val.toUpperCase());
+              }
+            }
+          });
+        }
 
         if (serials.length === 0) return null;
         return { name: String(name), tracking: String(tracking), alias: String(alias), email: String(email), networkId: String(networkId), rowProduct: String(rowProduct), rowPhase: String(rowPhase), country: String(country), address: String(address), serials };
@@ -221,7 +252,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     setParsedRows(rows);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (parsedRows.length === 0) return;
 
     const allSerials: string[] = [];
@@ -343,6 +374,132 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     };
     addShipment(shipment);
 
+    // Direction-based logic: populate the correct Packages tab
+    const uniqueTrackingNumbers = [...new Set(parsedRows.map((r) => r.tracking).filter(Boolean))];
+    const now = new Date().toISOString();
+    const epicMap: Record<string, string> = {
+      beta: 'BETA-SHIPMENTS', dogfood: 'DOGFOOD-SHIPMENTS', prq: 'PRQ-SHIPMENTS',
+      pvt: 'PVT-SHIPMENTS', evt: 'EVT-SHIPMENTS', dvt: 'DVT-SHIPMENTS', other: 'GENERAL-SHIPMENTS',
+    };
+    const epicKey = epicMap[program] || 'GENERAL-SHIPMENTS';
+
+    if (shipDirection === 'incoming') {
+      // ─── INCOMING: Create Inbound Package entries (one per tester/tracking) ───
+      parsedRows.forEach((row) => {
+        const asnTimestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+        const asnSeq = String(Math.floor(Math.random() * 9999)).padStart(4, '0');
+        const asnId = `ASN-${(fcLocation || 'HQ').replace(/\s/g, '')}-${asnTimestamp}-${asnSeq}`;
+
+        addInboundPackage({
+          id: crypto.randomUUID(),
+          asn: asnId,
+          carrier: carrier as any,
+          trackingNumber: String(row.tracking || 'N/A'),
+          models: productName || program.toUpperCase(),
+          itemsTotal: row.serials.length,
+          itemsReceived: 0,
+          eta: shipDate,
+          destination: row.country || 'USA',
+          status: 'open',
+          trackingStatus: 'IN_TRANSIT',
+          notes: `From: ${row.name || 'Unknown'}. Serials: ${row.serials.join(', ')}`,
+          createdAt: now,
+          updatedAt: now,
+        });
+      });
+
+      setJiraToast({
+        ticketKey: '',
+        summary: `${parsedRows.length} inbound package(s) created in Packages → Inbound`,
+        epicKey: 'INBOUND',
+      });
+
+    } else {
+      // ─── OUTGOING: Create ONE bulk JIRA ticket for the entire shipment ───
+      // All testers, serials, and tracking numbers in one ticket for easy management
+      const testerList = parsedRows.map((row) => {
+        const name = row.name || row.email || 'Unassigned';
+        const serialList = row.serials.join(', ');
+        return `• ${name} — ${serialList} (Tracking: ${row.tracking || 'N/A'})`;
+      }).join('\n');
+
+      const jiraSummary = `[${epicKey}] ${productName || program.toUpperCase()} — ${allSerials.length} device(s) to ${parsedRows.length} tester(s)`;
+      const jiraDescription = `Outgoing shipment batch uploaded on ${new Date().toLocaleDateString()}.\n\nProgram: ${program.toUpperCase()}\nProduct: ${productName || 'N/A'}\nCarrier: ${carrier}\nShip Date: ${shipDate}\nFrom: ${fcLocation || 'Fulfillment Center'}\nTotal Devices: ${allSerials.length}\nTotal Testers: ${parsedRows.length}\n\n--- TESTERS & DEVICES ---\n${testerList}`;
+
+      // Create ONE real JIRA ticket via API
+      const jiraResult = await createJiraIssue({
+        summary: jiraSummary,
+        description: jiraDescription,
+        labels: ['inventory-dashboard', program, 'shipment', 'bulk'],
+      });
+
+      const ticketKey = jiraResult.success ? jiraResult.key : `LOCAL-${Math.floor(Math.random() * 90000) + 10000}`;
+      const ticketUrl = jiraResult.success ? jiraResult.url : '';
+
+      // Store in local JIRA tracker
+      createJiraTicket({
+        id: crypto.randomUUID(),
+        key: ticketKey,
+        deviceId: '',
+        type: 'general',
+        status: 'open',
+        summary: jiraSummary,
+        createdAt: now,
+        url: ticketUrl || undefined,
+      });
+
+      // Create outbound package entries (one per tester for tracking)
+      parsedRows.forEach((row) => {
+        const testerName = row.name || row.email || 'Unassigned';
+        const serialList = row.serials.join(', ');
+        const outSeq = String(Math.floor(Math.random() * 9999)).padStart(4, '0');
+        addOutboundPackage({
+          id: crypto.randomUUID(),
+          shippingId: `OUT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${outSeq}`,
+          carrier: carrier as any,
+          trackingNumber: String(row.tracking || ''),
+          models: productName || program.toUpperCase(),
+          itemsTotal: row.serials.length,
+          recipient: testerName,
+          recipientEmail: row.email || undefined,
+          destination: row.country || 'USA',
+          status: 'open',
+          notes: `Serials: ${serialList}. JIRA: ${ticketKey}`,
+          createdAt: now,
+          updatedAt: now,
+        });
+      });
+
+      // ONE Service Board card for the whole batch (1:1 with the bulk JIRA ticket)
+      addServiceOrder({
+        id: crypto.randomUUID(),
+        title: jiraSummary,
+        description: jiraDescription,
+        type: 'outbound_shipment',
+        priority: 'P3',
+        status: 'intake',
+        assignee: '',
+        requester: 'System (auto-upload)',
+        site: 'USA',
+        deviceSerial: allSerials.length <= 3 ? allSerials.join(', ') : `${allSerials.slice(0, 3).join(', ')} +${allSerials.length - 3} more`,
+        jiraKey: ticketKey,
+        jiraUrl: ticketUrl || `https://eeroinc.atlassian.net/browse/${ticketKey}`,
+        epicKey: 'BPM-1886',
+        eta: shipDate,
+        columnEnteredAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      setJiraToast({
+        ticketKey,
+        summary: jiraResult.success
+          ? `JIRA ticket ${ticketKey} created — ${parsedRows.length} tester(s), ${allSerials.length} device(s)`
+          : `Local ticket created (JIRA API failed: ${jiraResult.error})`,
+        epicKey: 'BPM-1886',
+      });
+    }
+
     setSuccessMsg(`✓ Imported ${allSerials.length} devices — ${newDevices} new, ${updatedDevices} updated`);
     setPasteInput('');
     setParsedRows([]);
@@ -355,6 +512,15 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
   return (
     <div className="space-y-6">
+      {/* JIRA Toast Notification */}
+      {jiraToast && (
+        <JiraToast
+          ticketKey={jiraToast.ticketKey}
+          summary={jiraToast.summary}
+          epicKey={jiraToast.epicKey}
+          onClose={() => setJiraToast(null)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-gray-900">Device Ingestion & Returns</h2>
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
@@ -469,7 +635,18 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             )}
 
             {/* Shipment metadata */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Direction</label>
+                <select
+                  value={shipDirection}
+                  onChange={(e) => setShipDirection(e.target.value as 'outgoing' | 'incoming')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium"
+                >
+                  <option value="outgoing">Outgoing (to testers)</option>
+                  <option value="incoming">Incoming (to lab/warehouse)</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Carrier</label>
                 <select

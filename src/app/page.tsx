@@ -8,6 +8,7 @@ import ProgramsTab from '@/components/ProgramsTab';
 import LocationsTab from '@/components/LocationsTab';
 import PeopleTab from '@/components/PeopleTab';
 import ShipmentsTab from '@/components/ShipmentsTab';
+import PackagesTab from '@/components/PackagesTab';
 import DashboardStats from '@/components/DashboardStats';
 import SeedDataProvider from '@/components/SeedDataProvider';
 import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
@@ -93,6 +94,7 @@ export default function Home() {
           <div className="mt-6">
             {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
             {activeTab === 'testbeds' && <ProgramsTab />}
+            {activeTab === 'packages' && <PackagesTab />}
             {activeTab === 'locations' && <LocationsTab />}
             {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
             {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}

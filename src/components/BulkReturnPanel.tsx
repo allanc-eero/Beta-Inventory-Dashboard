@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
+import { usePackagesStore } from '@/store/packagesStore';
+import JiraToast from './JiraToast';
 
 interface BulkReturnPanelProps {
   devices: Device[];
@@ -11,6 +13,7 @@ interface BulkReturnPanelProps {
 
 export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelProps) {
   const { updateDevice, addHistoryEntry, createJiraTicket } = useDeviceStore();
+  const { addServiceOrder } = usePackagesStore();
   const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'>('returned_to_eero');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
@@ -18,6 +21,7 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [jiraToast, setJiraToast] = useState<{ ticketKey: string; summary: string; epicKey: string } | null>(null);
   const [emailSubject, setEmailSubject] = useState('[Action Required] Return {count} eero device(s)');
   const [emailBody, setEmailBody] = useState(`Hi {name},
 
@@ -190,6 +194,40 @@ Beta Team`;
       linkedFirmware: uniqueDevices[0]?.firmwareVersion,
     });
 
+    // Show JIRA toast for defective/hardware or end_of_program returns
+    if (reason === 'defective' || reason === 'end_of_program') {
+      setJiraToast({
+        ticketKey,
+        summary: `[${epic}] Bulk return: ${uniqueDevices.length} device(s) — ${reason.replace(/_/g, ' ')}`,
+        epicKey: epic,
+      });
+
+      // Create ONE Service Order on the Kanban board for this return batch (maps 1:1 to the JIRA ticket)
+      const now = new Date().toISOString();
+      const soType = reason === 'defective' ? 'repair' : 'swap';
+      const serialSummary = uniqueDevices.length <= 3
+        ? uniqueDevices.map((d) => d.serialNumber).join(', ')
+        : `${uniqueDevices.slice(0, 3).map((d) => d.serialNumber).join(', ')} +${uniqueDevices.length - 3} more`;
+      addServiceOrder({
+        id: crypto.randomUUID(),
+        title: `[${epic}] Return: ${uniqueDevices.length} device(s) — ${reason.replace(/_/g, ' ')}`,
+        description: `Returning ${uniqueDevices.length} device(s). Reason: ${reason.replace(/_/g, ' ')}.\n\nSerials: ${uniqueDevices.map((d) => d.serialNumber).join(', ')}\n\nTesters: ${[...new Set(uniqueDevices.map((d) => d.assignedTo || d.assignedEmail).filter(Boolean))].join(', ')}\n\n${notes || ''}`,
+        type: soType,
+        priority: reason === 'defective' ? 'P1' : 'P2',
+        status: 'intake',
+        assignee: '',
+        requester: 'System (return)',
+        site: uniqueDevices[0]?.country || 'USA',
+        deviceSerial: serialSummary,
+        jiraKey: ticketKey,
+        jiraUrl: `https://eeroinc.atlassian.net/browse/${ticketKey}`,
+        epicKey: epic,
+        columnEnteredAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
     // Log the consolidated JIRA to each device's timeline
     uniqueDevices.forEach((device) => {
       addHistoryEntry({
@@ -320,6 +358,15 @@ Beta Team`;
 
     return (
       <div className="fixed inset-0 top-12 z-40 bg-gray-50 overflow-y-auto">
+        {/* JIRA Toast Notification */}
+        {jiraToast && (
+          <JiraToast
+            ticketKey={jiraToast.ticketKey}
+            summary={jiraToast.summary}
+            epicKey={jiraToast.epicKey}
+            onClose={() => setJiraToast(null)}
+          />
+        )}
         <div className="max-w-[900px] mx-auto px-6 py-8">
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <p className="text-4xl mb-4">✓</p>

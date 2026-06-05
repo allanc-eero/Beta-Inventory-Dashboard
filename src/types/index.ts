@@ -151,7 +151,75 @@ export interface HistoryEntry {
   description: string;
 }
 
-export type TabType = 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments';
+export type TabType = 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments' | 'packages';
+
+// ─── Feature: Packages & Service Board ────────────────────────────────────────
+
+export type InboundPackageStatus = 'open' | 'received' | 'cancelled';
+export type OutboundPackageStatus = 'open' | 'shipped' | 'delivered' | 'cancelled';
+export type ServiceOrderStatus = 'intake' | 'triage' | 'assigned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+export type ServiceOrderType = 'swap' | 'repair' | 'new_testbed' | 'outbound_shipment' | 'other';
+export type ServiceOrderPriority = 'P0' | 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
+
+export interface InboundPackage {
+  id: string;
+  asn: string; // ASN-{SITE}-{timestamp}-{seq}
+  carrier: Carrier;
+  trackingNumber: string;
+  models: string; // e.g., "eero Max 7"
+  itemsTotal: number;
+  itemsReceived: number;
+  eta: string; // ISO date
+  destination: string; // site code, e.g., "SFO38"
+  status: InboundPackageStatus;
+  trackingStatus?: string; // "DELIVERED", "IN_TRANSIT", etc.
+  notes?: string;
+  receivedAt?: string;
+  receivedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OutboundPackage {
+  id: string;
+  shippingId: string; // auto or manual ID
+  carrier: Carrier;
+  trackingNumber: string;
+  models: string;
+  itemsTotal: number;
+  recipient: string; // tester name or email
+  recipientEmail?: string;
+  destination: string; // city/country
+  status: OutboundPackageStatus;
+  trackingStatus?: string;
+  notes?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceOrder {
+  id: string;
+  title: string;
+  description: string;
+  type: ServiceOrderType;
+  priority: ServiceOrderPriority;
+  status: ServiceOrderStatus;
+  assignee: string; // person handling it
+  assigneeEmail?: string;
+  requester: string; // who requested it
+  site: string; // lab/site code
+  deviceSerial?: string; // linked device if applicable
+  jiraKey?: string; // e.g., "QA-17918"
+  jiraUrl?: string;
+  epicKey?: string; // Beta epic this syncs to
+  eta?: string; // ISO date
+  columnEnteredAt: string; // when it entered current status — for SLA tracking
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
 
 // ─── Feature: Firmware Tracking ───────────────────────────────────────────────
 export interface FirmwareInfo {
