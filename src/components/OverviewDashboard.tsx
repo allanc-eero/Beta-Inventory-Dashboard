@@ -148,14 +148,14 @@ export default function OverviewDashboard() {
           <span style={{ fontSize: '14px', color: '#6b7280' }}>31 total</span>
         </div>
 
-        {/* Segmented bar */}
-        <div style={{ display: 'flex', height: '28px', borderRadius: '4px', overflow: 'hidden', marginBottom: '4px' }}>
-          <div style={{ width: '45%', backgroundColor: '#3b82f6' }} />
-          <div style={{ width: '12%', backgroundColor: '#b45309' }} />
-          <div style={{ width: '20%', backgroundColor: '#16a34a' }} />
-          <div style={{ width: '2%', backgroundColor: '#6b7280' }} />
-          <div style={{ width: '14%', backgroundColor: '#bbf7d0' }} />
-          <div style={{ width: '7%', backgroundColor: '#991b1b' }} />
+        {/* Segmented bar with gaps between segments */}
+        <div style={{ display: 'flex', gap: '3px', height: '28px', marginBottom: '4px' }}>
+          <div style={{ width: '45%', backgroundColor: '#3b82f6', borderRadius: '4px' }} />
+          <div style={{ width: '12%', backgroundColor: '#b45309', borderRadius: '4px' }} />
+          <div style={{ width: '20%', backgroundColor: '#16a34a', borderRadius: '4px' }} />
+          <div style={{ width: '2%', backgroundColor: '#6b7280', borderRadius: '4px' }} />
+          <div style={{ width: '14%', backgroundColor: '#bbf7d0', borderRadius: '4px' }} />
+          <div style={{ width: '7%', backgroundColor: '#991b1b', borderRadius: '4px' }} />
         </div>
 
         {/* Numbers above */}
