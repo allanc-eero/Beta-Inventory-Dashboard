@@ -204,7 +204,7 @@ Beta Team`;
 
       // Create ONE Service Order on the Kanban board for this return batch (maps 1:1 to the JIRA ticket)
       const now = new Date().toISOString();
-      const soType = reason === 'defective' ? 'repair' : 'swap';
+      const soType = reason as any; // maps directly: 'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'
       const serialSummary = uniqueDevices.length <= 3
         ? uniqueDevices.map((d) => d.serialNumber).join(', ')
         : `${uniqueDevices.slice(0, 3).map((d) => d.serialNumber).join(', ')} +${uniqueDevices.length - 3} more`;

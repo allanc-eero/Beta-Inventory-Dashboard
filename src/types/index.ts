@@ -158,7 +158,7 @@ export type TabType = 'overview' | 'devices' | 'testbeds' | 'locations' | 'peopl
 export type InboundPackageStatus = 'open' | 'received' | 'cancelled';
 export type OutboundPackageStatus = 'open' | 'shipped' | 'delivered' | 'cancelled';
 export type ServiceOrderStatus = 'intake' | 'triage' | 'assigned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
-export type ServiceOrderType = 'swap' | 'repair' | 'new_testbed' | 'outbound_shipment' | 'other';
+export type ServiceOrderType = 'returned_to_eero' | 'defective' | 'end_of_program' | 'lost' | 'outbound_shipment' | 'other';
 export type ServiceOrderPriority = 'P0' | 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
 
 export interface InboundPackage {

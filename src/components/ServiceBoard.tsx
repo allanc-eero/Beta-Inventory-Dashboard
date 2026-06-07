@@ -21,17 +21,19 @@ const columns: { id: ServiceOrderStatus; label: string }[] = [
 ];
 
 const typeColors: Record<ServiceOrderType, string> = {
-  swap: 'bg-orange-500 text-white',
-  repair: 'bg-red-600 text-white',
-  new_testbed: 'bg-green-600 text-white',
+  returned_to_eero: 'bg-blue-500 text-white',
+  defective: 'bg-red-600 text-white',
+  end_of_program: 'bg-orange-500 text-white',
+  lost: 'bg-gray-700 text-white',
   outbound_shipment: 'bg-blue-500 text-white',
   other: 'bg-gray-500 text-white',
 };
 
 const typeLabels: Record<ServiceOrderType, string> = {
-  swap: 'Swap',
-  repair: 'Repair',
-  new_testbed: 'New Testbed',
+  returned_to_eero: 'Returned to eero',
+  defective: 'Defective / Hardware issue',
+  end_of_program: 'End of program phase',
+  lost: 'Lost / Unrecoverable',
   outbound_shipment: 'Outbound Shipment',
   other: 'Other',
 };
@@ -68,7 +70,7 @@ export default function ServiceBoard() {
   // New order form state
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [newType, setNewType] = useState<ServiceOrderType>('swap');
+  const [newType, setNewType] = useState<ServiceOrderType>('returned_to_eero');
   const [newPriority, setNewPriority] = useState<ServiceOrderPriority>('P2');
   const [newAssignee, setNewAssignee] = useState('');
   const [newSite, setNewSite] = useState('USA');
@@ -197,9 +199,10 @@ export default function ServiceBoard() {
           className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600"
         >
           <option value="all">All types</option>
-          <option value="swap">Swap</option>
-          <option value="repair">Repair</option>
-          <option value="new_testbed">New Testbed</option>
+          <option value="returned_to_eero">Returned to eero</option>
+          <option value="defective">Defective / Hardware issue</option>
+          <option value="end_of_program">End of program phase</option>
+          <option value="lost">Lost / Unrecoverable</option>
           <option value="outbound_shipment">Outbound Shipment</option>
           <option value="other">Other</option>
         </select>
@@ -266,9 +269,10 @@ export default function ServiceBoard() {
                 onChange={(e) => setNewType(e.target.value as ServiceOrderType)}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
               >
-                <option value="swap">Swap</option>
-                <option value="repair">Repair</option>
-                <option value="new_testbed">New Testbed</option>
+                <option value="returned_to_eero">Returned to eero</option>
+                <option value="defective">Defective / Hardware issue</option>
+                <option value="end_of_program">End of program phase</option>
+                <option value="lost">Lost / Unrecoverable</option>
                 <option value="outbound_shipment">Outbound Shipment</option>
                 <option value="other">Other</option>
               </select>

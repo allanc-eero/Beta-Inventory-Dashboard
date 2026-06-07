@@ -130,12 +130,13 @@ export default function OverviewDashboard() {
   const soBarTotal = Math.max(soOpen + soInProgress + soComplete + soClosed30d, 1);
 
   // By Job Type — live counts from service orders
-  const swapCount = serviceOrders.filter((o) => o.type === 'swap').length;
-  const repairCount = serviceOrders.filter((o) => o.type === 'repair').length;
-  const newTestbedCount = serviceOrders.filter((o) => o.type === 'new_testbed').length;
+  const returnedCount = serviceOrders.filter((o) => o.type === 'returned_to_eero').length;
+  const defectiveCount = serviceOrders.filter((o) => o.type === 'defective').length;
+  const endProgramCount = serviceOrders.filter((o) => o.type === 'end_of_program').length;
+  const lostCount = serviceOrders.filter((o) => o.type === 'lost').length;
   const outboundShipments = serviceOrders.filter((o) => o.type === 'outbound_shipment').length;
   const otherCount = serviceOrders.filter((o) => o.type === 'other').length;
-  const jobTypeMax = Math.max(swapCount, repairCount, newTestbedCount, outboundShipments, otherCount, 1);
+  const jobTypeMax = Math.max(returnedCount, defectiveCount, endProgramCount, lostCount, outboundShipments, otherCount, 1);
 
   // By Priority — live from JIRA tickets
   const openTickets = jiraTickets.filter((t) => t.status === 'open' || t.status === 'in_progress');
@@ -202,11 +203,12 @@ export default function OverviewDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Job Type</p>
-            <BarRow letter="S" label="Swap" width={`${(swapCount / jobTypeMax) * 100}%`} color="#dc2626" count={swapCount} />
-            <BarRow letter="R" label="Repair" width={`${(repairCount / jobTypeMax) * 100}%`} color="#16a34a" count={repairCount} />
-            <BarRow letter="N" label="New Testbed" width={`${(newTestbedCount / jobTypeMax) * 100}%`} color="#7c3aed" count={newTestbedCount} />
+            <BarRow letter="R" label="Returned to eero" width={`${(returnedCount / jobTypeMax) * 100}%`} color="#3b82f6" count={returnedCount} />
+            <BarRow letter="D" label="Defective / Hardware" width={`${(defectiveCount / jobTypeMax) * 100}%`} color="#dc2626" count={defectiveCount} />
+            <BarRow letter="E" label="End of program phase" width={`${(endProgramCount / jobTypeMax) * 100}%`} color="#f97316" count={endProgramCount} />
+            <BarRow letter="L" label="Lost / Unrecoverable" width={`${(lostCount / jobTypeMax) * 100}%`} color="#374151" count={lostCount} />
             <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1d4ed8" count={outboundShipments} />
-            <BarRow letter="O" label="Other" width={`${(otherCount / jobTypeMax) * 100}%`} color="#374151" count={otherCount} />
+            <BarRow letter="O" label="Other" width={`${(otherCount / jobTypeMax) * 100}%`} color="#6b7280" count={otherCount} />
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>Top Assignees (Open)</p>
             {topAssignees.length === 0 && <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>}
             {topAssignees.map(([name], i) => <p key={i} style={{ fontSize: '13px', color: '#4b5563', margin: '2px 0' }}>{name}</p>)}
