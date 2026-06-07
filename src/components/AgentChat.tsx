@@ -5,6 +5,13 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import { Sparkles, Send, X } from 'lucide-react';
 
+// Simple markdown-like formatting for agent responses
+function formatMessage(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br/>');
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -178,7 +185,7 @@ export default function AgentChat() {
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-800'
               }`}>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
               </div>
             </div>
           ))}

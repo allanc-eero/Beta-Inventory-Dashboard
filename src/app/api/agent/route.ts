@@ -115,13 +115,24 @@ function processQuery(query: string, data: any): string {
   }
 
   // ─── Program queries ────────────────────────────────────────────────
-  if (query.match(/program|active program|which program/)) {
-    if (stats.programs?.length > 0) {
-      const programCounts = stats.programs.map((p: string) => {
-        const count = devices?.filter((d: any) => d.program === p).length || 0;
-        return `- **${p}**: ${count} device(s)`;
+  if (query.match(/program|active program|which program|how many program|live program/)) {
+    // Build program info the same way ProgramsTab does — group by program with product name
+    const programMap: Record<string, { count: number; online: number; product: string }> = {};
+    devices?.forEach((d: any) => {
+      const prog = d.program || 'other';
+      if (!programMap[prog]) programMap[prog] = { count: 0, online: 0, product: '' };
+      programMap[prog].count++;
+      if (d.status === 'online') programMap[prog].online++;
+      if (d.product && !programMap[prog].product) programMap[prog].product = d.product;
+    });
+
+    const activePrograms = Object.entries(programMap).filter(([, info]) => info.count > 0);
+    if (activePrograms.length > 0) {
+      const lines = activePrograms.map(([prog, info]) => {
+        const label = info.product ? `${info.product} ${prog.toUpperCase()}` : prog.toUpperCase();
+        return `• ${label}: ${info.count} device(s), ${info.online} online`;
       });
-      return `**Active programs (${stats.programs.length}):**\n${programCounts.join('\n')}`;
+      return `Active programs (${activePrograms.length}):\n${lines.join('\n')}`;
     }
     return 'No active programs found.';
   }
