@@ -212,7 +212,7 @@ export default function OverviewDashboard() {
         </div>
 
         {/* Status bar — colored segments with labels inside */}
-        <div className="flex h-7 rounded overflow-hidden text-[10px] font-medium text-white mb-4">
+        <div className="flex h-9 rounded overflow-hidden text-xs font-medium text-white mb-4">
           {[
             { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6', bg: 'bg-blue-500' },
             { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308', bg: 'bg-yellow-500' },
@@ -235,7 +235,7 @@ export default function OverviewDashboard() {
         </div>
 
         {/* Status numbers row */}
-        <div className="flex gap-8 mb-6">
+        <div className="flex gap-10 mb-8">
           {[
             { value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), label: 'Open' },
             { value: orderStats.byStatus.in_progress || 0, label: 'In progress' },
@@ -243,7 +243,7 @@ export default function OverviewDashboard() {
             { value: orderStats.byStatus.on_hold || 0, label: 'On hold' },
           ].map((s) => (
             <div key={s.label}>
-              <p className="text-xl font-bold text-gray-900">{s.value}</p>
+              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
               <p className="text-xs text-gray-500">{s.label}</p>
             </div>
           ))}
@@ -267,7 +267,7 @@ export default function OverviewDashboard() {
                   <div key={type.key} className="flex items-center gap-3">
                     <span className="text-xs font-bold text-gray-900 w-3">{type.letter}</span>
                     <span className="text-xs text-gray-600">· {type.label}</span>
-                    <div className="flex-1 h-4 bg-gray-50 rounded-sm overflow-hidden ml-2">
+                    <div className="flex-1 h-6 bg-gray-100 rounded-sm overflow-hidden ml-2">
                       <div className="h-full rounded-sm" style={{ width: `${maxType > 0 ? (count / maxType) * 100 : 0}%`, backgroundColor: type.color }} />
                     </div>
                     {count > 0 && <span className="text-[10px] text-gray-400 w-4 text-right">{count}</span>}
@@ -305,7 +305,7 @@ export default function OverviewDashboard() {
                   <div key={p.key} className="flex items-center gap-2">
                     <span className="text-xs text-gray-700 w-4 text-right font-medium">{count}</span>
                     <span className="text-xs text-gray-600 w-40 shrink-0">{p.label}</span>
-                    <div className="flex-1 h-3.5 bg-gray-50 rounded-sm overflow-hidden">
+                    <div className="flex-1 h-5 bg-gray-100 rounded-sm overflow-hidden">
                       <div className="h-full rounded-sm" style={{ width: `${maxPriority > 0 ? (count / maxPriority) * 100 : 0}%`, backgroundColor: p.color }} />
                     </div>
                     <span className="text-xs text-gray-700 w-4 text-right font-medium">{count}</span>
