@@ -47,8 +47,8 @@ export default function AgentChat() {
     const programs = [...new Set(devices.map((d) => d.program).filter(Boolean))];
     const countries = [...new Set(devices.map((d) => d.country).filter(Boolean))];
 
-    // Include first 50 devices for lookups (serial, name, email, status, program)
-    const deviceSummary = devices.slice(0, 100).map((d) => ({
+    // ALL devices — full data
+    const allDevices = devices.map((d) => ({
       serial: d.serialNumber,
       name: d.assignedTo || d.checkedOutTo || '',
       email: d.assignedEmail || '',
@@ -56,26 +56,58 @@ export default function AgentChat() {
       program: d.program,
       product: d.product,
       model: d.model,
+      internalName: d.internalName,
       country: d.country,
+      location: d.location,
       firmware: d.firmwareVersion,
       network: d.network,
+      tracking: d.tracking || d.leg2Tracking || '',
+      dueDate: d.dueDate || '',
+      deactivated: d.deactivated,
+      returnEmailSentAt: d.returnEmailSentAt || '',
+      testbedName: d.testbedName || '',
     }));
 
-    // Tester profiles
-    const testerSummary = testerProfiles.slice(0, 50).map((t) => ({
+    // ALL tester profiles
+    const allTesters = testerProfiles.map((t) => ({
       name: t.name,
       email: t.email,
-      country: t.country,
-      programs: t.programs,
       testerId: t.testerId,
+      country: t.country,
+      location: t.location,
+      programs: t.programs,
+      networkId: t.networkId,
+      adminId: t.adminId,
+      additionalEmails: t.additionalEmails,
     }));
+
+    // Recent device history (last 200 entries)
+    const { deviceHistory, getOptOuts, getAllShipments: getShipments } = useDeviceStore.getState();
+    const recentHistory = deviceHistory
+      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 200)
+      .map((h: any) => {
+        const dev = devices.find((d) => d.id === h.deviceId);
+        return { serial: dev?.serialNumber || '', action: h.action, description: h.description, user: h.user, date: h.timestamp };
+      });
+
+    // Opt-outs
+    const optOuts = getOptOuts().map((o: any) => ({ name: o.personName, email: o.personEmail, reason: o.reason, date: o.optOutDate, program: o.program }));
+
+    // Shipments
+    const shipments = getShipments().slice(0, 20).map((s: any) => ({ fileName: s.fileName, carrier: s.carrier, devices: s.serials?.length, program: s.program, date: s.createdAt, status: s.status }));
 
     return JSON.stringify({
       stats: { total: devices.length, online: onlineCount, offline: offlineCount, deactivated: deactivatedCount, pendingReturn: pendingReturnCount, programs, countries, testerCount: testerProfiles.length },
-      devices: deviceSummary,
-      testers: testerSummary,
-      recentShapeshifts: shapeshiftJobs.slice(0, 10).map((j) => ({ serial: j.serial, target: j.targetEnv, status: j.status, assignedTo: j.assignedTo })),
-      serviceOrders: serviceOrders.slice(0, 10).map((o) => ({ title: o.title, status: o.status, jiraKey: o.jiraKey })),
+      devices: allDevices,
+      testers: allTesters,
+      recentActivity: recentHistory,
+      optOuts,
+      shipments,
+      shapeshiftJobs: shapeshiftJobs.map((j) => ({ serial: j.serial, target: j.targetEnv, status: j.status, assignedTo: j.assignedTo, retries: j.retries, created: j.createdAt })),
+      serviceOrders: serviceOrders.map((o) => ({ title: o.title, status: o.status, type: o.type, jiraKey: o.jiraKey, assignee: o.assignee, site: o.site })),
+      inboundPackages: inboundPackages.map((p) => ({ asn: p.asn, carrier: p.carrier, tracking: p.trackingNumber, models: p.models, items: p.itemsTotal, status: p.status, destination: p.destination })),
+      outboundPackages: outboundPackages.map((p) => ({ id: p.shippingId, recipient: p.recipient, carrier: p.carrier, tracking: p.trackingNumber, models: p.models, status: p.status, destination: p.destination })),
     });
   };
 

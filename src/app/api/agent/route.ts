@@ -164,8 +164,59 @@ function processQuery(query: string, data: any): string {
     return `**${stats.testerCount}** testers tracked in the system across ${stats.programs?.length || 0} program(s).`;
   }
 
+  // ─── Recent activity ────────────────────────────────────────────────
+  if (query.match(/recent|activity|what happened|latest|history/)) {
+    const activity = data.recentActivity;
+    if (activity?.length > 0) {
+      const lines = activity.slice(0, 10).map((a: any) => `• ${a.serial || '—'}: ${a.description} (${new Date(a.date).toLocaleDateString()})`);
+      return `**Recent Activity (last ${Math.min(activity.length, 10)} events):**\n${lines.join('\n')}`;
+    }
+    return 'No recent activity recorded.';
+  }
+
+  // ─── Opt-out queries ────────────────────────────────────────────────
+  if (query.match(/opt.?out|opted out|who.*opt/)) {
+    const optOuts = data.optOuts;
+    if (optOuts?.length > 0) {
+      const lines = optOuts.map((o: any) => `• ${o.name} (${o.email}) — ${o.reason}, ${new Date(o.date).toLocaleDateString()}`);
+      return `**Opted-out testers (${optOuts.length}):**\n${lines.join('\n')}`;
+    }
+    return 'No testers have opted out.';
+  }
+
+  // ─── Package queries ────────────────────────────────────────────────
+  if (query.match(/inbound|incoming.*package/)) {
+    const pkgs = data.inboundPackages;
+    if (pkgs?.length > 0) {
+      const lines = pkgs.slice(0, 10).map((p: any) => `• ${p.asn} — ${p.models}, ${p.items} items, ${p.status} (${p.carrier} ${p.tracking})`);
+      return `**Inbound Packages (${pkgs.length}):**\n${lines.join('\n')}`;
+    }
+    return 'No inbound packages.';
+  }
+
+  if (query.match(/outbound|outgoing.*package|shipment/)) {
+    const pkgs = data.outboundPackages;
+    if (pkgs?.length > 0) {
+      const lines = pkgs.slice(0, 10).map((p: any) => `• ${p.id} → ${p.recipient} — ${p.models}, ${p.status} (${p.carrier})`);
+      return `**Outbound Packages (${pkgs.length}):**\n${lines.join('\n')}`;
+    }
+    return 'No outbound packages.';
+  }
+
+  // ─── Service order queries ──────────────────────────────────────────
+  if (query.match(/service order|kanban|board/)) {
+    const orders = data.serviceOrders;
+    if (orders?.length > 0) {
+      const byStatus: Record<string, number> = {};
+      orders.forEach((o: any) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
+      const statusLines = Object.entries(byStatus).map(([s, c]) => `• ${s}: ${c}`);
+      return `**Service Orders (${orders.length}):**\n${statusLines.join('\n')}\n\nRecent:\n${orders.slice(0, 5).map((o: any) => `• ${o.title} — ${o.status}${o.jiraKey ? ` (${o.jiraKey})` : ''}`).join('\n')}`;
+    }
+    return 'No service orders.';
+  }
+
   // ─── Fallback ───────────────────────────────────────────────────────
-  return `I can help with:\n- **Device lookups**: "Who has serial GGC...?" or "How many devices are online?"\n- **Tester lookups**: "Show me Jake's devices" or "Who is this email?"\n- **Stats**: "Give me a dashboard summary"\n- **Programs**: "What programs are active?"\n- **Regions**: "How many devices in Australia?"\n- **Processes**: "How do I shapeshift?" or "What's the return process?"\n\nTry rephrasing your question.`;
+  return `I can help with:\n- **Device lookups**: "Who has serial GGC...?" or "How many devices are online?"\n- **Tester lookups**: "Show me Jake's devices" or "Who is this email?"\n- **Stats**: "Give me a dashboard summary"\n- **Programs**: "What programs are active?"\n- **Regions**: "How many devices in Australia?"\n- **Activity**: "What happened recently?" or "Show recent activity"\n- **Processes**: "How do I shapeshift?" or "What's the return process?"\n- **Packages**: "Show inbound packages" or "Any outbound shipments?"\n\nTry rephrasing your question.`;
 }
 
 function extractNameOrEmail(query: string): string | null {
