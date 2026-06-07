@@ -211,21 +211,31 @@ export default function OverviewDashboard() {
           <span className="text-sm text-gray-400">{orderStats.total} total</span>
         </div>
 
-        {/* Status blocks row — colored squares with count + label */}
-        <div className="flex mb-6">
+        {/* Thin colored segment bar */}
+        <div className="flex h-6 rounded overflow-hidden mb-3">
           {[
-            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
-            { label: 'In progress', value: orderStats.byStatus.in_progress || 0, bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700' },
-            { label: 'Complete', value: orderStats.byStatus.completed || 0, bg: 'bg-green-50 border-green-200', text: 'text-green-700' },
-            { label: 'On hold', value: orderStats.byStatus.on_hold || 0, bg: 'bg-gray-50 border-gray-200', text: 'text-gray-700' },
-            { label: 'Closed 30d', value: 0, bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
-            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, bg: 'bg-red-50 border-red-200', text: 'text-red-700' },
-          ].map((seg) => (
-            <div key={seg.label} className={`flex-1 border-t-2 px-3 py-2 ${seg.bg}`}>
-              <p className={`text-lg font-bold ${seg.text}`}>{seg.value}</p>
-              <p className="text-[11px] text-gray-500">{seg.label}</p>
-            </div>
-          ))}
+            { value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#2563eb' },
+            { value: orderStats.byStatus.in_progress || 0, color: '#ca8a04' },
+            { value: orderStats.byStatus.completed || 0, color: '#16a34a' },
+            { value: orderStats.byStatus.on_hold || 0, color: '#9ca3af' },
+            { value: 0, color: '#d1d5db' },
+            { value: orderStats.byStatus.cancelled || 0, color: '#991b1b' },
+          ].map((seg, i) => {
+            const total = orderStats.total || 1;
+            if (seg.value === 0 && i > 0) return null;
+            return <div key={i} className="h-full" style={{ width: `${Math.max((seg.value / total) * 100, seg.value > 0 ? 4 : 0)}%`, backgroundColor: seg.color }} />;
+          })}
+          {orderStats.total === 0 && <div className="flex-1 bg-gray-200" />}
+        </div>
+
+        {/* Status counts — plain numbers, no colored backgrounds */}
+        <div className="flex gap-8 mb-6">
+          <div><p className="text-xl font-bold text-gray-900">{(orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0)}</p><p className="text-xs text-gray-500">Open</p></div>
+          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.in_progress || 0}</p><p className="text-xs text-gray-500">In progress</p></div>
+          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.completed || 0}</p><p className="text-xs text-gray-500">Complete</p></div>
+          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.on_hold || 0}</p><p className="text-xs text-gray-500">On hold</p></div>
+          <div><p className="text-xl font-bold text-gray-900">0</p><p className="text-xs text-gray-500">Closed 30d</p></div>
+          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.cancelled || 0}</p><p className="text-xs text-gray-500">Cancelled</p></div>
         </div>
 
         {/* Two columns — clean, aligned layout */}
