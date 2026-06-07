@@ -205,106 +205,131 @@ export default function OverviewDashboard() {
 
       {/* Service Orders section */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="text-sm font-semibold text-gray-900">Service Orders</h3>
-          <span className="text-xs text-gray-400">{orderStats.total} total</span>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-3">
+          <h3 className="text-base font-bold text-gray-900">Service Orders</h3>
+          <span className="text-sm text-gray-400">{orderStats.total} total</span>
         </div>
 
-        {/* Status segment bar with numbers above */}
-        <div className="mb-6">
-          <div className="grid grid-cols-6 mb-2">
-            {[
-              { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
-              { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308' },
-              { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#22c55e' },
-              { label: 'On hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316' },
-              { label: 'Closed 30d', value: 0, color: '#d1d5db' },
-              { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#94a3b8' },
-            ].map((seg) => (
-              <div key={seg.label}>
-                <p className="text-2xl font-bold text-gray-900">{seg.value}</p>
-                <p className="text-[11px] text-gray-500">{seg.label}</p>
+        {/* Status bar — colored segments with labels inside */}
+        <div className="flex h-7 rounded overflow-hidden text-[10px] font-medium text-white mb-4">
+          {[
+            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6', bg: 'bg-blue-500' },
+            { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308', bg: 'bg-yellow-500' },
+            { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#22c55e', bg: 'bg-green-500' },
+            { label: 'On hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316', bg: 'bg-orange-400' },
+            { label: 'Closed 30d', value: 0, color: '#a3a3a3', bg: 'bg-neutral-300' },
+            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#7f1d1d', bg: 'bg-red-900' },
+          ].map((seg) => {
+            const total = orderStats.total || 1;
+            const pct = (seg.value / total) * 100;
+            if (seg.value === 0) return null;
+            return (
+              <div key={seg.label} className={`flex items-center justify-center px-2 ${seg.bg}`} style={{ width: `${Math.max(pct, 6)}%` }}>
+                <span>{seg.value}</span>
+                <span className="ml-1 hidden md:inline opacity-80">{seg.label}</span>
               </div>
-            ))}
-          </div>
-          <StatusBar segments={[
-            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
-            { label: 'In Progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308' },
-            { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#22c55e' },
-            { label: 'On Hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316' },
-            { label: 'Closed 30d', value: 0, color: '#d1d5db' },
-            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#94a3b8' },
-          ]} />
+            );
+          })}
+          {orderStats.total === 0 && <div className="flex-1 bg-gray-100" />}
         </div>
 
-        {/* Two-column layout: Job Type (left) | Priority + Region (right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: By Job Type */}
-          <div>
-            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4">By Job Type</h4>
-            <div className="space-y-3">
-              {Object.entries(orderStats.byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-                <div key={type} className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-gray-500 w-4">{typeLabels[type]?.charAt(0) || '?'}</span>
-                  <span className="text-xs text-gray-700 w-32 shrink-0">{typeLabels[type]?.slice(4) || type}</span>
-                  <div className="flex-1 h-5 bg-gray-50 rounded overflow-hidden">
-                    <div className="h-full rounded" style={{ width: `${maxType > 0 ? (count / maxType) * 100 : 0}%`, backgroundColor: typeColors[type] || '#6b7280' }} />
-                  </div>
-                  <span className="text-xs font-bold text-gray-700 w-6 text-right">{count}</span>
-                </div>
-              ))}
+        {/* Status numbers row */}
+        <div className="flex gap-8 mb-6">
+          {[
+            { value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), label: 'Open' },
+            { value: orderStats.byStatus.in_progress || 0, label: 'In progress' },
+            { value: orderStats.byStatus.completed || 0, label: 'Complete' },
+            { value: orderStats.byStatus.on_hold || 0, label: 'On hold' },
+          ].map((s) => (
+            <div key={s.label}>
+              <p className="text-xl font-bold text-gray-900">{s.value}</p>
+              <p className="text-xs text-gray-500">{s.label}</p>
             </div>
+          ))}
+        </div>
 
-            {/* Top Assignees */}
-            {Object.keys(orderStats.byAssignee).length > 0 && (
-              <div className="mt-6">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Top Assignees (Open)</h4>
-                <div className="space-y-2">
-                  {Object.entries(orderStats.byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => (
-                    <div key={name} className="flex items-center justify-between text-xs py-1">
-                      <span className="text-gray-700">{name}</span>
-                      <span className="font-bold text-gray-900">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right: Priority + Region */}
+        {/* Two columns: Job Type (left) | Priority + Site (right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* LEFT: By Job Type */}
           <div>
-            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4">By Priority (Open)</h4>
-            <div className="space-y-2.5">
-              {['P0', 'P1', 'P2', 'P3', 'P4', 'P5'].map((p) => {
-                const count = orderStats.byPriority[p] || 0;
-                const labels: Record<string, string> = { P0: 'Emergency / Blocking', P1: 'Critical', P2: 'Corrective', P3: 'Routine', P4: 'Low / Backlog', P5: 'Minimal' };
+            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">By Job Type</h4>
+            <div className="space-y-3">
+              {[
+                { key: 'repair', letter: 'R', label: 'Repair', color: '#dc2626' },
+                { key: 'new_testbed', letter: 'N', label: 'New Testbed', color: '#16a34a' },
+                { key: 'swap', letter: 'S', label: 'Swap', color: '#7c3aed' },
+                { key: 'outbound_shipment', letter: 'T', label: 'Outbound Shipment', color: '#1d4ed8' },
+                { key: 'other', letter: 'O', label: 'Other', color: '#374151' },
+              ].map((type) => {
+                const count = orderStats.byType[type.key] || 0;
                 return (
-                  <div key={p} className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-500 w-5">{count}</span>
-                    <span className="text-xs text-gray-600 w-28 shrink-0">{p} — {labels[p]}</span>
-                    <div className="flex-1 h-4 bg-gray-50 rounded overflow-hidden">
-                      <div className="h-full rounded" style={{ width: `${maxPriority > 0 ? (count / maxPriority) * 100 : 0}%`, backgroundColor: priorityColors[p] }} />
+                  <div key={type.key} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-900 w-3">{type.letter}</span>
+                    <span className="text-xs text-gray-600">· {type.label}</span>
+                    <div className="flex-1 h-4 bg-gray-50 rounded-sm overflow-hidden ml-2">
+                      <div className="h-full rounded-sm" style={{ width: `${maxType > 0 ? (count / maxType) * 100 : 0}%`, backgroundColor: type.color }} />
                     </div>
-                    <span className="text-xs font-bold text-gray-700 w-5 text-right">{count}</span>
+                    {count > 0 && <span className="text-[10px] text-gray-400 w-4 text-right">{count}</span>}
                   </div>
                 );
               })}
             </div>
 
-            {/* By Region */}
-            {Object.keys(orderStats.byRegion).length > 0 && (
+            {/* Top Assignees */}
+            {Object.keys(orderStats.byAssignee).length > 0 && (
               <div className="mt-6">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">By Site (Open)</h4>
-                <div className="space-y-2">
-                  {Object.entries(orderStats.byRegion).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([region, count]) => (
-                    <div key={region} className="flex items-center justify-between text-xs py-1">
-                      <span className="font-bold text-gray-700">{count}</span>
-                      <span className="text-gray-600">{region}</span>
-                    </div>
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">Top Assignees (Open)</h4>
+                <div className="space-y-1.5">
+                  {Object.entries(orderStats.byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => (
+                    <p key={name} className="text-xs text-gray-600">{name}</p>
                   ))}
                 </div>
               </div>
             )}
+          </div>
+
+          {/* RIGHT: By Priority + By Site */}
+          <div>
+            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">By Priority (Open)</h4>
+            <div className="space-y-2">
+              {[
+                { key: 'P0', label: 'P0 — Emergency / Blocking', color: '#dc2626' },
+                { key: 'P1', label: 'P1 — Critical', color: '#f97316' },
+                { key: 'P2', label: 'P2 — Corrective', color: '#eab308' },
+                { key: 'P3', label: 'P3 — Routine', color: '#22c55e' },
+                { key: 'P4', label: 'P4 — Low / Backlog', color: '#3b82f6' },
+              ].map((p) => {
+                const count = orderStats.byPriority[p.key] || 0;
+                return (
+                  <div key={p.key} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-700 w-4 text-right font-medium">{count}</span>
+                    <span className="text-xs text-gray-600 w-40 shrink-0">{p.label}</span>
+                    <div className="flex-1 h-3.5 bg-gray-50 rounded-sm overflow-hidden">
+                      <div className="h-full rounded-sm" style={{ width: `${maxPriority > 0 ? (count / maxPriority) * 100 : 0}%`, backgroundColor: p.color }} />
+                    </div>
+                    <span className="text-xs text-gray-700 w-4 text-right font-medium">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* By Site */}
+            <div className="mt-6">
+              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">By Site (Open)</h4>
+              {Object.keys(orderStats.byRegion).length > 0 ? (
+                <div className="space-y-1.5">
+                  {Object.entries(orderStats.byRegion).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([region, count]) => (
+                    <div key={region} className="flex items-center gap-3 text-xs">
+                      <span className="font-medium text-gray-900 w-5">{count}</span>
+                      <span className="text-gray-600">{region}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">No data</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
