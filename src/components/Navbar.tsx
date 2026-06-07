@@ -11,6 +11,7 @@ interface NavbarProps {
 }
 
 const tabs: { id: TabType; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
   { id: 'devices', label: 'Devices' },
   { id: 'testbeds', label: 'Programs' },
   { id: 'locations', label: 'Locations' },
@@ -44,7 +45,7 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
             {/* Left: Title */}
             <div className="flex items-center mr-8">
               <h1
-                onClick={() => setActiveTab('devices')}
+                onClick={() => setActiveTab('overview')}
                 className="text-white font-semibold text-sm cursor-pointer hover:text-white/90"
               >
                 Simplified Inventory Dashboard
