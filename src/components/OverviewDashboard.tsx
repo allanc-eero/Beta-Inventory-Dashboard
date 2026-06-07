@@ -204,72 +204,109 @@ export default function OverviewDashboard() {
 
       {/* Service Orders section */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3 mb-4">
           <h3 className="text-sm font-semibold text-gray-900">Service Orders</h3>
-          <span className="text-xs text-gray-500">{orderStats.total} total</span>
+          <span className="text-xs text-gray-400">{orderStats.total} total</span>
         </div>
 
-        {/* Status segment bar */}
-        <StatusBar segments={[
-          { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
-          { label: 'In Progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308' },
-          { label: 'On Hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316' },
-          { label: 'Completed', value: orderStats.byStatus.completed || 0, color: '#22c55e' },
-          { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#94a3b8' },
-        ]} />
-
-        {/* Counts row */}
-        <div className="flex items-center gap-6 mt-3 text-xs">
-          <span className="text-blue-600 font-medium">{(orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0)} Open</span>
-          <span className="text-yellow-600 font-medium">{orderStats.byStatus.in_progress || 0} In Progress</span>
-          <span className="text-orange-600 font-medium">{orderStats.byStatus.on_hold || 0} On Hold</span>
-          <span className="text-green-600 font-medium">{orderStats.byStatus.completed || 0} Complete</span>
-          <span className="text-gray-500 font-medium">{orderStats.byStatus.cancelled || 0} Cancelled</span>
+        {/* Status segment bar with numbers above */}
+        <div className="mb-6">
+          <div className="flex mb-1">
+            {[
+              { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
+              { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308' },
+              { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#22c55e' },
+              { label: 'On hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316' },
+              { label: 'Closed 30d', value: 0, color: '#d1d5db' },
+              { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#94a3b8' },
+            ].map((seg) => {
+              const total = orderStats.total || 1;
+              const width = Math.max((seg.value / total) * 100, seg.value > 0 ? 8 : 0);
+              return (
+                <div key={seg.label} style={{ width: `${width}%` }} className="text-center min-w-[40px]">
+                  <p className="text-lg font-bold text-gray-900">{seg.value}</p>
+                  <p className="text-[10px] text-gray-500">{seg.label}</p>
+                </div>
+              );
+            })}
+          </div>
+          <StatusBar segments={[
+            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
+            { label: 'In Progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308' },
+            { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#22c55e' },
+            { label: 'On Hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316' },
+            { label: 'Closed 30d', value: 0, color: '#d1d5db' },
+            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#94a3b8' },
+          ]} />
         </div>
 
-        {/* Detail grids */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-          {/* By Job Type */}
+        {/* Two-column layout: Job Type (left) | Priority + Region (right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left: By Job Type */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">By Job Type</h4>
-            <div className="space-y-2">
+            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4">By Job Type</h4>
+            <div className="space-y-3">
               {Object.entries(orderStats.byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-                <HBar key={type} label={typeLabels[type] || type} value={count} max={maxType} color={typeColors[type] || '#6b7280'} />
+                <div key={type} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-500 w-4">{typeLabels[type]?.charAt(0) || '?'}</span>
+                  <span className="text-xs text-gray-700 w-32 shrink-0">{typeLabels[type]?.slice(4) || type}</span>
+                  <div className="flex-1 h-5 bg-gray-50 rounded overflow-hidden">
+                    <div className="h-full rounded" style={{ width: `${maxType > 0 ? (count / maxType) * 100 : 0}%`, backgroundColor: typeColors[type] || '#6b7280' }} />
+                  </div>
+                  <span className="text-xs font-bold text-gray-700 w-6 text-right">{count}</span>
+                </div>
               ))}
             </div>
-          </div>
 
-          {/* By Priority (Open) */}
-          <div>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">By Priority (Open)</h4>
-            <div className="space-y-2">
-              {['P0', 'P1', 'P2', 'P3', 'P4', 'P5'].filter((p) => orderStats.byPriority[p]).map((p) => (
-                <HBar key={p} label={`${p} — ${p === 'P0' ? 'Emergency' : p === 'P1' ? 'Critical' : p === 'P2' ? 'Corrective' : p === 'P3' ? 'Routine' : 'Low'}`} value={orderStats.byPriority[p]} max={maxPriority} color={priorityColors[p]} />
-              ))}
-            </div>
-          </div>
-
-          {/* By Region (Open) */}
-          <div>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">By Region (Open)</h4>
-            <div className="space-y-2">
-              {Object.entries(orderStats.byRegion).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([region, count]) => (
-                <HBar key={region} label={region} value={count} max={maxRegion} color="#3b82f6" />
-              ))}
-            </div>
             {/* Top Assignees */}
             {Object.keys(orderStats.byAssignee).length > 0 && (
-              <>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-4">Top Assignees (Open)</h4>
-                <div className="space-y-1">
+              <div className="mt-6">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Top Assignees (Open)</h4>
+                <div className="space-y-2">
                   {Object.entries(orderStats.byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => (
-                    <div key={name} className="flex items-center justify-between text-xs">
+                    <div key={name} className="flex items-center justify-between text-xs py-1">
                       <span className="text-gray-700">{name}</span>
-                      <span className="text-gray-500 font-medium">{count}</span>
+                      <span className="font-bold text-gray-900">{count}</span>
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Priority + Region */}
+          <div>
+            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4">By Priority (Open)</h4>
+            <div className="space-y-2.5">
+              {['P0', 'P1', 'P2', 'P3', 'P4', 'P5'].map((p) => {
+                const count = orderStats.byPriority[p] || 0;
+                const labels: Record<string, string> = { P0: 'Emergency / Blocking', P1: 'Critical', P2: 'Corrective', P3: 'Routine', P4: 'Low / Backlog', P5: 'Minimal' };
+                return (
+                  <div key={p} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-500 w-5">{count}</span>
+                    <span className="text-xs text-gray-600 w-28 shrink-0">{p} — {labels[p]}</span>
+                    <div className="flex-1 h-4 bg-gray-50 rounded overflow-hidden">
+                      <div className="h-full rounded" style={{ width: `${maxPriority > 0 ? (count / maxPriority) * 100 : 0}%`, backgroundColor: priorityColors[p] }} />
+                    </div>
+                    <span className="text-xs font-bold text-gray-700 w-5 text-right">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* By Region */}
+            {Object.keys(orderStats.byRegion).length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">By Site (Open)</h4>
+                <div className="space-y-2">
+                  {Object.entries(orderStats.byRegion).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([region, count]) => (
+                    <div key={region} className="flex items-center justify-between text-xs py-1">
+                      <span className="font-bold text-gray-700">{count}</span>
+                      <span className="text-gray-600">{region}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
