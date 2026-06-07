@@ -129,14 +129,13 @@ export default function OverviewDashboard() {
   const soTotal = serviceOrders.length;
   const soBarTotal = Math.max(soOpen + soInProgress + soComplete + soClosed30d, 1);
 
-  // By Job Type — live counts
-  const newDevices = devices.filter((d) => { const age = Date.now() - new Date(d.createdAt).getTime(); return age < 30 * 24 * 60 * 60 * 1000; }).length;
-  const bricked = devices.filter((d) => d.deactivated && d.status === 'deactivated').length;
-  const archived = devices.filter((d) => d.status === 'deactivated').length;
-  const programRegions = new Set(devices.map((d) => `${d.program}-${d.country}`).filter((k) => !k.includes('undefined') && !k.includes('Unknown'))).size;
+  // By Job Type — live counts from service orders
+  const swapCount = serviceOrders.filter((o) => o.type === 'swap').length;
+  const repairCount = serviceOrders.filter((o) => o.type === 'repair').length;
+  const newTestbedCount = serviceOrders.filter((o) => o.type === 'new_testbed').length;
   const outboundShipments = serviceOrders.filter((o) => o.type === 'outbound_shipment').length;
-  const inboundShipments = devices.filter((d) => d.shipmentStatus === 'in_transit_to_tester' || d.shipmentStatus === 'in_transit_to_fc').length;
-  const jobTypeMax = Math.max(newDevices, bricked, archived, programRegions, outboundShipments, inboundShipments, 1);
+  const otherCount = serviceOrders.filter((o) => o.type === 'other').length;
+  const jobTypeMax = Math.max(swapCount, repairCount, newTestbedCount, outboundShipments, otherCount, 1);
 
   // By Priority — live from JIRA tickets
   const openTickets = jiraTickets.filter((t) => t.status === 'open' || t.status === 'in_progress');
@@ -203,12 +202,11 @@ export default function OverviewDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Job Type</p>
-            <BarRow letter="R" label="New Devices" width={`${(newDevices / jobTypeMax) * 100}%`} color="#dc2626" count={newDevices} />
-            <BarRow letter="N" label="Bricked Devices" width={`${(bricked / jobTypeMax) * 100}%`} color="#16a34a" count={bricked} />
-            <BarRow letter="S" label="Archived Devices" width={`${(archived / jobTypeMax) * 100}%`} color="#7c3aed" count={archived} />
-            <BarRow letter="P" label="Program Regions" width={`${(programRegions / jobTypeMax) * 100}%`} color="#1d4ed8" count={programRegions} />
-            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1e3a5f" count={outboundShipments} />
-            <BarRow letter="O" label="Inbound Shipments" width={`${(inboundShipments / jobTypeMax) * 100}%`} color="#374151" count={inboundShipments} />
+            <BarRow letter="S" label="Swap" width={`${(swapCount / jobTypeMax) * 100}%`} color="#dc2626" count={swapCount} />
+            <BarRow letter="R" label="Repair" width={`${(repairCount / jobTypeMax) * 100}%`} color="#16a34a" count={repairCount} />
+            <BarRow letter="N" label="New Testbed" width={`${(newTestbedCount / jobTypeMax) * 100}%`} color="#7c3aed" count={newTestbedCount} />
+            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1d4ed8" count={outboundShipments} />
+            <BarRow letter="O" label="Other" width={`${(otherCount / jobTypeMax) * 100}%`} color="#374151" count={otherCount} />
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>Top Assignees (Open)</p>
             {topAssignees.length === 0 && <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>}
             {topAssignees.map(([name], i) => <p key={i} style={{ fontSize: '13px', color: '#4b5563', margin: '2px 0' }}>{name}</p>)}
