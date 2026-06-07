@@ -10,6 +10,7 @@ import PeopleTab from '@/components/PeopleTab';
 import ShipmentsTab from '@/components/ShipmentsTab';
 import PackagesTab from '@/components/PackagesTab';
 import ShapeshiftTab from '@/components/ShapeshiftTab';
+import OverviewDashboard from '@/components/OverviewDashboard';
 import DashboardStats from '@/components/DashboardStats';
 import SeedDataProvider from '@/components/SeedDataProvider';
 import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
@@ -20,7 +21,7 @@ import LoginPage from '@/components/LoginPage';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabType>('devices');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -28,10 +29,10 @@ export default function Home() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Reset to Devices tab whenever user changes (login/logout)
+  // Reset to Overview tab whenever user changes (login/logout)
   useEffect(() => {
     if (currentUser) {
-      setActiveTab('devices');
+      setActiveTab('overview');
       setResetKey((k) => k + 1);
     }
   }, [currentUser?.email]);
@@ -83,7 +84,7 @@ export default function Home() {
               </div>
             </>
           )}
-          {activeTab !== 'devices' && (
+          {activeTab !== 'devices' && activeTab !== 'overview' && (
             <>
               <OverdueAlertsBanner />
               <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
@@ -93,6 +94,7 @@ export default function Home() {
             </>
           )}
           <div className="mt-6">
+            {activeTab === 'overview' && <OverviewDashboard />}
             {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
             {activeTab === 'testbeds' && <ProgramsTab />}
             {activeTab === 'packages' && <PackagesTab />}
