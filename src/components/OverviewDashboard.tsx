@@ -63,14 +63,15 @@ function DonutChart({ title, items, total, size, strokeWidth, centerLabel }: {
   );
 }
 
-function BarRow({ letter, label, width, color }: { letter: string; label: string; width: string; color: string }) {
+function BarRow({ letter, label, width, color, count }: { letter: string; label: string; width: string; color: string; count?: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
       <span style={{ fontSize: '13px', fontWeight: 700, width: '14px' }}>{letter}</span>
       <span style={{ fontSize: '13px', color: '#4b5563', width: '160px', flexShrink: 0 }}>· {label}</span>
       <div style={{ flex: 1, height: '14px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width, backgroundColor: color, borderRadius: '2px' }} />
+        <div style={{ height: '100%', width: count === 0 ? '0%' : width, backgroundColor: color, borderRadius: '2px' }} />
       </div>
+      <span style={{ fontSize: '12px', color: '#6b7280', width: '20px', textAlign: 'right' }}>{count ?? ''}</span>
     </div>
   );
 }
@@ -202,12 +203,12 @@ export default function OverviewDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Job Type</p>
-            <BarRow letter="R" label="New Devices" width={`${(newDevices / jobTypeMax) * 100}%`} color="#dc2626" />
-            <BarRow letter="N" label="Bricked Devices" width={`${(bricked / jobTypeMax) * 100}%`} color="#16a34a" />
-            <BarRow letter="S" label="Archived Devices" width={`${(archived / jobTypeMax) * 100}%`} color="#7c3aed" />
-            <BarRow letter="P" label="Program Regions" width={`${(programRegions / jobTypeMax) * 100}%`} color="#1d4ed8" />
-            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1e3a5f" />
-            <BarRow letter="O" label="Inbound Shipments" width={`${(inboundShipments / jobTypeMax) * 100}%`} color="#374151" />
+            <BarRow letter="R" label="New Devices" width={`${(newDevices / jobTypeMax) * 100}%`} color="#dc2626" count={newDevices} />
+            <BarRow letter="N" label="Bricked Devices" width={`${(bricked / jobTypeMax) * 100}%`} color="#16a34a" count={bricked} />
+            <BarRow letter="S" label="Archived Devices" width={`${(archived / jobTypeMax) * 100}%`} color="#7c3aed" count={archived} />
+            <BarRow letter="P" label="Program Regions" width={`${(programRegions / jobTypeMax) * 100}%`} color="#1d4ed8" count={programRegions} />
+            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1e3a5f" count={outboundShipments} />
+            <BarRow letter="O" label="Inbound Shipments" width={`${(inboundShipments / jobTypeMax) * 100}%`} color="#374151" count={inboundShipments} />
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>Top Assignees (Open)</p>
             {topAssignees.length === 0 && <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>}
             {topAssignees.map(([name], i) => <p key={i} style={{ fontSize: '13px', color: '#4b5563', margin: '2px 0' }}>{name}</p>)}
