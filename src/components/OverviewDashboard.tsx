@@ -156,7 +156,7 @@ export default function OverviewDashboard() {
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px', backgroundColor: '#f9fafb' }}>
       {/* ROW 1: Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '12px', marginBottom: '16px' }}>
         <StatCard icon="💻" value={total} label="Total Devices" iconBg="#dbeafe" />
         <StatCard icon="✓" value={online} label="Online" iconBg="#d1fae5" />
         <StatCard icon="👥" value={notOnline} label="Not Online" iconBg="#fef3c7" />
@@ -164,6 +164,7 @@ export default function OverviewDashboard() {
         <StatCard icon="🔬" value={programs} label="Programs" iconBg="#ede9fe" />
         <StatCard icon="👤" value={people} label="People" iconBg="#dbeafe" />
         <StatCard icon="⚠️" value={overdue} label="Overdue" iconBg="#fef3c7" />
+        <StatCard icon="⚡" value={shapeshiftJobs.filter((j) => j.status === 'success').length} label="Shapeshifted" iconBg="#f3e8ff" />
       </div>
 
       {/* ROW 2: Three Donut Charts */}
