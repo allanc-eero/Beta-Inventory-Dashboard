@@ -211,40 +211,19 @@ export default function OverviewDashboard() {
           <span className="text-sm text-gray-400">{orderStats.total} total</span>
         </div>
 
-        {/* Status bar — colored segments with labels inside */}
-        <div className="flex h-9 rounded overflow-hidden text-xs font-medium text-white mb-4">
+        {/* Status blocks row — colored squares with count + label */}
+        <div className="flex mb-6">
           {[
-            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6', bg: 'bg-blue-500' },
-            { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308', bg: 'bg-yellow-500' },
-            { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#22c55e', bg: 'bg-green-500' },
-            { label: 'On hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316', bg: 'bg-orange-400' },
-            { label: 'Closed 30d', value: 0, color: '#a3a3a3', bg: 'bg-neutral-300' },
-            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#7f1d1d', bg: 'bg-red-900' },
-          ].map((seg) => {
-            const total = orderStats.total || 1;
-            const pct = (seg.value / total) * 100;
-            if (seg.value === 0) return null;
-            return (
-              <div key={seg.label} className={`flex items-center justify-center px-2 ${seg.bg}`} style={{ width: `${Math.max(pct, 6)}%` }}>
-                <span>{seg.value}</span>
-                <span className="ml-1 hidden md:inline opacity-80">{seg.label}</span>
-              </div>
-            );
-          })}
-          {orderStats.total === 0 && <div className="flex-1 bg-gray-100" />}
-        </div>
-
-        {/* Status numbers row */}
-        <div className="flex gap-10 mb-8">
-          {[
-            { value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), label: 'Open' },
-            { value: orderStats.byStatus.in_progress || 0, label: 'In progress' },
-            { value: orderStats.byStatus.completed || 0, label: 'Complete' },
-            { value: orderStats.byStatus.on_hold || 0, label: 'On hold' },
-          ].map((s) => (
-            <div key={s.label}>
-              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-xs text-gray-500">{s.label}</p>
+            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
+            { label: 'In progress', value: orderStats.byStatus.in_progress || 0, bg: 'bg-yellow-50 border-yellow-200', text: 'text-yellow-700' },
+            { label: 'Complete', value: orderStats.byStatus.completed || 0, bg: 'bg-green-50 border-green-200', text: 'text-green-700' },
+            { label: 'On hold', value: orderStats.byStatus.on_hold || 0, bg: 'bg-gray-50 border-gray-200', text: 'text-gray-700' },
+            { label: 'Closed 30d', value: 0, bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
+            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, bg: 'bg-red-50 border-red-200', text: 'text-red-700' },
+          ].map((seg) => (
+            <div key={seg.label} className={`flex-1 border-t-2 px-3 py-2 ${seg.bg}`}>
+              <p className={`text-lg font-bold ${seg.text}`}>{seg.value}</p>
+              <p className="text-[11px] text-gray-500">{seg.label}</p>
             </div>
           ))}
         </div>
