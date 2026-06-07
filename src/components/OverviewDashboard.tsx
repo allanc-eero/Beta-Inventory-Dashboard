@@ -211,32 +211,43 @@ export default function OverviewDashboard() {
           <span className="text-sm text-gray-400">{orderStats.total} total</span>
         </div>
 
-        {/* Thin colored segment bar */}
-        <div className="flex h-6 rounded overflow-hidden mb-3">
-          {[
-            { value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#2563eb' },
-            { value: orderStats.byStatus.in_progress || 0, color: '#ca8a04' },
-            { value: orderStats.byStatus.completed || 0, color: '#16a34a' },
-            { value: orderStats.byStatus.on_hold || 0, color: '#9ca3af' },
-            { value: 0, color: '#d1d5db' },
-            { value: orderStats.byStatus.cancelled || 0, color: '#991b1b' },
-          ].map((seg, i) => {
-            const total = orderStats.total || 1;
-            if (seg.value === 0 && i > 0) return null;
-            return <div key={i} className="h-full" style={{ width: `${Math.max((seg.value / total) * 100, seg.value > 0 ? 4 : 0)}%`, backgroundColor: seg.color }} />;
-          })}
-          {orderStats.total === 0 && <div className="flex-1 bg-gray-200" />}
-        </div>
-
-        {/* Status counts — plain numbers, no colored backgrounds */}
-        <div className="flex gap-8 mb-6">
-          <div><p className="text-xl font-bold text-gray-900">{(orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0)}</p><p className="text-xs text-gray-500">Open</p></div>
-          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.in_progress || 0}</p><p className="text-xs text-gray-500">In progress</p></div>
-          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.completed || 0}</p><p className="text-xs text-gray-500">Complete</p></div>
-          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.on_hold || 0}</p><p className="text-xs text-gray-500">On hold</p></div>
-          <div><p className="text-xl font-bold text-gray-900">0</p><p className="text-xs text-gray-500">Closed 30d</p></div>
-          <div><p className="text-xl font-bold text-gray-900">{orderStats.byStatus.cancelled || 0}</p><p className="text-xs text-gray-500">Cancelled</p></div>
-        </div>
+        {/* Segmented status bar with numbers above each segment */}
+        {(() => {
+          const segments = [
+            { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#2563eb' },
+            { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#b45309' },
+            { label: 'Complete', value: orderStats.byStatus.completed || 0, color: '#15803d' },
+            { label: 'On hold', value: orderStats.byStatus.on_hold || 0, color: '#6b7280' },
+            { label: 'Closed 30d', value: 0, color: '#a7f3d0' },
+            { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#7f1d1d' },
+          ];
+          const total = Math.max(segments.reduce((s, seg) => s + seg.value, 0), 1);
+          return (
+            <div className="mb-6">
+              {/* Numbers + labels above bar */}
+              <div className="flex mb-1">
+                {segments.map((seg) => {
+                  const pct = (seg.value / total) * 100;
+                  const width = seg.value > 0 ? Math.max(pct, 8) : (100 / segments.length);
+                  return (
+                    <div key={seg.label} style={{ width: `${width}%` }}>
+                      <p className="text-lg font-bold text-gray-900">{seg.value}</p>
+                      <p className="text-[11px] text-gray-500 -mt-0.5">{seg.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Colored bar */}
+              <div className="flex h-5 rounded-sm overflow-hidden">
+                {segments.map((seg) => {
+                  const pct = (seg.value / total) * 100;
+                  if (seg.value === 0 && total > 1) return <div key={seg.label} style={{ width: `${100 / segments.length}%`, backgroundColor: '#f3f4f6' }} />;
+                  return <div key={seg.label} style={{ width: `${Math.max(pct, seg.value > 0 ? 4 : (100 / segments.length))}%`, backgroundColor: seg.value > 0 ? seg.color : '#f3f4f6' }} />;
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Two columns — clean, aligned layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12">
