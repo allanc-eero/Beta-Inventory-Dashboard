@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<ShapeshiftJobStatus, string> = {
 
 export default function ShapeshiftTab() {
   const { shapeshiftJobs, addShapeshiftJob, updateShapeshiftJob, cancelShapeshiftJob } = usePackagesStore();
-  const { devices } = useDeviceStore();
+  const { devices, addHistoryEntry } = useDeviceStore();
   const { currentUser } = useAuthStore();
 
   // Form state
@@ -25,7 +25,6 @@ export default function ShapeshiftTab() {
   const [targetEnv, setTargetEnv] = useState<ShapeshiftTargetEnv>('stage');
   const [networkId, setNetworkId] = useState('');
   const [retries, setRetries] = useState(10);
-  const [printLabel, setPrintLabel] = useState(false);
   const [otaToLatest, setOtaToLatest] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -61,7 +60,7 @@ export default function ShapeshiftTab() {
       retries,
       currentAttempt: 0,
       status: 'queued',
-      printLabel,
+      printLabel: false,
       otaToLatest,
       assignedTo: currentUser?.email || 'admin',
       createdAt: new Date().toISOString(),
@@ -209,10 +208,6 @@ export default function ShapeshiftTab() {
         {/* Options row */}
         <div className="flex items-center gap-6 mt-3 flex-wrap">
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" checked={printLabel} onChange={(e) => setPrintLabel(e.target.checked)} className="rounded border-gray-300" />
-            Print label on success
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
             <input type="checkbox" checked={otaToLatest} onChange={(e) => setOtaToLatest(e.target.checked)} className="rounded border-gray-300" />
             OTA to latest stable in target env
           </label>
@@ -290,7 +285,21 @@ export default function ShapeshiftTab() {
                     )}
                     {job.status === 'in_progress' && (
                       <button
-                        onClick={() => updateShapeshiftJob(job.id, { status: 'success', completedAt: new Date().toISOString() })}
+                        onClick={() => {
+                          updateShapeshiftJob(job.id, { status: 'success', completedAt: new Date().toISOString() });
+                          // Log to device timeline
+                          const device = devices.find((d) => d.serialNumber.toUpperCase() === job.serial.toUpperCase());
+                          if (device) {
+                            addHistoryEntry({
+                              id: crypto.randomUUID(),
+                              deviceId: device.id,
+                              timestamp: new Date().toISOString(),
+                              action: 'shapeshifted',
+                              user: job.assignedTo,
+                              description: `Shapeshifted to ${job.targetEnv}${job.networkId ? ` (network: ${job.networkId})` : ''}${job.otaToLatest ? ' — OTA to latest stable' : ''}`,
+                            });
+                          }
+                        }}
                         className="text-xs px-2.5 py-1 bg-green-100 text-green-700 rounded font-medium hover:bg-green-200"
                       >
                         Mark Success
@@ -321,7 +330,6 @@ export default function ShapeshiftTab() {
                       <div><span className="text-gray-500">Network:</span> <span className="font-medium">{job.networkId || '—'}</span></div>
                       <div><span className="text-gray-500">Retries:</span> <span className="font-medium">{job.currentAttempt}/{job.retries}</span></div>
                       <div><span className="text-gray-500">Queued by:</span> <span className="font-medium">{job.assignedTo}</span></div>
-                      <div><span className="text-gray-500">Print label:</span> <span className="font-medium">{job.printLabel ? 'Yes' : 'No'}</span></div>
                       <div><span className="text-gray-500">OTA:</span> <span className="font-medium">{job.otaToLatest ? 'Yes' : 'No'}</span></div>
                       <div><span className="text-gray-500">Created:</span> <span className="font-medium">{new Date(job.createdAt).toLocaleString()}</span></div>
                       {job.completedAt && <div><span className="text-gray-500">Completed:</span> <span className="font-medium">{new Date(job.completedAt).toLocaleString()}</span></div>}
