@@ -229,65 +229,83 @@ export default function OverviewDashboard() {
         </div>
 
         {/* Two columns: Job Type (left) | Priority + Site (right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* LEFT: By Job Type */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          {/* LEFT: By Job Type + By Program + Top Assignees */}
           <div>
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">By Job Type</h4>
+            <h4 className="text-xs font-bold text-gray-900 uppercase mb-4">By Job Type</h4>
             <div className="space-y-3">
               {[
-                { key: 'repair', letter: 'R', label: 'Repair', color: '#dc2626' },
-                { key: 'new_testbed', letter: 'N', label: 'New Testbed', color: '#16a34a' },
-                { key: 'swap', letter: 'S', label: 'Swap', color: '#7c3aed' },
-                { key: 'outbound_shipment', letter: 'T', label: 'Outbound Shipment', color: '#1d4ed8' },
-                { key: 'other', letter: 'O', label: 'Other', color: '#374151' },
+                { letter: 'S', label: 'Swap', key: 'swap', color: '#7c3aed' },
+                { letter: 'T', label: 'Outbound Shipment', key: 'outbound_shipment', color: '#1d4ed8' },
+                { letter: 'O', label: 'Other', key: 'other', color: '#374151' },
               ].map((type) => {
                 const count = orderStats.byType[type.key] || 0;
                 return (
                   <div key={type.key} className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-gray-900 w-3">{type.letter}</span>
-                    <span className="text-xs text-gray-600">· {type.label}</span>
-                    <div className="flex-1 h-6 bg-gray-100 rounded-sm overflow-hidden ml-2">
+                    <span className="text-sm font-bold text-gray-900 w-4">{type.letter}</span>
+                    <span className="text-sm text-gray-600 w-36 shrink-0">· {type.label}</span>
+                    <div className="flex-1 h-6 bg-gray-100 rounded-sm overflow-hidden">
                       <div className="h-full rounded-sm" style={{ width: `${maxType > 0 ? (count / maxType) * 100 : 0}%`, backgroundColor: type.color }} />
                     </div>
-                    {count > 0 && <span className="text-[10px] text-gray-400 w-4 text-right">{count}</span>}
+                    {count > 0 && <span className="text-xs text-gray-500 w-5 text-right">{count}</span>}
                   </div>
                 );
               })}
             </div>
 
+            {/* By Program */}
+            {(() => {
+              const byProgram: Record<string, number> = {};
+              serviceOrders.forEach((o) => { const ep = o.epicKey || 'Unknown'; byProgram[ep] = (byProgram[ep] || 0) + 1; });
+              if (Object.keys(byProgram).length === 0) return null;
+              return (
+                <div className="mt-6">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase mb-3">By Program</h4>
+                  <div className="space-y-1.5">
+                    {Object.entries(byProgram).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([prog, count]) => (
+                      <div key={prog} className="flex items-center justify-between text-sm py-0.5">
+                        <span className="text-gray-600">{prog}</span>
+                        <span className="font-medium text-gray-900">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Top Assignees */}
             {Object.keys(orderStats.byAssignee).length > 0 && (
               <div className="mt-6">
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">Top Assignees (Open)</h4>
+                <h4 className="text-xs font-bold text-gray-900 uppercase mb-3">Top Assignees (Open)</h4>
                 <div className="space-y-1.5">
-                  {Object.entries(orderStats.byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => (
-                    <p key={name} className="text-xs text-gray-600">{name}</p>
+                  {Object.entries(orderStats.byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => (
+                    <p key={name} className="text-sm text-gray-600">{name}</p>
                   ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* RIGHT: By Priority + By Site */}
+          {/* RIGHT: By Priority + By Site + Aging */}
           <div>
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">By Priority (Open)</h4>
+            <h4 className="text-xs font-bold text-gray-900 uppercase mb-4">By Priority (Open)</h4>
             <div className="space-y-2">
               {[
                 { key: 'P0', label: 'P0 — Emergency / Blocking', color: '#dc2626' },
-                { key: 'P1', label: 'P1 — Critical', color: '#f97316' },
-                { key: 'P2', label: 'P2 — Corrective', color: '#eab308' },
-                { key: 'P3', label: 'P3 — Routine', color: '#22c55e' },
-                { key: 'P4', label: 'P4 — Low / Backlog', color: '#3b82f6' },
+                { key: 'P1', label: 'P1 — Critical', color: '#ea580c' },
+                { key: 'P2', label: 'P2 — Corrective', color: '#ca8a04' },
+                { key: 'P3', label: 'P3 — Routine', color: '#16a34a' },
+                { key: 'P4', label: 'P4 — Low / Backlog', color: '#2563eb' },
               ].map((p) => {
                 const count = orderStats.byPriority[p.key] || 0;
                 return (
                   <div key={p.key} className="flex items-center gap-2">
-                    <span className="text-xs text-gray-700 w-4 text-right font-medium">{count}</span>
-                    <span className="text-xs text-gray-600 w-40 shrink-0">{p.label}</span>
+                    <span className="text-sm text-gray-700 w-5 text-right font-medium">{count}</span>
+                    <span className="text-sm text-gray-600 w-44 shrink-0">{p.label}</span>
                     <div className="flex-1 h-5 bg-gray-100 rounded-sm overflow-hidden">
                       <div className="h-full rounded-sm" style={{ width: `${maxPriority > 0 ? (count / maxPriority) * 100 : 0}%`, backgroundColor: p.color }} />
                     </div>
-                    <span className="text-xs text-gray-700 w-4 text-right font-medium">{count}</span>
+                    <span className="text-sm text-gray-700 w-5 text-right font-medium">{count}</span>
                   </div>
                 );
               })}
@@ -295,22 +313,69 @@ export default function OverviewDashboard() {
 
             {/* By Site */}
             <div className="mt-6">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">By Site (Open)</h4>
+              <h4 className="text-xs font-bold text-gray-900 uppercase mb-3">By Site (Open)</h4>
               {Object.keys(orderStats.byRegion).length > 0 ? (
                 <div className="space-y-1.5">
                   {Object.entries(orderStats.byRegion).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([region, count]) => (
-                    <div key={region} className="flex items-center gap-3 text-xs">
+                    <div key={region} className="flex items-center gap-3 text-sm">
                       <span className="font-medium text-gray-900 w-5">{count}</span>
                       <span className="text-gray-600">{region}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-400">No data</p>
+                <p className="text-sm text-gray-400">No data</p>
               )}
             </div>
+
+            {/* Aging */}
+            {(() => {
+              const now = Date.now();
+              const openOrders = serviceOrders.filter((o) => o.status !== 'completed' && o.status !== 'cancelled');
+              const aging = { day1: 0, day3: 0, day7: 0, day7plus: 0 };
+              openOrders.forEach((o) => {
+                const days = (now - new Date(o.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+                if (days < 1) aging.day1++;
+                else if (days < 3) aging.day3++;
+                else if (days < 7) aging.day7++;
+                else aging.day7plus++;
+              });
+              if (openOrders.length === 0) return null;
+              return (
+                <div className="mt-6">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase mb-3">Aging (Open)</h4>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">&lt; 1 day</span><span className="font-medium text-gray-900">{aging.day1}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">1–3 days</span><span className="font-medium text-gray-900">{aging.day3}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="text-gray-600">3–7 days</span><span className="font-medium text-gray-900">{aging.day7}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className={`${aging.day7plus > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}`}>7+ days</span><span className={`font-medium ${aging.day7plus > 0 ? 'text-red-600' : 'text-gray-900'}`}>{aging.day7plus}{aging.day7plus > 0 ? ' ⚠' : ''}</span></div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
+
+        {/* Recent Completions */}
+        {(() => {
+          const completed = serviceOrders.filter((o) => o.status === 'completed').sort((a, b) => new Date(b.completedAt || b.updatedAt).getTime() - new Date(a.completedAt || a.updatedAt).getTime()).slice(0, 3);
+          if (completed.length === 0) return null;
+          return (
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <h4 className="text-xs font-bold text-gray-900 uppercase mb-3">Recent Completions</h4>
+              <div className="space-y-2">
+                {completed.map((o) => (
+                  <div key={o.id} className="flex items-center gap-2 text-sm">
+                    <span className="text-green-600">✓</span>
+                    {o.jiraKey && <span className="font-medium text-blue-600">{o.jiraKey}</span>}
+                    <span className="text-gray-600 truncate">{o.title}</span>
+                    <span className="text-xs text-gray-400 ml-auto shrink-0">{new Date(o.completedAt || o.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
