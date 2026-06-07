@@ -151,7 +151,7 @@ export interface HistoryEntry {
   description: string;
 }
 
-export type TabType = 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments' | 'packages';
+export type TabType = 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments' | 'packages' | 'shapeshift';
 
 // ─── Feature: Packages & Service Board ────────────────────────────────────────
 
@@ -216,6 +216,28 @@ export interface ServiceOrder {
   epicKey?: string; // Beta epic this syncs to
   eta?: string; // ISO date
   columnEnteredAt: string; // when it entered current status — for SLA tracking
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+// ─── Feature: Shapeshift (Prod ↔ Stage) ──────────────────────────────────────
+export type ShapeshiftTargetEnv = 'stage' | 'prod';
+export type ShapeshiftJobStatus = 'queued' | 'in_progress' | 'success' | 'failed' | 'cancelled';
+
+export interface ShapeshiftJob {
+  id: string;
+  serial: string;
+  targetEnv: ShapeshiftTargetEnv;
+  networkId?: string;
+  retries: number;
+  currentAttempt: number;
+  status: ShapeshiftJobStatus;
+  printLabel: boolean;
+  otaToLatest: boolean;
+  assignedTo: string; // who queued it
+  notes?: string;
+  log?: string[];
   createdAt: string;
   updatedAt: string;
   completedAt?: string;

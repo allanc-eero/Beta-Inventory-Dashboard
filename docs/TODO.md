@@ -214,3 +214,34 @@ All features currently run with simulated API calls (setTimeout delays). When la
 - [ ] Confirm JIRA tickets appear in correct epics
 - [ ] Run a full sync and verify device counts match RNM
 - [ ] Test with 2+ simultaneous users to confirm shared state works
+
+---
+
+## Security Audit Items (Added 2026-06-07)
+
+### 🔴 High Priority
+- [ ] **Environment Variables** — All API tokens (Partner API, JIRA, Salesforce, email) must be in `.env.local` or server-side env vars, never hardcoded in source
+- [ ] **Verify `.env.local` is in `.gitignore`** — Confirm secrets file is excluded from git
+- [ ] **No secrets in localStorage** — Ensure API tokens are never stored client-side; all authenticated API calls should go through Next.js API routes (server-side)
+
+### 🟡 Medium Priority
+- [ ] **npm audit fix** — Run `npm audit fix` to resolve known vulnerabilities in dependencies
+- [ ] **Dependency pinning** — Ensure `package.json` uses exact versions (not `^` ranges) for security-sensitive packages
+- [ ] **CORS / API route protection** — When API routes go live, restrict to authenticated users only (no open endpoints)
+- [ ] **Rate limiting on API routes** — Prevent abuse of sync, bricking, and email endpoints
+- [ ] **Input validation on device serial numbers** — Sanitize all user inputs (CSV uploads, Add Device form, search) to prevent injection
+- [ ] **Audit trail integrity** — History/timeline entries should be append-only and tamper-evident once database is live
+
+### 🟢 Before Production Launch
+- [ ] **Security review with Amazon AppSec** — If hosting internally, submit for security review
+- [ ] **Data classification** — Serial numbers, tester emails, and network IDs are confidential; ensure proper handling per Amazon data classification policies
+- [ ] **Session timeout** — Auto-logout after inactivity (when auth is added)
+- [ ] **HTTPS only** — Ensure production deployment is HTTPS with valid cert (no HTTP fallback)
+- [ ] **Prototype security compliance** — Confirm that the bricking workflow meets Amazon's prototype security requirements (EVT/DVT reclamation policy)
+- [ ] **PII handling** — Tester names, emails, phone numbers, and addresses require proper data retention and deletion policies per Amazon privacy guidelines
+
+### 🔧 Integration Security (for Kiro agent hooks)
+- [ ] **Connect dashboard to "Tester Setup Outreach" hook** — Expose an endpoint or data export that shows devices received but not online, so the hook can identify non-setup testers
+- [ ] **Connect dashboard to "Hardware Reclamation Tracker" hook** — Expose serial number + tester mapping so the hook can cross-reference against CEVA returns data
+- [ ] **Read-only API for hooks** — Create a read-only API endpoint that Kiro hooks can query for device status without write access
+- [ ] **Webhook for status changes** — When a device goes online/offline/deactivated, fire a webhook that could trigger Slack notifications or hook actions

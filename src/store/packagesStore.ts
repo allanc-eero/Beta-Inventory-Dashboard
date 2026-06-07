@@ -9,6 +9,8 @@ import {
   InboundPackageStatus,
   OutboundPackageStatus,
   ServiceOrderStatus,
+  ShapeshiftJob,
+  ShapeshiftJobStatus,
 } from '@/types';
 
 interface PackagesStore {
@@ -37,6 +39,12 @@ interface PackagesStore {
   moveServiceOrder: (id: string, newStatus: ServiceOrderStatus) => void;
   getServiceOrdersByStatus: (status: ServiceOrderStatus) => ServiceOrder[];
   getServiceOrdersByJira: (jiraKey: string) => ServiceOrder | undefined;
+
+  // Shapeshift actions
+  shapeshiftJobs: ShapeshiftJob[];
+  addShapeshiftJob: (job: ShapeshiftJob) => void;
+  updateShapeshiftJob: (id: string, updates: Partial<ShapeshiftJob>) => void;
+  cancelShapeshiftJob: (id: string) => void;
 }
 
 export const usePackagesStore = create<PackagesStore>()(
@@ -45,6 +53,7 @@ export const usePackagesStore = create<PackagesStore>()(
       inboundPackages: [],
       outboundPackages: [],
       serviceOrders: [],
+      shapeshiftJobs: [],
 
       // ─── Inbound ────────────────────────────────────────────────────────
       addInboundPackage: (pkg) =>
@@ -167,6 +176,24 @@ export const usePackagesStore = create<PackagesStore>()(
 
       getServiceOrdersByJira: (jiraKey) =>
         get().serviceOrders.find((o) => o.jiraKey === jiraKey),
+
+      // ─── Shapeshift Jobs ────────────────────────────────────────────────
+      addShapeshiftJob: (job) =>
+        set((state) => ({ shapeshiftJobs: [...state.shapeshiftJobs, job] })),
+
+      updateShapeshiftJob: (id, updates) =>
+        set((state) => ({
+          shapeshiftJobs: state.shapeshiftJobs.map((j) =>
+            j.id === id ? { ...j, ...updates, updatedAt: new Date().toISOString() } : j
+          ),
+        })),
+
+      cancelShapeshiftJob: (id) =>
+        set((state) => ({
+          shapeshiftJobs: state.shapeshiftJobs.map((j) =>
+            j.id === id ? { ...j, status: 'cancelled' as ShapeshiftJobStatus, updatedAt: new Date().toISOString() } : j
+          ),
+        })),
     }),
     {
       name: 'packages-store',
