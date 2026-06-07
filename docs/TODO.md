@@ -2,6 +2,13 @@
 
 ## Priority 1: Need Soon
 
+### 0a. AI Agent — Upgrade to AWS Bedrock (Claude)
+- [ ] Get console access to `eero-token-vending` AWS account (ID: `127696279518`) — ask account owner
+- [ ] Enable Claude models in Bedrock → Model Access (request access for Claude 3 Haiku + Sonnet)
+- [ ] Once enabled, swap local engine in `/api/agent/route.ts` back to Bedrock client (code already exists in git history)
+- [ ] Test with: "Who has serial GGC54MX36114004L?" — should return natural language answer
+- **Why:** Local engine handles common patterns but can't do freeform reasoning. Bedrock Claude makes the agent truly conversational — handles follow-ups, complex queries, and process guidance without predefined patterns.
+
 ### 0. Email System — Replace mailto: with Real Email Integration
 - [ ] The current email system uses `mailto:` links — no delivery confirmation, no threading, no proof of delivery
 - [ ] Logging "email sent" gives false confidence — you only know the mail client opened, not that it was delivered
