@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
+import { usePackagesStore } from '@/store/packagesStore';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
 
@@ -99,7 +100,8 @@ function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[
 }
 
 export default function OverviewDashboard() {
-  const { devices } = useDeviceStore();
+  const { devices, jiraTickets } = useDeviceStore();
+  const { serviceOrders, shapeshiftJobs } = usePackagesStore();
 
   const total = devices.length;
   const online = devices.filter((d) => d.status === 'online').length;
@@ -116,6 +118,40 @@ export default function OverviewDashboard() {
     { name: 'Online', count: online, color: '#3b82f6' },
     { name: 'Not Online', count: notOnline, color: '#6b7280' },
   ].filter((d) => d.count > 0), [online, notOnline]);
+
+  // Service Orders — live from store
+  const soOpen = serviceOrders.filter((o) => ['intake', 'triage', 'assigned'].includes(o.status)).length;
+  const soInProgress = serviceOrders.filter((o) => o.status === 'in_progress').length;
+  const soComplete = serviceOrders.filter((o) => o.status === 'completed').length;
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const soClosed30d = serviceOrders.filter((o) => o.status === 'completed' && o.completedAt && o.completedAt >= thirtyDaysAgo).length;
+  const soTotal = serviceOrders.length;
+  const soBarTotal = Math.max(soOpen + soInProgress + soComplete + soClosed30d, 1);
+
+  // By Job Type — live counts
+  const newDevices = devices.filter((d) => { const age = Date.now() - new Date(d.createdAt).getTime(); return age < 30 * 24 * 60 * 60 * 1000; }).length;
+  const bricked = devices.filter((d) => d.deactivated && d.status === 'deactivated').length;
+  const archived = devices.filter((d) => d.status === 'deactivated').length;
+  const programRegions = new Set(devices.map((d) => `${d.program}-${d.country}`).filter((k) => !k.includes('undefined') && !k.includes('Unknown'))).size;
+  const outboundShipments = serviceOrders.filter((o) => o.type === 'outbound_shipment').length;
+  const inboundShipments = devices.filter((d) => d.shipmentStatus === 'in_transit_to_tester' || d.shipmentStatus === 'in_transit_to_fc').length;
+  const jobTypeMax = Math.max(newDevices, bricked, archived, programRegions, outboundShipments, inboundShipments, 1);
+
+  // By Priority — live from JIRA tickets
+  const openTickets = jiraTickets.filter((t) => t.status === 'open' || t.status === 'in_progress');
+  const triageCount = openTickets.filter((t) => t.status === 'open').length;
+  const onHoldCount = serviceOrders.filter((o) => o.status === 'on_hold').length;
+  const intakeCount = serviceOrders.filter((o) => o.status === 'intake').length;
+  const completedCount = jiraTickets.filter((t) => t.status === 'closed' || t.status === 'resolved').length;
+  const backlogCount = jiraTickets.filter((t) => t.status === 'in_progress').length;
+  const priorityMax = Math.max(triageCount, onHoldCount, intakeCount, completedCount, backlogCount, 1);
+
+  // Top Assignees
+  const topAssignees = useMemo(() => {
+    const map: Record<string, number> = {};
+    serviceOrders.filter((o) => !['completed', 'cancelled'].includes(o.status)).forEach((o) => { if (o.assignee) map[o.assignee] = (map[o.assignee] || 0) + 1; });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [serviceOrders]);
 
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px', backgroundColor: '#f9fafb' }}>
@@ -141,45 +177,47 @@ export default function OverviewDashboard() {
       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
           <span style={{ fontSize: '16px', fontWeight: 700 }}>Service Orders</span>
-          <span style={{ fontSize: '14px', color: '#6b7280' }}>31 total</span>
+          <span style={{ fontSize: '14px', color: '#6b7280' }}>{soTotal} total</span>
         </div>
 
         {/* Segmented bar */}
         <div style={{ display: 'flex', gap: '3px', height: '28px', marginBottom: '4px' }}>
-          <div style={{ width: '50%', backgroundColor: '#3b82f6', borderRadius: '4px' }} />
-          <div style={{ width: '15%', backgroundColor: '#b45309', borderRadius: '4px' }} />
-          <div style={{ width: '22%', backgroundColor: '#16a34a', borderRadius: '4px' }} />
-          <div style={{ width: '13%', backgroundColor: '#bbf7d0', borderRadius: '4px' }} />
+          {soOpen > 0 && <div style={{ width: `${(soOpen / soBarTotal) * 100}%`, backgroundColor: '#3b82f6', borderRadius: '4px' }} />}
+          {soInProgress > 0 && <div style={{ width: `${(soInProgress / soBarTotal) * 100}%`, backgroundColor: '#b45309', borderRadius: '4px' }} />}
+          {soComplete > 0 && <div style={{ width: `${(soComplete / soBarTotal) * 100}%`, backgroundColor: '#16a34a', borderRadius: '4px' }} />}
+          {soClosed30d > 0 && <div style={{ width: `${(soClosed30d / soBarTotal) * 100}%`, backgroundColor: '#bbf7d0', borderRadius: '4px' }} />}
+          {soTotal === 0 && <div style={{ flex: 1, backgroundColor: '#f3f4f6', borderRadius: '4px' }} />}
         </div>
 
         {/* Numbers */}
         <div style={{ display: 'flex', marginBottom: '24px' }}>
-          <div style={{ width: '50%' }}><span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>22</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Open</span></div>
-          <div style={{ width: '15%' }}><span style={{ fontSize: '14px', fontWeight: 700 }}>6</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>In progress</span></div>
-          <div style={{ width: '22%' }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>10</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Complete</span></div>
-          <div style={{ width: '13%' }}><span style={{ fontSize: '12px' }}>7</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Closed 30d</span></div>
+          <div style={{ flex: 1 }}><span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>{soOpen}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Open</span></div>
+          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700 }}>{soInProgress}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>In progress</span></div>
+          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>{soComplete}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Complete</span></div>
+          <div style={{ flex: 1 }}><span style={{ fontSize: '12px' }}>{soClosed30d}</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Closed 30d</span></div>
         </div>
 
         {/* Two columns */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Job Type</p>
-            <BarRow letter="R" label="New Devices" width="80%" color="#dc2626" />
-            <BarRow letter="N" label="Bricked Devices" width="65%" color="#16a34a" />
-            <BarRow letter="S" label="Archived Devices" width="40%" color="#7c3aed" />
-            <BarRow letter="P" label="Program Regions" width="30%" color="#1d4ed8" />
-            <BarRow letter="T" label="Outbound Shipment" width="15%" color="#1e3a5f" />
-            <BarRow letter="O" label="Inbound Shipments" width="5%" color="#374151" />
+            <BarRow letter="R" label="New Devices" width={`${(newDevices / jobTypeMax) * 100}%`} color="#dc2626" />
+            <BarRow letter="N" label="Bricked Devices" width={`${(bricked / jobTypeMax) * 100}%`} color="#16a34a" />
+            <BarRow letter="S" label="Archived Devices" width={`${(archived / jobTypeMax) * 100}%`} color="#7c3aed" />
+            <BarRow letter="P" label="Program Regions" width={`${(programRegions / jobTypeMax) * 100}%`} color="#1d4ed8" />
+            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1e3a5f" />
+            <BarRow letter="O" label="Inbound Shipments" width={`${(inboundShipments / jobTypeMax) * 100}%`} color="#374151" />
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>Top Assignees (Open)</p>
-            <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>
+            {topAssignees.length === 0 && <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>}
+            {topAssignees.map(([name], i) => <p key={i} style={{ fontSize: '13px', color: '#4b5563', margin: '2px 0' }}>{name}</p>)}
           </div>
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Priority (Open - JIRA)</p>
-            <PriorityRow count={10} label="P0 — Triage & Investigate" width="100%" color="#dc2626" right={9} />
-            <PriorityRow count={3} label="P1 — On Hold" width="55%" color="#ea580c" right={7} />
-            <PriorityRow count={10} label="P2 — Intake" width="100%" color="#ca8a04" right={6} />
-            <PriorityRow count={4} label="P3 — Completed" width="40%" color="#16a34a" right={5} />
-            <PriorityRow count={3} label="P4 — Low / Backlog" width="30%" color="#3b82f6" right={22} />
+            <PriorityRow count={triageCount} label="P0 — Triage & Investigate" width={`${(triageCount / priorityMax) * 100}%`} color="#dc2626" right={triageCount} />
+            <PriorityRow count={onHoldCount} label="P1 — On Hold" width={`${(onHoldCount / priorityMax) * 100}%`} color="#ea580c" right={onHoldCount} />
+            <PriorityRow count={intakeCount} label="P2 — Intake" width={`${(intakeCount / priorityMax) * 100}%`} color="#ca8a04" right={intakeCount} />
+            <PriorityRow count={completedCount} label="P3 — Completed" width={`${(completedCount / priorityMax) * 100}%`} color="#16a34a" right={completedCount} />
+            <PriorityRow count={backlogCount} label="P4 — Low / Backlog" width={`${(backlogCount / priorityMax) * 100}%`} color="#3b82f6" right={backlogCount} />
           </div>
         </div>
       </div>
