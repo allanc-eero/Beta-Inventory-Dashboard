@@ -119,73 +119,128 @@ export default function OverviewDashboard() {
 
       {/* ═══ SECTION 3: Service Orders ═══ */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-baseline gap-3 mb-4">
+        <div className="flex items-baseline gap-3 mb-5">
           <p className="text-base font-bold text-gray-900">Service Orders</p>
           <span className="text-sm text-gray-400">{orderStats.total} total</span>
         </div>
 
-        {/* Segmented bar with labels above */}
-        <ServiceOrdersBar open={orderStats.open} inProgress={orderStats.inProgress} complete={orderStats.complete} onHold={orderStats.onHold} cancelled={orderStats.cancelled} />
+        {/* Segmented colored bar with numbers+labels above */}
+        {(() => {
+          const segs = [
+            { value: orderStats.open, label: 'Open', color: '#2563eb' },
+            { value: orderStats.inProgress, label: 'In progress', color: '#b45309' },
+            { value: orderStats.complete, label: 'Complete', color: '#15803d' },
+            { value: orderStats.onHold, label: 'On hold', color: '#6b7280' },
+            { value: 0, label: 'Closed 30d', color: '#86efac' },
+            { value: orderStats.cancelled, label: 'Cancelled', color: '#991b1b' },
+          ];
+          const total = Math.max(segs.reduce((s, seg) => s + seg.value, 0), 1);
+          return (
+            <div className="relative mb-8">
+              {/* Numbers + labels row */}
+              <div className="flex">
+                {segs.map((seg, i) => (
+                  <div key={i} style={{ width: `${100 / segs.length}%` }} className="pr-4">
+                    {seg.value > 0 && <p className="text-xl font-bold text-gray-900">{seg.value}</p>}
+                    {seg.value > 0 && <p className="text-[11px] text-gray-500">{seg.label}</p>}
+                  </div>
+                ))}
+              </div>
+              {/* Colored bar */}
+              <div className="flex h-6 rounded-sm overflow-hidden mt-2">
+                {segs.map((seg, i) => {
+                  if (total <= 1 && i === 0) return <div key={i} className="flex-1" style={{ backgroundColor: seg.color }} />;
+                  const pct = (seg.value / total) * 100;
+                  if (seg.value === 0) return <div key={i} style={{ width: `${100/segs.length}%`, backgroundColor: '#f3f4f6' }} />;
+                  return <div key={i} style={{ width: `${pct}%`, backgroundColor: seg.color }} />;
+                })}
+              </div>
+              {/* Labels below for zero-value segments */}
+              <div className="flex mt-1">
+                {segs.map((seg, i) => (
+                  <div key={i} style={{ width: `${100 / segs.length}%` }}>
+                    {seg.value === 0 && <p className="text-[10px] text-gray-400">{seg.label}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Two columns */}
-        <div className="grid grid-cols-2 gap-12 mt-6">
-          {/* Left: By Job Type + Assignees */}
+        <div className="grid grid-cols-2 gap-12">
+          {/* LEFT: By Job Type + Assignees */}
           <div>
-            <p className="text-xs font-bold text-gray-900 uppercase mb-3">By Job Type</p>
-            {[
-              { letter: 'S', label: 'Swap', key: 'swap', color: '#7c3aed' },
-              { letter: 'T', label: 'Outbound Shipment', key: 'outbound_shipment', color: '#1d4ed8' },
-              { letter: 'O', label: 'Other', key: 'other', color: '#374151' },
-            ].map((t) => (
-              <div key={t.key} className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-bold w-4">{t.letter}</span>
-                <span className="text-sm text-gray-600 w-32">· {t.label}</span>
-                <div className="flex-1 h-5 bg-gray-100 rounded-sm overflow-hidden">
-                  <div className="h-full" style={{ width: `${(orderStats.byType[t.key] || 0) / maxType * 100}%`, backgroundColor: t.color }} />
-                </div>
-                <span className="text-sm w-6 text-right text-gray-500">{orderStats.byType[t.key] || ''}</span>
-              </div>
-            ))}
+            <p className="text-xs font-bold text-gray-900 uppercase mb-4">By Job Type</p>
+            <table className="w-full">
+              <tbody>
+                {[
+                  { letter: 'S', label: 'Swap', key: 'swap', color: '#7c3aed' },
+                  { letter: 'T', label: 'Outbound Shipment', key: 'outbound_shipment', color: '#1d4ed8' },
+                  { letter: 'O', label: 'Other', key: 'other', color: '#374151' },
+                ].map((t) => {
+                  const count = orderStats.byType[t.key] || 0;
+                  return (
+                    <tr key={t.key} className="h-8">
+                      <td className="text-sm font-bold text-gray-900 w-6 align-middle">{t.letter}</td>
+                      <td className="text-sm text-gray-600 w-40 align-middle whitespace-nowrap">· {t.label}</td>
+                      <td className="align-middle">
+                        <div className="h-5 bg-gray-100 rounded-sm overflow-hidden">
+                          <div className="h-full" style={{ width: `${count / maxType * 100}%`, backgroundColor: t.color }} />
+                        </div>
+                      </td>
+                      <td className="text-sm text-gray-500 w-8 text-right align-middle">{count || ''}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
             {Object.keys(orderStats.byAssignee).length > 0 && (
-              <div className="mt-6">
+              <div className="mt-8">
                 <p className="text-xs font-bold text-gray-900 uppercase mb-2">Top Assignees (Open)</p>
                 {Object.entries(orderStats.byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => (
-                  <p key={name} className="text-sm text-gray-600">{name}</p>
+                  <p key={name} className="text-sm text-gray-600 mb-0.5">{name}</p>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Right: By Priority + By Site */}
+          {/* RIGHT: By Priority + By Site */}
           <div>
-            <p className="text-xs font-bold text-gray-900 uppercase mb-3">By Priority (Open)</p>
-            {[
-              { key: 'P0', label: 'P0 — Emergency / Blocking', color: '#dc2626' },
-              { key: 'P1', label: 'P1 — Critical', color: '#ea580c' },
-              { key: 'P2', label: 'P2 — Corrective', color: '#ca8a04' },
-              { key: 'P3', label: 'P3 — Routine', color: '#16a34a' },
-              { key: 'P4', label: 'P4 — Low / Backlog', color: '#2563eb' },
-            ].map((p) => {
-              const count = orderStats.byPriority[p.key] || 0;
-              return (
-                <div key={p.key} className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm w-5 text-right">{count}</span>
-                  <span className="text-sm text-gray-600 w-40">{p.label}</span>
-                  <div className="flex-1 h-4 bg-gray-100 rounded-sm overflow-hidden">
-                    <div className="h-full" style={{ width: `${count / maxPriority * 100}%`, backgroundColor: p.color }} />
-                  </div>
-                  <span className="text-sm w-5 text-right">{count}</span>
-                </div>
-              );
-            })}
+            <p className="text-xs font-bold text-gray-900 uppercase mb-4">By Priority (Open)</p>
+            <table className="w-full">
+              <tbody>
+                {[
+                  { key: 'P0', label: 'P0 — Emergency / Blocking', color: '#dc2626' },
+                  { key: 'P1', label: 'P1 — Critical', color: '#ea580c' },
+                  { key: 'P2', label: 'P2 — Corrective', color: '#ca8a04' },
+                  { key: 'P3', label: 'P3 — Routine', color: '#16a34a' },
+                  { key: 'P4', label: 'P4 — Low / Backlog', color: '#2563eb' },
+                ].map((p) => {
+                  const count = orderStats.byPriority[p.key] || 0;
+                  return (
+                    <tr key={p.key} className="h-7">
+                      <td className="text-sm text-gray-700 w-6 text-right align-middle">{count}</td>
+                      <td className="text-sm text-gray-600 pl-2 w-44 align-middle whitespace-nowrap">{p.label}</td>
+                      <td className="align-middle px-2">
+                        <div className="h-4 bg-gray-100 rounded-sm overflow-hidden">
+                          <div className="h-full" style={{ width: `${count / maxPriority * 100}%`, backgroundColor: p.color }} />
+                        </div>
+                      </td>
+                      <td className="text-sm text-gray-700 w-6 text-right align-middle">{count}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
-            <div className="mt-6">
+            <div className="mt-8">
               <p className="text-xs font-bold text-gray-900 uppercase mb-2">By Site (Open)</p>
               {Object.keys(orderStats.byRegion).length > 0 ? (
                 Object.entries(orderStats.byRegion).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([region, count]) => (
-                  <div key={region} className="flex gap-3 text-sm mb-1">
-                    <span className="font-medium w-5">{count}</span>
+                  <div key={region} className="flex gap-3 text-sm mb-0.5">
+                    <span className="font-medium w-5 text-right">{count}</span>
                     <span className="text-gray-600">{region}</span>
                   </div>
                 ))
@@ -239,46 +294,4 @@ function Donut({ data, total, label }: { data: { name: string; value: number; co
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SERVICE ORDERS BAR (segmented with labels above)
-// ═══════════════════════════════════════════════════════════════════════════════
-function ServiceOrdersBar({ open, inProgress, complete, onHold, cancelled }: { open: number; inProgress: number; complete: number; onHold: number; cancelled: number }) {
-  const segments = [
-    { value: open, label: 'Open', color: '#2563eb' },
-    { value: inProgress, label: 'In progress', color: '#b45309' },
-    { value: complete, label: 'Complete', color: '#15803d' },
-    { value: onHold, label: 'On hold', color: '#6b7280' },
-    { value: 0, label: 'Closed 30d', color: '#86efac' },
-    { value: cancelled, label: 'Cancelled', color: '#991b1b' },
-  ];
-  const total = Math.max(segments.reduce((s, seg) => s + seg.value, 0), 1);
-
-  return (
-    <div>
-      {/* Bar */}
-      <div className="flex h-7 rounded overflow-hidden">
-        {segments.map((seg, i) => {
-          const pct = total > 0 ? (seg.value / total) * 100 : 100 / segments.length;
-          return (
-            <div key={i} className="relative" style={{ width: `${Math.max(pct, seg.value > 0 ? 5 : 100/segments.length)}%`, backgroundColor: seg.value > 0 ? seg.color : '#f3f4f6' }}>
-              {/* Label above */}
-              <span className="absolute -top-5 left-0 text-[11px] font-medium text-gray-500">{seg.value > 0 ? seg.value : ''}</span>
-              <span className="absolute -top-5 left-4 text-[11px] text-gray-400">{seg.value > 0 ? seg.label : ''}</span>
-            </div>
-          );
-        })}
-      </div>
-      {/* Below-bar labels for segments with no value */}
-      <div className="flex mt-1">
-        {segments.map((seg, i) => {
-          const pct = total > 0 ? (seg.value / total) * 100 : 100 / segments.length;
-          return (
-            <div key={i} style={{ width: `${Math.max(pct, seg.value > 0 ? 5 : 100/segments.length)}%` }}>
-              {seg.value === 0 && <span className="text-[10px] text-gray-400">{seg.label}</span>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// End of file
