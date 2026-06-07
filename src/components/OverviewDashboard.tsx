@@ -1,144 +1,140 @@
 'use client';
 
-export default function OverviewDashboard() {
-  return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px', backgroundColor: '#f9fafb' }}>
+import { useMemo } from 'react';
+import { useDeviceStore } from '@/store/deviceStore';
 
-      {/* ROW 1: Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', marginBottom: '16px' }}>
-        <div style={{ backgroundColor: '#1f2937', borderRadius: '8px', padding: '16px' }}>
-          <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#9ca3af', margin: 0 }}>Total Devices</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#ffffff', margin: '4px 0 0 0' }}>1,034</p>
+// ─── Reusable Components ──────────────────────────────────────────────────────
+
+function StatCard({ icon, value, label, iconBg }: { icon: string; value: number; label: string; iconBg: string }) {
+  return (
+    <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px' }}>
+      <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+        <span style={{ fontSize: '18px' }}>{icon}</span>
+      </div>
+      <p style={{ fontSize: '28px', fontWeight: 700, color: '#111827', margin: '0 0 4px 0' }}>{value}</p>
+      <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>{label}</p>
+    </div>
+  );
+}
+
+function DonutChart({ title, items, total, size, strokeWidth, centerLabel }: {
+  title: string; items: { name: string; count: number; color: string }[]; total: number; size: number; strokeWidth: number; centerLabel: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circ = 2 * Math.PI * radius;
+  let offset = 0;
+  const arcData = items.map((item) => {
+    const dash = total > 0 ? (item.count / total) * circ : 0;
+    const arc = { dash, offset, color: item.color };
+    offset += dash;
+    return arc;
+  });
+
+  return (
+    <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
+      <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '0 0 16px 0' }}>{title}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, flexShrink: 0 }}>
+          <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} />
+            {arcData.map((arc, i) => (
+              <circle key={i} cx={size/2} cy={size/2} r={radius} fill="none" stroke={arc.color} strokeWidth={strokeWidth}
+                strokeDasharray={`${arc.dash} ${circ - arc.dash}`} strokeDashoffset={-arc.offset} />
+            ))}
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: size > 130 ? '20px' : '18px', fontWeight: 700 }}>{total > 0 ? total.toLocaleString() : items.length}</span>
+            <span style={{ fontSize: size > 130 ? '9px' : '8px', color: '#6b7280', textTransform: 'uppercase' }}>{centerLabel}</span>
+          </div>
         </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
-          <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', margin: 0 }}>In Stock</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: '4px 0 0 0' }}>428</p>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
-          <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', margin: 0 }}>Checked Out</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: '4px 0 0 0' }}>390</p>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
-          <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', margin: 0 }}>On Hold</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: '4px 0 0 0' }}>0</p>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
-          <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', margin: 0 }}>Inactive</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: '4px 0 0 0' }}>216</p>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px' }}>
-          <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', margin: 0 }}>Disposal</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: '4px 0 0 0' }}>0</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: size > 130 ? '6px' : '4px', fontSize: size > 130 ? '12px' : '11px' }}>
+          {items.map((item, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: size > 130 ? '8px' : '6px' }}>
+              <span style={{ width: size > 130 ? '10px' : '8px', height: size > 130 ? '10px' : '8px', backgroundColor: item.color, borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+              <span style={{ color: '#374151' }}>{item.name}</span>
+              <b>{item.count}</b>
+              <span style={{ color: '#9ca3af' }}>{total > 0 ? Math.round((item.count / total) * 100) : 0}%</span>
+            </div>
+          ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* ROW 2: Three Charts */}
+function BarRow({ letter, label, width, color }: { letter: string; label: string; width: string; color: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      <span style={{ fontSize: '13px', fontWeight: 700, width: '14px' }}>{letter}</span>
+      <span style={{ fontSize: '13px', color: '#4b5563', width: '160px', flexShrink: 0 }}>· {label}</span>
+      <div style={{ flex: 1, height: '14px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width, backgroundColor: color, borderRadius: '2px' }} />
+      </div>
+    </div>
+  );
+}
+
+function PriorityRow({ count, label, width, color, right }: { count: number; label: string; width: string; color: string; right: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+      <span style={{ fontSize: '13px', fontWeight: 500, width: '20px', textAlign: 'right' }}>{count}</span>
+      <span style={{ fontSize: '12px', color: '#4b5563', width: '160px', flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1, height: '12px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width, backgroundColor: color, borderRadius: '2px' }} />
+      </div>
+      <span style={{ fontSize: '13px', fontWeight: 500, width: '20px', textAlign: 'right' }}>{right}</span>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+const REGION_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#ec4899', '#0891b2', '#65a30d', '#e11d48', '#f97316'];
+const MODEL_COLORS = ['#1e3a5f', '#d97706', '#059669', '#dc2626', '#7c3aed', '#0891b2', '#65a30d', '#ec4899', '#e11d48', '#f97316'];
+
+function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[]) {
+  const map: Record<string, number> = {};
+  devices.forEach((d) => { const k = keyFn(d); map[k] = (map[k] || 0) + 1; });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count], i) => ({ name, count, color: colors[i % colors.length] }));
+}
+
+export default function OverviewDashboard() {
+  const { devices } = useDeviceStore();
+
+  const total = devices.length;
+  const online = devices.filter((d) => d.status === 'online').length;
+  const notOnline = devices.filter((d) => d.status === 'not_online').length;
+  const countries = new Set(devices.map((d) => d.country).filter(Boolean)).size;
+  const programs = new Set(devices.filter((d) => d.status !== 'deactivated').map((d) => d.program)).size;
+  const people = new Set(devices.map((d) => d.assignedEmail).filter(Boolean)).size;
+  const overdue = devices.filter((d) => d.status === 'pending_return' && d.returnEmailSentAt && (Date.now() - new Date(d.returnEmailSentAt).getTime()) >= 14 * 24 * 60 * 60 * 1000).length;
+
+  const regionItems = useMemo(() => groupAndSort(devices, (d) => d.country || 'Unknown', REGION_COLORS), [devices]);
+  const modelItems = useMemo(() => groupAndSort(devices, (d) => d.product || d.internalName || d.model || 'Unknown', MODEL_COLORS), [devices]);
+
+  const statusItems = useMemo(() => [
+    { name: 'Online', count: online, color: '#3b82f6' },
+    { name: 'Not Online', count: notOnline, color: '#6b7280' },
+  ].filter((d) => d.count > 0), [online, notOnline]);
+
+  return (
+    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px', backgroundColor: '#f9fafb' }}>
+      {/* ROW 1: Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '12px', marginBottom: '16px' }}>
+        <StatCard icon="💻" value={total} label="Total Devices" iconBg="#dbeafe" />
+        <StatCard icon="✓" value={online} label="Online" iconBg="#d1fae5" />
+        <StatCard icon="👥" value={notOnline} label="Not Online" iconBg="#fef3c7" />
+        <StatCard icon="🌍" value={countries} label="Countries" iconBg="#fee2e2" />
+        <StatCard icon="🔬" value={programs} label="Programs" iconBg="#ede9fe" />
+        <StatCard icon="👤" value={people} label="People" iconBg="#dbeafe" />
+        <StatCard icon="⚠️" value={overdue} label="Overdue" iconBg="#fef3c7" />
+      </div>
+
+      {/* ROW 2: Three Donut Charts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-        {/* STATUS BREAKDOWN */}
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '0 0 16px 0' }}>Status Breakdown</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <svg width="140" height="140" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="70" cy="70" r="52" fill="none" stroke="#3b82f6" strokeWidth="24" strokeDasharray="124 203" strokeDashoffset="0" />
-              <circle cx="70" cy="70" r="52" fill="none" stroke="#6b7280" strokeWidth="24" strokeDasharray="69 258" strokeDashoffset="-124" />
-              <circle cx="70" cy="70" r="52" fill="none" stroke="#10b981" strokeWidth="24" strokeDasharray="134 193" strokeDashoffset="-193" />
-            </svg>
-            <div style={{ position: 'absolute', width: '140px', height: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '20px', fontWeight: 700 }}>1,034</span>
-              <span style={{ fontSize: '9px', color: '#6b7280', textTransform: 'uppercase' }}>Total</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '10px', height: '10px', backgroundColor: '#3b82f6', borderRadius: '2px', display: 'inline-block' }} /><span>checked out</span><b>390</b><span style={{ color: '#9ca3af' }}>38%</span></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '10px', height: '10px', backgroundColor: '#6b7280', borderRadius: '2px', display: 'inline-block' }} /><span>inactive</span><b>216</b><span style={{ color: '#9ca3af' }}>21%</span></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '10px', height: '10px', backgroundColor: '#10b981', borderRadius: '2px', display: 'inline-block' }} /><span>in stock</span><b>428</b><span style={{ color: '#9ca3af' }}>41%</span></div>
-            </div>
-          </div>
-        </div>
-
-        {/* TOP LOCATIONS */}
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '0 0 16px 0' }}>Top Locations</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
-              <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#2563eb" strokeWidth="20" strokeDasharray="63 213" strokeDashoffset="0" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#059669" strokeWidth="20" strokeDasharray="52 224" strokeDashoffset="-63" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#d97706" strokeWidth="20" strokeDasharray="44 232" strokeDashoffset="-115" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#7c3aed" strokeWidth="20" strokeDasharray="25 251" strokeDashoffset="-159" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#dc2626" strokeWidth="20" strokeDasharray="25 251" strokeDashoffset="-184" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#ec4899" strokeWidth="20" strokeDasharray="17 259" strokeDashoffset="-209" />
-              </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '18px', fontWeight: 700 }}>10</span>
-                <span style={{ fontSize: '8px', color: '#6b7280', textTransform: 'uppercase' }}>Locations</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-              {[
-                { color: '#2563eb', name: 'SFO38-3', count: 212, pct: '23%' },
-                { color: '#059669', name: 'SFO38', count: 180, pct: '19%' },
-                { color: '#d97706', name: 'SFO38-3-GATEWA...', count: 148, pct: '16%' },
-                { color: '#7c3aed', name: 'SFO38-4-BALONEY-D1', count: 82, pct: '9%' },
-                { color: '#dc2626', name: 'SFO125', count: 79, pct: '9%' },
-                { color: '#ec4899', name: 'ZZZ', count: 60, pct: '6%' },
-                { color: '#0891b2', name: 'TPE16', count: 53, pct: '6%' },
-                { color: '#65a30d', name: 'SFO38-4-BALONEY-C1', count: 42, pct: '5%' },
-                { color: '#e11d48', name: 'ZZ7-REMOTE', count: 36, pct: '4%' },
-                { color: '#f97316', name: 'ZZZ-BRAZIL', count: 33, pct: '4%' },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ width: '8px', height: '8px', backgroundColor: item.color, borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ color: '#374151' }}>{item.name}</span>
-                  <b>{item.count}</b>
-                  <span style={{ color: '#9ca3af' }}>{item.pct}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* TOP MODELS */}
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '0 0 16px 0' }}>Top Models</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
-              <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#1e3a5f" strokeWidth="20" strokeDasharray="47 229" strokeDashoffset="0" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#d97706" strokeWidth="20" strokeDasharray="44 232" strokeDashoffset="-47" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#059669" strokeWidth="20" strokeDasharray="37 239" strokeDashoffset="-91" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#dc2626" strokeWidth="20" strokeDasharray="37 239" strokeDashoffset="-128" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#7c3aed" strokeWidth="20" strokeDasharray="30 246" strokeDashoffset="-165" />
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#0891b2" strokeWidth="20" strokeDasharray="27 249" strokeDashoffset="-195" />
-              </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '18px', fontWeight: 700 }}>10</span>
-                <span style={{ fontSize: '8px', color: '#6b7280', textTransform: 'uppercase' }}>Models</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-              {[
-                { color: '#1e3a5f', name: 'Merci', count: 64, pct: '17%' },
-                { color: '#d97706', name: 'Patria', count: 58, pct: '16%' },
-                { color: '#059669', name: 'Retrograde_4U', count: 50, pct: '13%' },
-                { color: '#dc2626', name: 'FireflyExtender', count: 50, pct: '13%' },
-                { color: '#7c3aed', name: 'Foghorn', count: 41, pct: '11%' },
-                { color: '#0891b2', name: 'Novo', count: 37, pct: '10%' },
-                { color: '#65a30d', name: 'Jupiter', count: 32, pct: '9%' },
-                { color: '#ec4899', name: 'FireflyALC', count: 28, pct: '7%' },
-                { color: '#e11d48', name: 'AndytownGateway', count: 8, pct: '2%' },
-                { color: '#f97316', name: 'XeniaPoe', count: 6, pct: '2%' },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ width: '8px', height: '8px', backgroundColor: item.color, borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ color: '#374151' }}>{item.name}</span>
-                  <b>{item.count}</b>
-                  <span style={{ color: '#9ca3af' }}>{item.pct}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <p style={{ fontSize: '11px', color: '#3b82f6', textAlign: 'right', marginTop: '8px', cursor: 'pointer' }}>View all →</p>
-        </div>
+        <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Total" />
+        <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" />
+        <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Models" />
       </div>
 
       {/* ROW 3: Service Orders */}
@@ -148,77 +144,42 @@ export default function OverviewDashboard() {
           <span style={{ fontSize: '14px', color: '#6b7280' }}>31 total</span>
         </div>
 
-        {/* Segmented bar with gaps between segments */}
+        {/* Segmented bar */}
         <div style={{ display: 'flex', gap: '3px', height: '28px', marginBottom: '4px' }}>
-          <div style={{ width: '45%', backgroundColor: '#3b82f6', borderRadius: '4px' }} />
-          <div style={{ width: '12%', backgroundColor: '#b45309', borderRadius: '4px' }} />
-          <div style={{ width: '20%', backgroundColor: '#16a34a', borderRadius: '4px' }} />
-          <div style={{ width: '2%', backgroundColor: '#6b7280', borderRadius: '4px' }} />
-          <div style={{ width: '14%', backgroundColor: '#bbf7d0', borderRadius: '4px' }} />
-          <div style={{ width: '7%', backgroundColor: '#991b1b', borderRadius: '4px' }} />
+          <div style={{ width: '50%', backgroundColor: '#3b82f6', borderRadius: '4px' }} />
+          <div style={{ width: '15%', backgroundColor: '#b45309', borderRadius: '4px' }} />
+          <div style={{ width: '22%', backgroundColor: '#16a34a', borderRadius: '4px' }} />
+          <div style={{ width: '13%', backgroundColor: '#bbf7d0', borderRadius: '4px' }} />
         </div>
 
-        {/* Numbers above */}
+        {/* Numbers */}
         <div style={{ display: 'flex', marginBottom: '24px' }}>
-          <div style={{ width: '45%' }}><span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>22</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Open</span></div>
-          <div style={{ width: '12%' }}><span style={{ fontSize: '14px', fontWeight: 700 }}>6</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>In progress</span></div>
-          <div style={{ width: '20%' }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>10</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Complete</span></div>
-          <div style={{ width: '2%' }}><span style={{ fontSize: '12px' }}>1</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>On hold</span></div>
-          <div style={{ width: '14%', textAlign: 'center' }}><span style={{ fontSize: '12px' }}>7</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Closed 30d</span></div>
-          <div style={{ width: '7%', textAlign: 'center' }}><span style={{ fontSize: '12px' }}>2</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Cancelled</span></div>
+          <div style={{ width: '50%' }}><span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>22</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Open</span></div>
+          <div style={{ width: '15%' }}><span style={{ fontSize: '14px', fontWeight: 700 }}>6</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>In progress</span></div>
+          <div style={{ width: '22%' }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>10</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Complete</span></div>
+          <div style={{ width: '13%' }}><span style={{ fontSize: '12px' }}>7</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Closed 30d</span></div>
         </div>
 
         {/* Two columns */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
-          {/* LEFT */}
           <div>
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Job Type</p>
-            {[
-              { letter: 'R', label: 'Repair', width: '80%', color: '#dc2626' },
-              { letter: 'N', label: 'New Testbed', width: '65%', color: '#16a34a' },
-              { letter: 'S', label: 'Swap', width: '40%', color: '#7c3aed' },
-              { letter: 'P', label: 'Procurement / Device Request', width: '30%', color: '#1d4ed8' },
-              { letter: 'T', label: 'Outbound Shipment', width: '15%', color: '#1e3a5f' },
-              { letter: 'O', label: 'Other', width: '5%', color: '#374151' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, width: '14px' }}>{item.letter}</span>
-                <span style={{ fontSize: '13px', color: '#4b5563', width: '160px', flexShrink: 0 }}>· {item.label}</span>
-                <div style={{ flex: 1, height: '14px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: item.width, backgroundColor: item.color, borderRadius: '2px' }} />
-                </div>
-              </div>
-            ))}
-
+            <BarRow letter="R" label="New Devices" width="80%" color="#dc2626" />
+            <BarRow letter="N" label="Bricked Devices" width="65%" color="#16a34a" />
+            <BarRow letter="S" label="Archived Devices" width="40%" color="#7c3aed" />
+            <BarRow letter="P" label="Program Regions" width="30%" color="#1d4ed8" />
+            <BarRow letter="T" label="Outbound Shipment" width="15%" color="#1e3a5f" />
+            <BarRow letter="O" label="Inbound Shipments" width="5%" color="#374151" />
             <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>Top Assignees (Open)</p>
-            <p style={{ fontSize: '13px', color: '#4b5563' }}>sidney@eero.com</p>
+            <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>
           </div>
-
-          {/* RIGHT */}
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Priority (Open)</p>
-            {[
-              { count: 10, label: 'P0 — Emergency / Blocking', width: '100%', color: '#dc2626', right: 9 },
-              { count: 3, label: 'P1 — Critical', width: '55%', color: '#ea580c', right: 7 },
-              { count: 10, label: 'P2 — Corrective', width: '100%', color: '#ca8a04', right: 6 },
-              { count: 4, label: 'P3 — Routine', width: '40%', color: '#16a34a', right: 5 },
-              { count: 3, label: 'P4 — Low / Backlog', width: '30%', color: '#3b82f6', right: 22 },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 500, width: '20px', textAlign: 'right' }}>{item.count}</span>
-                <span style={{ fontSize: '12px', color: '#4b5563', width: '160px', flexShrink: 0 }}>{item.label}</span>
-                <div style={{ flex: 1, height: '12px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: item.width, backgroundColor: item.color, borderRadius: '2px' }} />
-                </div>
-                <span style={{ fontSize: '13px', fontWeight: 500, width: '20px', textAlign: 'right' }}>{item.right}</span>
-              </div>
-            ))}
-
-            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>By Site (Open)</p>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '13px' }}>
-              <span style={{ fontWeight: 600 }}>22</span>
-              <span style={{ color: '#4b5563' }}>SFO38</span>
-            </div>
+            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Priority (Open - JIRA)</p>
+            <PriorityRow count={10} label="P0 — Triage & Investigate" width="100%" color="#dc2626" right={9} />
+            <PriorityRow count={3} label="P1 — On Hold" width="55%" color="#ea580c" right={7} />
+            <PriorityRow count={10} label="P2 — Intake" width="100%" color="#ca8a04" right={6} />
+            <PriorityRow count={4} label="P3 — Completed" width="40%" color="#16a34a" right={5} />
+            <PriorityRow count={3} label="P4 — Low / Backlog" width="30%" color="#3b82f6" right={22} />
           </div>
         </div>
       </div>
