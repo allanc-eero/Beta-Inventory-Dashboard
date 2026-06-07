@@ -72,17 +72,18 @@ function HBar({ label, value, max, color }: { label: string; value: number; max:
 // ─── Status Segment Bar ───────────────────────────────────────────────────────
 function StatusBar({ segments }: { segments: { label: string; value: number; color: string }[] }) {
   const total = segments.reduce((s, seg) => s + seg.value, 0);
-  if (total === 0) return <div className="h-8 bg-gray-100 rounded-lg" />;
+  if (total === 0) return <div className="h-6 bg-gray-100 rounded-lg" />;
   return (
-    <div className="flex h-8 rounded-lg overflow-hidden">
+    <div className="flex h-6 rounded-lg overflow-hidden bg-gray-100">
       {segments.filter((s) => s.value > 0).map((seg) => (
         <div
           key={seg.label}
-          className="flex items-center justify-center text-[10px] font-medium text-white"
-          style={{ width: `${(seg.value / total) * 100}%`, backgroundColor: seg.color }}
+          className="flex items-center justify-center text-[9px] font-bold text-white transition-all"
+          style={{ width: `${(seg.value / total) * 100}%`, backgroundColor: seg.color, minWidth: '24px' }}
           title={`${seg.label}: ${seg.value}`}
         >
-          {seg.value > 0 && <span>{seg.value}<br/>{seg.label}</span>}
+          {seg.value}
+          <span className="ml-1 hidden sm:inline font-normal">{seg.label}</span>
         </div>
       ))}
     </div>
@@ -211,7 +212,7 @@ export default function OverviewDashboard() {
 
         {/* Status segment bar with numbers above */}
         <div className="mb-6">
-          <div className="flex mb-1">
+          <div className="grid grid-cols-6 mb-2">
             {[
               { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
               { label: 'In progress', value: orderStats.byStatus.in_progress || 0, color: '#eab308' },
@@ -219,16 +220,12 @@ export default function OverviewDashboard() {
               { label: 'On hold', value: orderStats.byStatus.on_hold || 0, color: '#f97316' },
               { label: 'Closed 30d', value: 0, color: '#d1d5db' },
               { label: 'Cancelled', value: orderStats.byStatus.cancelled || 0, color: '#94a3b8' },
-            ].map((seg) => {
-              const total = orderStats.total || 1;
-              const width = Math.max((seg.value / total) * 100, seg.value > 0 ? 8 : 0);
-              return (
-                <div key={seg.label} style={{ width: `${width}%` }} className="text-center min-w-[40px]">
-                  <p className="text-lg font-bold text-gray-900">{seg.value}</p>
-                  <p className="text-[10px] text-gray-500">{seg.label}</p>
-                </div>
-              );
-            })}
+            ].map((seg) => (
+              <div key={seg.label}>
+                <p className="text-2xl font-bold text-gray-900">{seg.value}</p>
+                <p className="text-[11px] text-gray-500">{seg.label}</p>
+              </div>
+            ))}
           </div>
           <StatusBar segments={[
             { label: 'Open', value: (orderStats.byStatus.intake || 0) + (orderStats.byStatus.triage || 0) + (orderStats.byStatus.assigned || 0), color: '#3b82f6' },
