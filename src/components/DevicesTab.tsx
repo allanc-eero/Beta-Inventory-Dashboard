@@ -3,10 +3,11 @@
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, DeviceStatus, Program } from '@/types';
-import { Search, Plus, Monitor } from 'lucide-react';
+import { Plus, Monitor } from 'lucide-react';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import AddDeviceModal from './AddDeviceModal';
 import BulkReturnPanel from './BulkReturnPanel';
+import AgentChat from './AgentChat';
 import { useAuthStore } from '@/store/authStore';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
@@ -48,16 +49,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="relative flex-1 min-w-[250px]">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search serial, model, name, email, MAC..."
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <AgentChat />
 
         <select
           value={statusFilter}

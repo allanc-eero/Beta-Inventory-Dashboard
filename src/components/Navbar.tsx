@@ -13,11 +13,11 @@ interface NavbarProps {
 const tabs: { id: TabType; label: string }[] = [
   { id: 'devices', label: 'Devices' },
   { id: 'testbeds', label: 'Programs' },
-  { id: 'packages', label: 'Packages' },
-  { id: 'shapeshift', label: 'Shapeshift' },
   { id: 'locations', label: 'Locations' },
   { id: 'people', label: 'People' },
-  { id: 'shipments', label: 'Device Ingestion & Returns' },
+  { id: 'packages', label: 'Packages' },
+  { id: 'shapeshift', label: 'Shapeshift' },
+  { id: 'shipments', label: 'Ingestion & Returns' },
 ];
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
