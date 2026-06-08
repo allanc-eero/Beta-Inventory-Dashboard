@@ -1,10 +1,12 @@
 'use client';
 
 import { useDeviceStore } from '@/store/deviceStore';
+import { useAuthStore } from '@/store/authStore';
 import { useState } from 'react';
 
 export default function JiraPanel({ deviceId }: { deviceId: string }) {
   const { devices, getJiraTicketsForDevice, createJiraTicket, closeJiraTicket } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const [showCreate, setShowCreate] = useState(false);
   const [summary, setSummary] = useState('');
 
@@ -47,12 +49,14 @@ export default function JiraPanel({ deviceId }: { deviceId: string }) {
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-gray-900">JIRA Tickets</h4>
+        {canEdit() && (
         <button
           onClick={() => setShowCreate(!showCreate)}
           className="text-xs font-medium text-blue-600 hover:text-blue-800"
         >
           {showCreate ? 'Cancel' : '+ Create'}
         </button>
+        )}
       </div>
 
       {showCreate && (
@@ -84,7 +88,7 @@ export default function JiraPanel({ deviceId }: { deviceId: string }) {
                     {ticket.status}
                   </span>
                 </div>
-                {(ticket.status === 'open' || ticket.status === 'in_progress') && (
+                {canEdit() && (ticket.status === 'open' || ticket.status === 'in_progress') && (
                   <button
                     onClick={() => closeJiraTicket(ticket.id)}
                     className="text-xs text-gray-400 hover:text-gray-600"

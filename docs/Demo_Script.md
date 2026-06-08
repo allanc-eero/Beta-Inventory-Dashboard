@@ -1,4 +1,4 @@
-# Demo Script — Simplified Inventory Dashboard
+# Demo Script — eero Fetch
 **Duration:** 30 minutes  
 **Audience:** Beta team / stakeholders
 

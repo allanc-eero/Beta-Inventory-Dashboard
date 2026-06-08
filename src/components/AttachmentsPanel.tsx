@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
+import { useAuthStore } from '@/store/authStore';
 import { Attachment, AttachmentType } from '@/types';
 
 const ATTACHMENT_TYPES: { value: AttachmentType; label: string }[] = [
@@ -38,6 +39,7 @@ interface AttachmentsPanelProps {
 
 export default function AttachmentsPanel({ deviceId, shipmentId }: AttachmentsPanelProps) {
   const { addAttachment, deleteAttachment, getAttachmentsForDevice, getAttachmentsForShipment } = useDeviceStore();
+  const { canEdit } = useAuthStore();
   const [showUpload, setShowUpload] = useState(false);
   const [attachmentType, setAttachmentType] = useState<AttachmentType>('other');
   const [uploadNotes, setUploadNotes] = useState('');
@@ -97,12 +99,14 @@ export default function AttachmentsPanel({ deviceId, shipmentId }: AttachmentsPa
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-gray-900">Attachments</h4>
+        {canEdit() && (
         <button
           onClick={() => setShowUpload(!showUpload)}
           className="text-xs font-medium text-blue-600 hover:text-blue-800"
         >
           {showUpload ? 'Cancel' : '+ Upload'}
         </button>
+        )}
       </div>
 
       {/* Upload form */}
@@ -167,12 +171,14 @@ export default function AttachmentsPanel({ deviceId, shipmentId }: AttachmentsPa
                 >
                   Download
                 </button>
+                {canEdit() && (
                 <button
                   onClick={() => deleteAttachment(att.id)}
                   className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
                 >
                   ×
                 </button>
+                )}
               </div>
             </div>
           ))}

@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Simplified Inventory Dashboard',
+  title: 'eero Fetch',
   description: 'Track and manage beta and dogfood test devices across programs',
 }
 

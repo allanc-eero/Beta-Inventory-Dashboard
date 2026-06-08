@@ -576,6 +576,7 @@ Device Management Team`
                       <span className="text-sm font-semibold text-gray-700">📍 {region}</span>
                       <span className="text-xs text-gray-400">{grouped[region].length} device(s)</span>
                     </div>
+                    {canEdit() && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500">Set region to:</span>
                       <button
@@ -599,6 +600,7 @@ Device Management Team`
                         Archive
                       </button>
                     </div>
+                    )}
                   </div>
                   <table className="w-full text-sm">
                     <thead>
@@ -627,6 +629,7 @@ Device Management Team`
                             </span>
                           </td>
                           <td className="px-4 py-2.5">
+                            {canEdit() ? (
                             <select
                               value={deviceActions[device.id] || ''}
                               onChange={(e) => setDeviceActions({ ...deviceActions, [device.id]: e.target.value as DeviceAction })}
@@ -637,6 +640,9 @@ Device Management Team`
                               <option value="brick_and_return">Brick & Return</option>
                               <option value="archive">Archive</option>
                             </select>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}

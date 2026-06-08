@@ -7,6 +7,8 @@
 | **Super Admin** | 1 | Full platform control. Code changes, UI modifications, user management, all destructive actions. |
 | **Admin** | 5 | Can brick devices, archive devices, close programs, upload shipments, edit devices, send return emails, process regions. Cannot manage users or modify code/UI. |
 | **Viewer** | Unlimited | Read-only. Can see all devices, programs, people, history. Can export CSVs. Cannot make any changes. |
+| **Beta Viewer** | 11 | Dogfooder portal only. Can see their own devices, programs, report issues, upload videos. Cannot see other testers' data or admin tools. |
+| **Dogfooder** | Self-register | Internal eero employee in a beta program. Self-registers, sees only their own devices/programs, can report issues and upload videos. No admin access. |
 
 **Operator role:** Reserved for future use. Can be activated when someone joins who needs edit access but should NOT brick/archive. Not currently assigned.
 
@@ -15,13 +17,14 @@
 
 ## Access Rules
 
-- **Any @eero.com email can log in** — they automatically get Viewer access (read-only)
-- **Only the people listed below have elevated access** — Admin or Super Admin
-- **No pre-registration needed for Viewers** — if you have an @eero.com email, you can see the data
+- **Only explicitly listed users can log in** — no automatic access for any @eero.com email
+- **Super Admin grants all access** — must be added to the roster below to use the platform
 - **To get Admin access, Super Admin must explicitly grant it**
 
 
-## User Roster (Elevated Access Only)
+## User Roster
+
+### Elevated Access (Admin Dashboard)
 
 | Email | Role | Status |
 |-------|------|--------|
@@ -32,7 +35,21 @@
 | shelby@eero.com | Admin | Active |
 | vrabago@eero.com | Admin | Active |
 
-**Everyone else with an @eero.com account = Viewer (automatic, no setup needed)**
+### Beta Viewers (Dogfooder Portal)
+
+| Email | Role | Status |
+|-------|------|--------|
+| aaron@eero.com | Beta Viewer | Active |
+| deep@eero.com | Beta Viewer | Active |
+| diego.kim@eero.com | Beta Viewer | Active |
+| jeffrey.bell@eero.com | Beta Viewer | Active |
+| john.pelebo@eero.com | Beta Viewer | Active |
+| lalitha@eero.com | Beta Viewer | Active |
+| layton.hill@eero.com | Beta Viewer | Active |
+| philip.rivera@eero.com | Beta Viewer | Active |
+| johnlushenko@eero.com | Beta Viewer | Active |
+| matthew.mullin@eero.com | Beta Viewer | Active |
+| stacia@eero.com | Beta Viewer | Active |
 
 
 ## Permissions Matrix

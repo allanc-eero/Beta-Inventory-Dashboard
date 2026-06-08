@@ -124,10 +124,12 @@ export default function OverviewDashboard() {
   const soOpen = serviceOrders.filter((o) => ['intake', 'triage', 'assigned'].includes(o.status)).length;
   const soInProgress = serviceOrders.filter((o) => o.status === 'in_progress').length;
   const soComplete = serviceOrders.filter((o) => o.status === 'completed').length;
+  const soOnHold = serviceOrders.filter((o) => o.status === 'on_hold').length;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const soClosed30d = serviceOrders.filter((o) => o.status === 'completed' && o.completedAt && o.completedAt >= thirtyDaysAgo).length;
+  const soCancelled = serviceOrders.filter((o) => o.status === 'cancelled').length;
   const soTotal = serviceOrders.length;
-  const soBarTotal = Math.max(soOpen + soInProgress + soComplete + soClosed30d, 1);
+  const soBarTotal = Math.max(soOpen + soInProgress + soComplete + soOnHold + soClosed30d + soCancelled, 1);
 
   // By Job Type — live counts from service orders
   const returnedCount = serviceOrders.filter((o) => o.type === 'returned_to_eero').length;
@@ -182,13 +184,14 @@ export default function OverviewDashboard() {
           <span style={{ fontSize: '14px', color: '#6b7280' }}>{soTotal} total</span>
         </div>
 
-        {/* Segmented bar */}
-        <div style={{ display: 'flex', gap: '3px', height: '28px', marginBottom: '4px' }}>
-          {soOpen > 0 && <div style={{ width: `${(soOpen / soBarTotal) * 100}%`, backgroundColor: '#3b82f6', borderRadius: '4px' }} />}
-          {soInProgress > 0 && <div style={{ width: `${(soInProgress / soBarTotal) * 100}%`, backgroundColor: '#b45309', borderRadius: '4px' }} />}
-          {soComplete > 0 && <div style={{ width: `${(soComplete / soBarTotal) * 100}%`, backgroundColor: '#16a34a', borderRadius: '4px' }} />}
-          {soClosed30d > 0 && <div style={{ width: `${(soClosed30d / soBarTotal) * 100}%`, backgroundColor: '#bbf7d0', borderRadius: '4px' }} />}
-          {soTotal === 0 && <div style={{ flex: 1, backgroundColor: '#f3f4f6', borderRadius: '4px' }} />}
+        {/* Segmented bar — always show all 6 segments with equal width, separated by gaps */}
+        <div style={{ display: 'flex', gap: '8px', height: '28px', marginBottom: '4px' }}>
+          <div style={{ flex: 1, backgroundColor: soOpen > 0 ? '#3b82f6' : '#e5e7eb', borderRadius: '4px' }} />
+          <div style={{ flex: 1, backgroundColor: soInProgress > 0 ? '#b45309' : '#e5e7eb', borderRadius: '4px' }} />
+          <div style={{ flex: 1, backgroundColor: soComplete > 0 ? '#16a34a' : '#e5e7eb', borderRadius: '4px' }} />
+          <div style={{ flex: 1, backgroundColor: soOnHold > 0 ? '#6b7280' : '#e5e7eb', borderRadius: '4px' }} />
+          <div style={{ flex: 1, backgroundColor: soClosed30d > 0 ? '#bbf7d0' : '#e5e7eb', borderRadius: '4px' }} />
+          <div style={{ flex: 1, backgroundColor: soCancelled > 0 ? '#7f1d1d' : '#e5e7eb', borderRadius: '4px' }} />
         </div>
 
         {/* Numbers */}
@@ -196,7 +199,9 @@ export default function OverviewDashboard() {
           <div style={{ flex: 1 }}><span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>{soOpen}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Open</span></div>
           <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700 }}>{soInProgress}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>In progress</span></div>
           <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>{soComplete}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Complete</span></div>
+          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700 }}>{soOnHold}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>On hold</span></div>
           <div style={{ flex: 1 }}><span style={{ fontSize: '12px' }}>{soClosed30d}</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Closed 30d</span></div>
+          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#7f1d1d' }}>{soCancelled}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Cancelled</span></div>
         </div>
 
         {/* Two columns */}

@@ -19,12 +19,18 @@ const tabs: { id: TabType; label: string }[] = [
   { id: 'packages', label: 'Packages' },
   { id: 'shapeshift', label: 'Shapeshift' },
   { id: 'shipments', label: 'Ingestion & Returns' },
+  { id: 'dogfood', label: 'Dogfooders' },
 ];
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const { currentUser, logout, canEdit } = useAuthStore();
+  const { currentUser, logout, canEdit, isBetaViewer } = useAuthStore();
+
+  // Beta Viewers see most tabs but not Packages, Shapeshift, Ingestion & Returns, or Dogfood
+  const visibleTabs = isBetaViewer()
+    ? tabs.filter((t) => !['packages', 'shapeshift', 'shipments', 'dogfood'].includes(t.id))
+    : tabs;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -48,13 +54,13 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
                 onClick={() => setActiveTab('overview')}
                 className="text-white font-semibold text-sm cursor-pointer hover:text-white/90"
               >
-                Simplified Inventory Dashboard
+                eero Fetch
               </h1>
             </div>
 
             {/* Center: Tabs */}
             <div className="flex items-center gap-1">
-              {tabs.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}

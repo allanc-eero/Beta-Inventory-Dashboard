@@ -259,7 +259,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           // Update existing device with assignment + tracking + program
           updateDevice(existing.id, {
             assignedTo: row.name,
-            assignedEmail: row.email || (row.alias ? `${row.alias}@amazon.com` : ''),
+            assignedEmail: row.email || (row.alias ? `${row.alias}@eero.com` : ''),
             checkedOutTo: row.name,
             network: row.networkId || undefined,
             leg2Tracking: row.tracking,
@@ -291,7 +291,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             firmwareVersion: '',
             status: 'not_online',
             assignedTo: row.name,
-            assignedEmail: row.email || (row.alias ? `${row.alias}@amazon.com` : ''),
+            assignedEmail: row.email || (row.alias ? `${row.alias}@eero.com` : ''),
             contactEmail: '',
             alternateEmail: '',
             location: row.address || '',

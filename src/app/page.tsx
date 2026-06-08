@@ -18,6 +18,8 @@ import NetworkSyncButton from '@/components/NetworkSyncButton';
 import PendingReturnReminder from '@/components/PendingReturnReminder';
 import TodayBriefing from '@/components/TodayBriefing';
 import LoginPage from '@/components/LoginPage';
+import DogfooderPortal from '@/components/DogfooderPortal';
+import DogfoodOnboarding from '@/components/DogfoodOnboarding';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
@@ -25,7 +27,7 @@ export default function Home() {
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { isLoggedIn, currentUser, canEdit } = useAuthStore();
+  const { isLoggedIn, currentUser, canEdit, isBetaViewer, isDogfoofer } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -69,6 +71,11 @@ export default function Home() {
     return <LoginPage />;
   }
 
+  // Dogfoofers get the Dogfoofer Portal
+  if (isDogfoofer()) {
+    return <DogfooderPortal />;
+  }
+
   return (
     <SeedDataProvider>
       <div className="min-h-screen bg-gray-50">
@@ -79,18 +86,17 @@ export default function Home() {
           {activeTab === 'devices' && !canEdit() && (
             <>
               <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
-              <div className="mt-4">
-                <NetworkSyncButton />
-              </div>
             </>
           )}
           {activeTab !== 'devices' && activeTab !== 'overview' && (
             <>
               <OverdueAlertsBanner />
               <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
+              {canEdit() && (
               <div className="mt-4">
                 <NetworkSyncButton />
               </div>
+              )}
             </>
           )}
           <div className="mt-6">
@@ -99,6 +105,7 @@ export default function Home() {
             {activeTab === 'testbeds' && <ProgramsTab />}
             {activeTab === 'packages' && <PackagesTab />}
             {activeTab === 'shapeshift' && <ShapeshiftTab />}
+            {activeTab === 'dogfood' && <DogfoodOnboarding />}
             {activeTab === 'locations' && <LocationsTab />}
             {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
             {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}

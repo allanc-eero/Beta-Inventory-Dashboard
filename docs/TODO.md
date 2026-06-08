@@ -205,6 +205,7 @@ All features currently run with simulated API calls (setTimeout delays). When la
 
 ### Infrastructure
 - [ ] **Database** — Migrate from localStorage to PostgreSQL/DynamoDB
+- [ ] **Dogfooder Accounts in Database** — Move registered dogfooder accounts from localStorage to Supabase or DynamoDB so accounts persist across browsers/devices and aren't lost on cache clear. Include: email, name, role, registeredAt, firstLoginAt, status.
 - [ ] **API Layer** — Add Next.js API routes as backend (store API tokens server-side)
 - [ ] **Authentication** — Add real login (NextAuth or internal SSO)
 - [ ] **Scheduled Sync** — Set up daily cron job for network status sync (replace manual button)
