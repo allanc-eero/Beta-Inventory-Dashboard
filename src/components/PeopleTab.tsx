@@ -6,6 +6,7 @@ import { Search, Plus, Monitor } from 'lucide-react';
 import { OptOutReason, OptOutRecord, Device } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
+import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
@@ -277,6 +278,11 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       </div>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Opted Out</span>
                     </div>
+                    {record.selfInitiated && (
+                      <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-md">
+                        🙋 Self-requested from portal — needs offboarding
+                      </div>
+                    )}
                     <div className="mt-3 space-y-1 text-xs text-gray-600">
                       <p><span className="font-medium text-gray-700">Reason:</span> {OPT_OUT_REASONS.find((r) => r.value === record.reason)?.label || record.reason}</p>
                       {record.notes && <p><span className="font-medium text-gray-700">Notes:</span> {record.notes}</p>}
@@ -287,6 +293,10 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         <p><span className="font-medium text-gray-700">Devices at opt-out:</span> {record.devicesAtOptOut.join(', ')}</p>
                       )}
                     </div>
+
+                    {/* Offboarding checklist (incl. network reset) */}
+                    {canEdit() && <OptOutChecklistPanel record={record} />}
+
                     {canEdit() && (
                       <button
                         onClick={() => setOptBackInRecord(record)}

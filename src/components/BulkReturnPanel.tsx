@@ -5,6 +5,7 @@ import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
+import { isDomesticCountry, getReturnEpic } from '@/constants';
 
 interface BulkReturnPanelProps {
   devices: Device[];
@@ -33,8 +34,7 @@ Devices to return:
 Please follow these steps:
 1. Disconnect all devices from power and your network
 2. Pack them securely
-3. Print the attached return shipping label
-4. Drop off at any Parcel Transportation location
+3. Drop off at any Parcel Transportation location
 
 It is very important you return the prototype before {deadline}. If you are unable to accommodate the return by this date, please let us know immediately.
 
@@ -109,12 +109,6 @@ Beta Team`;
     });
   }, [devices]);
 
-  // Helper: determine if a tester is US/Canada (domestic) or international
-  const isDomestic = (country: string) => {
-    const c = country.toLowerCase().trim();
-    return c === 'united states' || c === 'us' || c === 'usa' || c === 'canada' || c === 'ca';
-  };
-
   // Initialize per-tester emails — auto-select template based on tester's country
   useEffect(() => {
     const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -123,7 +117,7 @@ Beta Team`;
       if (email === 'unassigned') return;
       const testerName = assigneeDevices[0].assignedTo || assigneeDevices[0].checkedOutTo || 'Team Member';
       const testerCountry = assigneeDevices[0].country || '';
-      const template = isDomestic(testerCountry) ? emailBody : INTERNATIONAL_TEMPLATE;
+      const template = isDomesticCountry(testerCountry) ? emailBody : INTERNATIONAL_TEMPLATE;
       const deviceList = assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model || d.product || ''})`.trim()).join('\n');
       emails[email] = template
         .replace(/\{name\}/g, testerName)
@@ -145,11 +139,7 @@ Beta Team`;
 
     // Get program for epic mapping
     const program = uniqueDevices[0]?.program || 'beta';
-    const epicMap: Record<string, string> = {
-      beta: 'BETA-RETURNS', dogfood: 'DOGFOOD-RETURNS', prq: 'PRQ-RETURNS',
-      pvt: 'PVT-RETURNS', evt: 'EVT-RETURNS', dvt: 'DVT-RETURNS', other: 'GENERAL-RETURNS',
-    };
-    const epic = epicMap[program] || 'GENERAL-RETURNS';
+    const epic = getReturnEpic(program);
     const ticketKey = `QA-${Math.floor(Math.random() * 90000) + 10000}`;
 
     // Process each device — mark as pending return (not deactivated until confirmed)
@@ -273,59 +263,6 @@ Beta Team`;
         if (email === Object.keys(groupedByAssignee)[0]) {
           window.open(`mailto:${email}?from=beta-team@eero.com&subject=${subject}&body=${body}`, '_self');
         }
-
-        // Generate shipping label for this tester
-        const labelWindow = window.open('', '_blank', 'width=500,height=400');
-        if (labelWindow) {
-          labelWindow.document.write(`
-            <html>
-              <head>
-                <title>Return Label — ${testerName}</title>
-                <style>
-                  body { font-family: Arial, sans-serif; padding: 24px; }
-                  .label { border: 3px solid #000; padding: 24px; max-width: 450px; margin: 0 auto; }
-                  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; }
-                  .header h1 { font-size: 18px; margin: 0; }
-                  .section { margin-bottom: 16px; }
-                  .section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; color: #666; margin-bottom: 4px; }
-                  .section-content { font-size: 13px; font-weight: bold; }
-                  .serial { font-family: monospace; font-size: 12px; margin: 2px 0; }
-                  @media print { body { padding: 0; } }
-                </style>
-              </head>
-              <body>
-                <div class="label">
-                  <div class="header">
-                    <h1>RETURN SHIPPING LABEL</h1>
-                    <p style="font-size:11px;color:#666;">eero Device Return Program</p>
-                  </div>
-                  <div class="section">
-                    <div class="section-title">Ship To</div>
-                    <div class="section-content">eero Returns Center<br/>1 eero Way<br/>San Francisco, CA 94105</div>
-                  </div>
-                  <div class="section">
-                    <div class="section-title">From</div>
-                    <div class="section-content">${testerName}</div>
-                    <div style="font-size:12px;color:#444;">${email}</div>
-                  </div>
-                  <div class="section">
-                    <div class="section-title">Devices (${assigneeDevices.length})</div>
-                    ${assigneeDevices.map((d) => `<div class="serial">${d.serialNumber}</div>`).join('')}
-                  </div>
-                  <div class="section">
-                    <div class="section-title">Reason</div>
-                    <div class="section-content">${reason.replace(/_/g, ' ')}</div>
-                  </div>
-                  <div style="font-size:10px;color:#666;margin-top:16px;padding-top:12px;border-top:1px solid #ddd;">
-                    <strong>Instructions:</strong> Pack all devices securely. Include cables and accessories. Attach this label to the outside.
-                  </div>
-                </div>
-                <script>window.onload = function() { window.print(); }</script>
-              </body>
-            </html>
-          `);
-          labelWindow.document.close();
-        }
       });
     }
 
@@ -372,7 +309,7 @@ Beta Team`;
             <p className="text-4xl mb-4">✓</p>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Bulk Return Complete</h2>
             <p className="text-sm text-gray-500 mb-6">
-              {uniqueDevices.length} device(s) processed. JIRA tickets created. {requiresReturn ? `${assigneeCount} return email(s) and label(s) generated.` : ''}
+              {uniqueDevices.length} device(s) processed. JIRA tickets created. {requiresReturn ? `${assigneeCount} return email(s) generated.` : ''}
             </p>
             <div className="flex items-center justify-center gap-3">
               <button
@@ -408,7 +345,7 @@ Beta Team`;
         {/* Title */}
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Bulk Return to eero</h1>
         <p className="text-sm text-gray-500 mb-8">
-          Process {uniqueDevices.length} device(s) for return. Emails and labels will be grouped by tester.
+          Process {uniqueDevices.length} device(s) for return. Emails will be grouped by tester.
         </p>
 
         {/* Devices summary table */}
@@ -608,10 +545,6 @@ Beta Team`;
                 <div className="flex items-start gap-3">
                   <span className="text-green-500 mt-0.5">✓</span>
                   <p className="text-sm text-gray-700"><span className="font-medium">{assigneeCount}</span> return email(s) drafted (grouped by tester — one email per person)</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <p className="text-sm text-gray-700"><span className="font-medium">{assigneeCount}</span> shipping label(s) generated (one per tester, listing all their devices)</p>
                 </div>
               </>
             )}

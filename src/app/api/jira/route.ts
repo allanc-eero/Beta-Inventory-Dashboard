@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
 
     if (action === 'create') {
       return await createIssue(body);
+    } else if (action === 'createDogReport') {
+      return await createDogReport(body);
     } else if (action === 'transition') {
       return await transitionIssue(body);
     } else if (action === 'createEpic') {
@@ -131,7 +133,98 @@ async function createIssue(body: any) {
   });
 }
 
-// ─── Transition Issue ─────────────────────────────────────────────────────────
+// ─── Create Dogfood Report (DOG project) ──────────────────────────────────────
+// Used by the dogfooder portal "Report an Issue" form. Creates a Bug in the
+// "Dogfood Reports" (DOG) project, tagged as Customer Feedback → Dogfood Population.
+const DOG_PROJECT_KEY = 'DOG';
+const DOG_ISSUE_TYPE = 'Bug';
+// Bug Source cascading select: Customer Feedback (parent) → Dogfood Population (child)
+const BUG_SOURCE_FIELD = 'customfield_11594';
+const BUG_SOURCE_CUSTOMER_FEEDBACK_ID = '10666';
+const BUG_SOURCE_DOGFOOD_POPULATION_ID = '10683';
+
+// Map the portal's category to a DOG priority + label
+const DOG_CATEGORY_MAP: Record<string, { priority: string; label: string; prefix: string }> = {
+  bug:      { priority: 'P2 - Major',   label: 'dogfood-bug',      prefix: 'Bug' },
+  hardware: { priority: 'P2 - Major',   label: 'dogfood-hardware', prefix: 'Hardware' },
+  feature:  { priority: 'P3 - Minor',   label: 'dogfood-feature',  prefix: 'Feature Request' },
+  feedback: { priority: 'P4 - Trivial', label: 'dogfood-feedback', prefix: 'Feedback' },
+  positive: { priority: 'P4 - Trivial', label: 'dogfood-positive', prefix: 'Positive' },
+};
+
+async function createDogReport(body: any) {
+  const {
+    category,
+    description,
+    deviceSerial,
+    reporterName,
+    reporterEmail,
+    attachmentNames,
+  } = body;
+
+  const map = DOG_CATEGORY_MAP[category] || DOG_CATEGORY_MAP.feedback;
+
+  // Build a concise summary
+  const shortDesc = (description || '').trim().split('\n')[0].slice(0, 80);
+  const summary = `[${map.prefix}] ${shortDesc || 'Dogfood report'}${reporterName ? ` — ${reporterName}` : ''}`;
+
+  // Build an ADF description with reporter/device context
+  const contextLines = [
+    `Reported by: ${reporterName || 'Unknown'}${reporterEmail ? ` (${reporterEmail})` : ''}`,
+    `Category: ${category || 'feedback'}`,
+    deviceSerial ? `Device: ${deviceSerial}` : null,
+    attachmentNames && attachmentNames.length ? `Attachments: ${attachmentNames.join(', ')}` : null,
+    `Submitted via: eero Fetch Dogfooder Portal`,
+  ].filter(Boolean) as string[];
+
+  const payload: any = {
+    fields: {
+      project: { key: DOG_PROJECT_KEY },
+      issuetype: { name: DOG_ISSUE_TYPE },
+      summary,
+      priority: { name: map.priority },
+      labels: [map.label, 'dogfood-portal'],
+      [BUG_SOURCE_FIELD]: {
+        id: BUG_SOURCE_CUSTOMER_FEEDBACK_ID,
+        child: { id: BUG_SOURCE_DOGFOOD_POPULATION_ID },
+      },
+      description: {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: description || '(no description provided)' }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: contextLines.join('\n') }],
+          },
+        ],
+      },
+    },
+  };
+
+  const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/issue`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error('[JIRA Create DOG Report Failed]', err);
+    return NextResponse.json({ success: false, error: err }, { status: res.status });
+  }
+
+  const data = await res.json();
+  return NextResponse.json({
+    success: true,
+    key: data.key,
+    id: data.id,
+    url: `${JIRA_BASE_URL}/browse/${data.key}`,
+  });
+}
 async function transitionIssue(body: any) {
   const { issueKey, transitionName } = body;
 

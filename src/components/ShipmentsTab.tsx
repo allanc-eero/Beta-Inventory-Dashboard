@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
 import { createJiraIssue } from '@/services/jiraService';
-import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY } from '@/constants';
+import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl } from '@/constants';
 
 interface ParsedRow {
   name: string;
@@ -100,6 +100,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
   const allShipments = getAllShipments();
   const pendingReturnDevices = devices.filter((d) => d.status === 'pending_return');
+  // Devices the tester has marked shipped (entered a return tracking number via the portal)
+  const testerShippedDevices = pendingReturnDevices.filter((d) => d.returnTrackingNumber);
 
   // Detect program and product from filename
   const detectedProgram = useMemo(() => {
@@ -525,9 +527,14 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           </button>
           <button
             onClick={() => setActiveView('pending_returns')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeView === 'pending_returns' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${pendingReturnDevices.length > 0 ? 'text-orange-600' : ''}`}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${activeView === 'pending_returns' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${pendingReturnDevices.length > 0 ? 'text-orange-600' : ''}`}
           >
             Pending Returns {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
+            {testerShippedDevices.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-blue-600 rounded-full" title={`${testerShippedDevices.length} shipped by tester`}>
+                {testerShippedDevices.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -786,6 +793,37 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
       {activeView === 'pending_returns' && (
         <div className="space-y-4">
+          {/* Shipped-by-tester alert — devices the tester confirmed shipped with a tracking # */}
+          {testerShippedDevices.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-2">
+                📦 Shipped by Tester ({testerShippedDevices.length})
+              </h3>
+              <p className="text-xs text-blue-700 mb-3">
+                These testers clicked "mark as returned" in their portal and provided a tracking number. Track the package, then confirm receipt below — from there you can archive or brick the device.
+              </p>
+              <div className="space-y-2">
+                {testerShippedDevices.map((d) => {
+                  const carrier = (d.leg2Carrier || d.leg1Carrier || '').toUpperCase();
+                  const tn = d.returnTrackingNumber || '';
+                  const trackUrl = getTrackingUrl(carrier, tn);
+                  return (
+                    <div key={d.id} className="flex items-center justify-between gap-3 bg-white border border-blue-100 rounded-lg px-3 py-2">
+                      <div className="min-w-0">
+                        <span className="font-mono text-xs font-medium text-blue-700">{d.serialNumber}</span>
+                        <span className="text-xs text-gray-500 ml-2">{d.assignedTo || d.assignedEmail || 'unassigned'}</span>
+                        {d.returnShippedAt && <span className="text-xs text-gray-400 ml-2">· marked shipped {new Date(d.returnShippedAt).toLocaleDateString()}</span>}
+                      </div>
+                      <a href={trackUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-blue-600 hover:text-blue-800 hover:underline shrink-0">
+                        {tn} ↗
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Explanation */}
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-orange-800 mb-1">Pending Device Returns</h3>
@@ -806,6 +844,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tester</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Return Tracking</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email Sent</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Days Waiting</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
@@ -824,6 +863,13 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                           <td className="px-4 py-3 font-mono text-xs font-medium text-blue-700">{d.serialNumber}</td>
                           <td className="px-4 py-3 text-gray-700">{d.assignedTo || '—'}</td>
                           <td className="px-4 py-3 text-gray-500 text-xs">{d.assignedEmail || '—'}</td>
+                          <td className="px-4 py-3 text-xs">
+                            {d.returnTrackingNumber ? (
+                              <span className="font-mono text-blue-700 font-medium">{d.returnTrackingNumber}</span>
+                            ) : (
+                              <span className="text-gray-400">not shipped yet</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-xs text-gray-600">
                             {d.returnEmailSentAt ? new Date(d.returnEmailSentAt).toLocaleDateString() : '—'}
                             {d.returnEmailCount && d.returnEmailCount > 1 && (

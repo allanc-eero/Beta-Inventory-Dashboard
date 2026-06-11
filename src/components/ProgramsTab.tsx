@@ -175,8 +175,7 @@ ${assigneeDevices.map((d) => `- ${d.serialNumber} (${d.model})`).join('\n')}
 Please follow these steps:
 1. Disconnect all devices from power and your network
 2. Pack them securely
-3. Use the attached return shipping label
-4. Drop off at any UPS or FedEx location
+3. Drop off at any UPS or FedEx location
 
 Please return within 7 business days.
 

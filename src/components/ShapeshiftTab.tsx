@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { usePackagesStore } from '@/store/packagesStore';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<ShapeshiftJobStatus, string> = {
 
 export default function ShapeshiftTab() {
   const { shapeshiftJobs, addShapeshiftJob, updateShapeshiftJob, cancelShapeshiftJob } = usePackagesStore();
-  const { devices, addHistoryEntry } = useDeviceStore();
+  const { devices, addHistoryEntry, updateDevice } = useDeviceStore();
   const { currentUser } = useAuthStore();
 
   // Form state
@@ -49,6 +49,112 @@ export default function ShapeshiftTab() {
     return sorted.filter((j) => j.status === filterStatus);
   }, [shapeshiftJobs, filterStatus]);
 
+  // eero CLI availability/auth status
+  const [cliStatus, setCliStatus] = useState<{ available: boolean; ready: boolean; adminStageAuthenticated?: boolean; adminProdAuthenticated?: boolean; version?: string } | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
+  const refreshStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const r = await fetch('/api/shapeshift', { cache: 'no-store' });
+      const d = await r.json();
+      setCliStatus({
+        available: !!d.available,
+        ready: !!d.ready,
+        adminStageAuthenticated: !!d.adminStageAuthenticated,
+        adminProdAuthenticated: !!d.adminProdAuthenticated,
+        version: d.version,
+      });
+      setLastChecked(new Date());
+    } catch {
+      setCliStatus({ available: false, ready: false });
+      setLastChecked(new Date());
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshStatus(); // on load
+    const interval = setInterval(refreshStatus, 30000); // every 30s
+    const onFocus = () => refreshStatus();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
+  // Poll a running shapeshift job until it finishes
+  const pollJob = (jobId: string, job: ShapeshiftJob): Promise<{ ok: boolean; output: string }> =>
+    new Promise((resolve) => {
+      const tick = async () => {
+        try {
+          const res = await fetch(`/api/shapeshift?jobId=${jobId}`);
+          const data = await res.json();
+          if (!data.found) return resolve({ ok: false, output: 'Job not found.' });
+          // Stream latest output into the job log for visibility
+          updateShapeshiftJob(job.id, { log: [data.output] });
+          if (data.status === 'running') {
+            setTimeout(tick, 4000);
+          } else {
+            resolve({ ok: data.status === 'success', output: data.output });
+          }
+        } catch (err: any) {
+          resolve({ ok: false, output: `Polling failed: ${err.message}` });
+        }
+      };
+      tick();
+    });
+
+  // Execute a queued/failed job via the real eero CLI (PTY-driven, job-based)
+  const runShapeshift = async (job: ShapeshiftJob) => {
+    setExpandedJob(job.id); // auto-open so the operator sees live output
+    updateShapeshiftJob(job.id, { status: 'in_progress', currentAttempt: (job.currentAttempt || 0) + 1 });
+    try {
+      const res = await fetch('/api/shapeshift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: job.targetEnv,
+          ...(job.networkId ? { network: job.networkId } : { eero: job.serial }),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.jobId) {
+        updateShapeshiftJob(job.id, { status: 'failed', log: [...(job.log || []), data.error || 'Failed to start shapeshift job.'] });
+        return;
+      }
+
+      // Poll the background job until it completes (several minutes).
+      const result = await pollJob(data.jobId, job);
+      const device = devices.find((d) => d.serialNumber.toUpperCase() === job.serial.toUpperCase());
+
+      if (result.ok) {
+        updateShapeshiftJob(job.id, { status: 'success', completedAt: new Date().toISOString(), log: [result.output] });
+        if (device) {
+          updateDevice(device.id, { environment: job.targetEnv });
+          addHistoryEntry({
+            id: crypto.randomUUID(),
+            deviceId: device.id,
+            timestamp: new Date().toISOString(),
+            action: 'shapeshifted',
+            user: job.assignedTo,
+            description: `Shapeshifted to ${job.targetEnv} via eero CLI${job.networkId ? ` (network: ${job.networkId})` : ` (eero: ${job.serial})`}`,
+          });
+        }
+      } else {
+        updateShapeshiftJob(job.id, { status: 'failed', log: [result.output] });
+      }
+    } catch (err: any) {
+      updateShapeshiftJob(job.id, {
+        status: 'failed',
+        log: [...(job.log || []), `Request failed: ${err.message}`],
+      });
+    }
+  };
+
   const handleSubmit = () => {
     if (!serial.trim() || !confirmed) return;
 
@@ -60,7 +166,6 @@ export default function ShapeshiftTab() {
       retries,
       currentAttempt: 0,
       status: 'queued',
-      printLabel: false,
       otaToLatest,
       assignedTo: currentUser?.email || 'admin',
       createdAt: new Date().toISOString(),
@@ -93,15 +198,53 @@ export default function ShapeshiftTab() {
         </p>
       </div>
 
-      {/* Pre-flight checklist */}
+      {/* eero CLI status banner */}
+      {cliStatus && (
+        <div className={`rounded-lg border px-4 py-2.5 text-sm flex items-start gap-2 ${
+          cliStatus.ready
+            ? 'bg-green-50 border-green-200 text-green-700'
+            : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+        }`}>
+          {cliStatus.ready ? (
+            <>
+              <span>✓</span>
+              <span className="flex-1">eero CLI connected{cliStatus.version ? ` (${cliStatus.version})` : ''} and admin-authenticated — shapeshifts run for real via <code className="bg-white/60 px-1 rounded">eero shapeshift</code>.</span>
+            </>
+          ) : (
+            <>
+              <span>⚠️</span>
+              <span className="flex-1">
+                {!cliStatus.available
+                  ? 'eero CLI not found on the server — shapeshifts can be queued but not executed.'
+                  : !cliStatus.adminProdAuthenticated
+                  ? 'Admin API token missing. Run `eero api admin --prod auth` (and `eero api admin auth` for stage) on the server, then re-check. Execution is disabled until then.'
+                  : 'eero CLI not ready — execution is disabled.'}
+              </span>
+            </>
+          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {lastChecked && (
+              <span className="text-xs opacity-60">checked {lastChecked.toLocaleTimeString()}</span>
+            )}
+            <button
+              onClick={refreshStatus}
+              disabled={checkingStatus}
+              className="text-xs font-medium px-2 py-1 rounded border border-current/30 hover:bg-white/40 disabled:opacity-50"
+            >
+              {checkingStatus ? 'Checking…' : '↻ Re-check'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Good to know */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">▸ Pre-flight checklist</h3>
-        <ul className="space-y-1.5 text-sm text-gray-700">
-          <li>• Node is in <strong>blinking blue</strong> state (factory reset / setup mode) and connected to the internet via <strong>hardwire (Ethernet)</strong>.</li>
-          <li>• eeros powered <strong>ON</strong> and connected to a WAN / modem / internet uplink.</li>
-          <li>• If multiple eeros, <strong>all</strong> of them must be wired to WAN. Wireless-only nodes are <strong>not currently supported</strong>.</li>
-          <li>• eero is <strong>NOT</strong> part of a customer network — SID adds it to a dummy shapeshift network; it can't move a unit out from under a real user.</li>
-          <li>• The shapeshifted eero will be <strong>tracked in SID</strong> (added if new) and <strong>assigned to you</strong> as the holder. The job is logged on the device's history with your name and reason.</li>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">▸ Good to Know</h3>
+        <ul className="space-y-2 text-sm text-gray-700">
+          <li><strong>Tokens expire.</strong> The browser-cookie admin auth is session-based and will lapse. When it does, the status banner above turns yellow and tells you which command to run. Re-auth, reload, done.</li>
+          <li><strong>In-memory jobs.</strong> Job status lives in server memory — if the dev server restarts mid-shapeshift, the UI loses the job, though the actual move continues on eero's side. (A database would fix this for production.)</li>
+          <li><strong>Don't double-run the same unit.</strong> Let a device finish its move before testing on it again, or use a different device. Re-running a unit that's mid-shapeshift can confuse the job state.</li>
+          <li><strong>It's slow on purpose.</strong> OTA + reboot + heartbeat takes several minutes. The "Running…" state is normal — don't interpret it as hung. Expand the job to watch live CLI output.</li>
         </ul>
       </div>
 
@@ -180,6 +323,7 @@ export default function ShapeshiftTab() {
               placeholder="e.g. 5754479"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
             />
+            <p className="text-[11px] text-gray-400 mt-1">If set, shapeshifts the whole network. Otherwise just the eero serial.</p>
           </div>
 
           {/* Retries */}
@@ -274,44 +418,21 @@ export default function ShapeshiftTab() {
                         <X className="w-4 h-4" />
                       </button>
                     )}
-                    {/* Status controls for manual tracking */}
-                    {job.status === 'queued' && (
+                    {/* Run via real eero CLI */}
+                    {(job.status === 'queued' || job.status === 'failed') && (
                       <button
-                        onClick={() => updateShapeshiftJob(job.id, { status: 'in_progress', currentAttempt: 1 })}
-                        className="text-xs px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded font-medium hover:bg-yellow-200"
+                        onClick={() => runShapeshift(job)}
+                        disabled={!cliStatus?.ready}
+                        title={!cliStatus?.available ? 'eero CLI not available' : !cliStatus?.ready ? 'eero CLI not admin-authenticated' : 'Run shapeshift via eero CLI'}
+                        className="text-xs px-2.5 py-1 bg-[#2c3e7a] text-white rounded font-medium hover:bg-[#1e2f5e] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Start
+                        {job.status === 'failed' ? 'Retry' : 'Run shapeshift'}
                       </button>
                     )}
                     {job.status === 'in_progress' && (
-                      <button
-                        onClick={() => {
-                          updateShapeshiftJob(job.id, { status: 'success', completedAt: new Date().toISOString() });
-                          // Log to device timeline
-                          const device = devices.find((d) => d.serialNumber.toUpperCase() === job.serial.toUpperCase());
-                          if (device) {
-                            addHistoryEntry({
-                              id: crypto.randomUUID(),
-                              deviceId: device.id,
-                              timestamp: new Date().toISOString(),
-                              action: 'shapeshifted',
-                              user: job.assignedTo,
-                              description: `Shapeshifted to ${job.targetEnv}${job.networkId ? ` (network: ${job.networkId})` : ''}${job.otaToLatest ? ' — OTA to latest stable' : ''}`,
-                            });
-                          }
-                        }}
-                        className="text-xs px-2.5 py-1 bg-green-100 text-green-700 rounded font-medium hover:bg-green-200"
-                      >
-                        Mark Success
-                      </button>
-                    )}
-                    {job.status === 'in_progress' && (
-                      <button
-                        onClick={() => updateShapeshiftJob(job.id, { status: 'failed' })}
-                        className="text-xs px-2.5 py-1 bg-red-100 text-red-700 rounded font-medium hover:bg-red-200"
-                      >
-                        Failed
-                      </button>
+                      <span className="text-xs px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded font-medium">
+                        Running…
+                      </span>
                     )}
                     <button
                       onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
@@ -324,7 +445,7 @@ export default function ShapeshiftTab() {
 
                 {/* Expanded details */}
                 {expandedJob === job.id && (
-                  <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 text-xs space-y-1">
+                  <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 text-xs space-y-2">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div><span className="text-gray-500">Target:</span> <span className="font-medium">{job.targetEnv}</span></div>
                       <div><span className="text-gray-500">Network:</span> <span className="font-medium">{job.networkId || '—'}</span></div>
@@ -334,6 +455,44 @@ export default function ShapeshiftTab() {
                       <div><span className="text-gray-500">Created:</span> <span className="font-medium">{new Date(job.createdAt).toLocaleString()}</span></div>
                       {job.completedAt && <div><span className="text-gray-500">Completed:</span> <span className="font-medium">{new Date(job.completedAt).toLocaleString()}</span></div>}
                     </div>
+
+                    {/* Live CLI output / console log */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-gray-500 font-medium uppercase tracking-wide">CLI Output</span>
+                        {job.status === 'in_progress' && (
+                          <span className="text-yellow-700 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse" /> streaming…
+                          </span>
+                        )}
+                      </div>
+                      {job.log && job.log.length > 0 ? (
+                        <pre className="max-h-64 overflow-auto bg-gray-900 text-gray-100 rounded-lg p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono">
+{job.log.join('\n')}
+                        </pre>
+                      ) : (
+                        <p className="text-gray-400 italic">No output yet. Click "Run shapeshift" to start.</p>
+                      )}
+                    </div>
+
+                    {/* What this does / how to retry */}
+                    {job.status === 'failed' && (
+                      <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                        <p className="font-medium">This shapeshift failed.</p>
+                        <p className="mt-0.5">Check the CLI output above for the reason. Common causes: admin token expired (re-run <code className="bg-white px-1 rounded">eero api admin --prod auth</code>), the eero didn't heartbeat in time (it may still be rebooting — verify in the {job.targetEnv} admin panel before retrying), or it's already in {job.targetEnv}. Click <strong>Retry</strong> to run it again.</p>
+                      </div>
+                    )}
+                    {job.status === 'in_progress' && (
+                      <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                        Shapeshift in progress — this includes an OTA to the cross-environment firmware, a reboot, and a heartbeat wait. It can take several minutes. Leave this open to watch progress.
+                      </div>
+                    )}
+                    {job.status === 'success' && (
+                      <div className="p-2.5 bg-green-50 border border-green-200 rounded-lg text-green-700">
+                        ✓ Device moved to <strong>{job.targetEnv}</strong>. The device record's environment was updated and the move was logged to its timeline. Confirm in the {job.targetEnv} admin panel if needed.
+                      </div>
+                    )}
+
                     {job.notes && <p className="text-gray-600 mt-2">{job.notes}</p>}
                   </div>
                 )}

@@ -12,6 +12,7 @@ import JiraPanel from './JiraPanel';
 import DeactivateDeviceModal from './DeactivateDeviceModal';
 import AttachmentsPanel from './AttachmentsPanel';
 import SalesforcePanel from './SalesforcePanel';
+import { STATUS_CONFIG as SHARED_STATUS_CONFIG } from '@/constants';
 
 interface DeviceDetailPanelProps {
   device: Device;
@@ -20,7 +21,7 @@ interface DeviceDetailPanelProps {
 }
 
 // ─── Field Definitions (data-driven) ──────────────────────────────────────────
-type FieldDef = { label: string; field: keyof Device; linkUrl?: (d: Device) => string | undefined };
+type FieldDef = { label: string; field: keyof Device; linkUrl?: (d: Device) => string | undefined; options?: string[] };
 
 const DEVICE_FIELDS: FieldDef[] = [
   { label: 'MODEL', field: 'model' },
@@ -35,6 +36,7 @@ const DEVICE_FIELDS: FieldDef[] = [
   { label: 'COUNTRY', field: 'country' },
   { label: 'ADMIN ID', field: 'unitId', linkUrl: (d) => d.unitId ? `https://admin.e2ro.com/users/${d.unitId.replace(/^UID0*/, '')}` : undefined },
   { label: 'FIRMWARE', field: 'firmwareVersion' },
+  { label: 'ENVIRONMENT', field: 'environment', options: ['', 'stage', 'prod'] },
 ];
 
 const ASSIGNMENT_FIELDS: FieldDef[] = [
@@ -46,6 +48,7 @@ const LOGISTICS_FIELDS: FieldDef[] = [
   { label: 'ASSET TAG', field: 'assetTag' },
   { label: 'PO / EXPENSIFY', field: 'poExpensify' },
   { label: 'TRACKING', field: 'tracking' },
+  { label: 'RETURN TRACKING', field: 'returnTrackingNumber' },
   { label: 'JIRA', field: 'jira' },
 ];
 
@@ -57,14 +60,7 @@ const CONTACT_FIELDS: FieldDef[] = [
 ];
 
 // ─── Status Display ───────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { class: string; label: string }> = {
-  online: { class: 'status-in-stock', label: 'Online' },
-  not_online: { class: 'status-checked-out', label: 'Not Online' },
-  in_testing: { class: 'status-in-testing', label: 'In Testing' },
-  in_repair: { class: 'status-in-repair', label: 'In Repair' },
-  pending_return: { class: 'bg-orange-100 text-orange-700', label: 'Pending Return' },
-  deactivated: { class: 'bg-gray-100 text-gray-600', label: 'Deactivated' },
-};
+const STATUS_CONFIG = SHARED_STATUS_CONFIG;
 
 // ─── Export Helper ────────────────────────────────────────────────────────────
 function exportDeviceCSV(device: Device) {
@@ -74,6 +70,7 @@ function exportDeviceCSV(device: Device) {
     ['Hardware Config', device.hardwareConfig], ['Internal Name', device.internalName],
     ['SKU', device.sku], ['Country', device.country],
     ['Admin ID', device.unitId], ['Firmware', device.firmwareVersion],
+    ['Environment', device.environment || ''],
     ['Status', device.status], ['Assigned To', device.assignedTo],
     ['Email', device.assignedEmail], ['Contact Email', device.contactEmail || ''],
     ['Alternate Email', device.alternateEmail || ''],
@@ -112,7 +109,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
   const statusInfo = STATUS_CONFIG[device.status] || { class: 'bg-gray-100 text-gray-600', label: device.status };
 
   const renderFields = (fields: FieldDef[], editable = true) =>
-    fields.map(({ label, field, linkUrl }) => (
+    fields.map(({ label, field, linkUrl, options }) => (
       <DetailField
         key={`${label}-${field}`}
         label={label}
@@ -122,6 +119,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
         editData={editData}
         setEditData={setEditData}
         linkUrl={linkUrl?.(device)}
+        options={options}
       />
     ));
 
@@ -359,15 +357,27 @@ function SectionBlock({ title, children }: { title: string; children: React.Reac
   );
 }
 
-function DetailField({ label, value, editing, field, editData, setEditData, linkUrl }: {
+function DetailField({ label, value, editing, field, editData, setEditData, linkUrl, options }: {
   label: string; value: string; editing: boolean; field: keyof Device;
-  editData: Device; setEditData: (d: Device) => void; linkUrl?: string;
+  editData: Device; setEditData: (d: Device) => void; linkUrl?: string; options?: string[];
 }) {
   if (editing) {
     return (
       <div className="flex items-center gap-3">
         <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">{label}</span>
-        <input type="text" value={(editData[field] as string) || ''} onChange={(e) => setEditData({ ...editData, [field]: e.target.value })} className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+        {options ? (
+          <select
+            value={(editData[field] as string) || ''}
+            onChange={(e) => setEditData({ ...editData, [field]: e.target.value })}
+            className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {options.map((opt) => (
+              <option key={opt} value={opt}>{opt === '' ? '— not set —' : opt}</option>
+            ))}
+          </select>
+        ) : (
+          <input type="text" value={(editData[field] as string) || ''} onChange={(e) => setEditData({ ...editData, [field]: e.target.value })} className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+        )}
       </div>
     );
   }

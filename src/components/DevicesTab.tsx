@@ -8,6 +8,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import AddDeviceModal from './AddDeviceModal';
 import BulkReturnPanel from './BulkReturnPanel';
 import AgentChat from './AgentChat';
+import { getStatusBadge } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
@@ -270,16 +271,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
 }
 
 function StatusBadge({ status }: { status: DeviceStatus }) {
-  const config: Record<DeviceStatus, { class: string; label: string }> = {
-    online: { class: 'status-in-stock', label: 'Online' },
-    not_online: { class: 'status-checked-out', label: 'Not Online' },
-    in_repair: { class: 'status-in-repair', label: 'In Repair' },
-    in_testing: { class: 'status-in-testing', label: 'In Testing' },
-    pending_return: { class: 'bg-orange-100 text-orange-700', label: 'Pending Return' },
-    deactivated: { class: 'bg-gray-100 text-gray-600', label: 'Deactivated' },
-  };
-
-  const c = config[status] || { class: 'bg-gray-100 text-gray-600', label: status };
+  const c = getStatusBadge(status);
   return (
     <span className={`status-badge ${c.class}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />

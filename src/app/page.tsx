@@ -20,6 +20,7 @@ import TodayBriefing from '@/components/TodayBriefing';
 import LoginPage from '@/components/LoginPage';
 import DogfooderPortal from '@/components/DogfooderPortal';
 import DogfoodOnboarding from '@/components/DogfoodOnboarding';
+import ProgramSignupsTab from '@/components/ProgramSignupsTab';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
@@ -106,6 +107,7 @@ export default function Home() {
             {activeTab === 'packages' && <PackagesTab />}
             {activeTab === 'shapeshift' && <ShapeshiftTab />}
             {activeTab === 'dogfood' && <DogfoodOnboarding />}
+            {activeTab === 'program_signups' && <ProgramSignupsTab />}
             {activeTab === 'locations' && <LocationsTab />}
             {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
             {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}

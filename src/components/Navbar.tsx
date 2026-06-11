@@ -20,6 +20,7 @@ const tabs: { id: TabType; label: string }[] = [
   { id: 'shapeshift', label: 'Shapeshift' },
   { id: 'shipments', label: 'Ingestion & Returns' },
   { id: 'dogfood', label: 'Dogfooders' },
+  { id: 'program_signups', label: 'Program Sign-ups' },
 ];
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
@@ -29,7 +30,7 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
 
   // Beta Viewers see most tabs but not Packages, Shapeshift, Ingestion & Returns, or Dogfood
   const visibleTabs = isBetaViewer()
-    ? tabs.filter((t) => !['packages', 'shapeshift', 'shipments', 'dogfood'].includes(t.id))
+    ? tabs.filter((t) => !['packages', 'shapeshift', 'shipments', 'dogfood', 'program_signups'].includes(t.id))
     : tabs;
 
   useEffect(() => {

@@ -171,7 +171,6 @@ The import system uses a declarative `COLUMN_MAP` array in `ImportTab.tsx`. Each
 - Data is browser-local (localStorage). No server-side persistence or multi-user sync.
 - Partner API integration is stubbed — sync button simulates the flow but doesn't make real API calls without a configured token.
 - `react-simple-maps` lacks TypeScript declarations (suppressed with implicit any).
-- The `DeactivateDeviceModal` has a minor type mismatch on the `end_of_program` reason enum.
 
 ## Backup Strategy
 

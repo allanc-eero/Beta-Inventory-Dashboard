@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Device, Testbed, Location, Person, CheckoutRecord, DeviceStatus, Program, HistoryEntry, SpeedTestResult, JiraTicket, DeactivationRecord, OverdueAlert, FirmwareInfo, Shipment, ShipmentStatus, Carrier, Attachment, AttachmentType, SyncMetadata, ClosedProgramRecord, OptOutRecord, TesterProfile } from '@/types';
+import { getReturnEpic } from '@/constants';
 
 interface DeviceStore {
   devices: Device[];
@@ -494,16 +495,7 @@ export const useDeviceStore = create<DeviceStore>()(
       deactivateDevice: (record) => {
         const device = get().devices.find((d) => d.id === record.deviceId);
         const program = device?.program || 'beta';
-        const epicMap: Record<string, string> = {
-          beta: 'BETA-RETURNS',
-          dogfood: 'DOGFOOD-RETURNS',
-          prq: 'PRQ-RETURNS',
-          pvt: 'PVT-RETURNS',
-          evt: 'EVT-RETURNS',
-          dvt: 'DVT-RETURNS',
-          other: 'GENERAL-RETURNS',
-        };
-        const epic = epicMap[program] || 'GENERAL-RETURNS';
+        const epic = getReturnEpic(program);
 
         set((state) => ({
           deactivationRecords: [...state.deactivationRecords, record],
@@ -870,13 +862,14 @@ export const useDeviceStore = create<DeviceStore>()(
             if (r.id !== id) return r;
             const now = new Date().toISOString();
             const checklist = r.checklist || {
-              adminRemoved: false, qualtricsRemoved: false, devicesOffboarded: false, allCompleted: false,
+              adminRemoved: false, qualtricsRemoved: false, devicesOffboarded: false, networkReset: false, allCompleted: false,
             };
             const updated = { ...checklist };
             if (field === 'adminRemoved') { updated.adminRemoved = true; updated.adminRemovedAt = now; updated.adminRemovedBy = user; }
             if (field === 'qualtricsRemoved') { updated.qualtricsRemoved = true; updated.qualtricsRemovedAt = now; updated.qualtricsRemovedBy = user; }
             if (field === 'devicesOffboarded') { updated.devicesOffboarded = true; updated.devicesOffboardedAt = now; updated.devicesOffboardedBy = user; }
-            updated.allCompleted = updated.adminRemoved && updated.qualtricsRemoved && updated.devicesOffboarded;
+            if (field === 'networkReset') { updated.networkReset = true; updated.networkResetAt = now; updated.networkResetBy = user; }
+            updated.allCompleted = updated.adminRemoved && updated.qualtricsRemoved && updated.devicesOffboarded && updated.networkReset;
             if (updated.allCompleted && !updated.completedAt) updated.completedAt = now;
             return { ...r, checklist: updated };
           }),

@@ -43,6 +43,7 @@ export interface Device {
   unitId: string;
   deactivated: boolean;
   firmwareVersion: string;
+  environment?: 'stage' | 'prod' | ''; // current cloud env — updated by shapeshift
   // Assignment
   status: DeviceStatus;
   assignedTo: string;
@@ -89,6 +90,9 @@ export interface Device {
   returnEmailSentAt?: string;
   returnReminderSentAt?: string;
   returnEmailCount?: number;
+  // Return shipment (tester-entered, US/CA self-ship)
+  returnTrackingNumber?: string;
+  returnShippedAt?: string;
 }
 
 export interface Testbed {
@@ -151,7 +155,7 @@ export interface HistoryEntry {
   description: string;
 }
 
-export type TabType = 'overview' | 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments' | 'packages' | 'shapeshift' | 'dogfood';
+export type TabType = 'overview' | 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments' | 'packages' | 'shapeshift' | 'dogfood' | 'program_signups';
 
 // ─── Feature: Packages & Service Board ────────────────────────────────────────
 
@@ -233,7 +237,6 @@ export interface ShapeshiftJob {
   retries: number;
   currentAttempt: number;
   status: ShapeshiftJobStatus;
-  printLabel: boolean;
   otaToLatest: boolean;
   assignedTo: string; // who queued it
   notes?: string;
@@ -297,7 +300,7 @@ export interface DeactivationRecord {
   id: string;
   deviceId: string;
   serialNumber: string;
-  reason: 'returned_to_eero' | 'defective' | 'end_of_life' | 'lost';
+  reason: 'returned_to_eero' | 'defective' | 'end_of_program' | 'lost';
   deactivatedAt: string;
   deactivatedBy: string;
   factoryReset: boolean;
@@ -345,6 +348,7 @@ export interface OptOutRecord {
   recordedBy: string;
   program: string;
   devicesAtOptOut: string[]; // serial numbers they had
+  selfInitiated?: boolean; // true when the dogfooder requested it from their portal
   // Offboarding checklist
   checklist?: OptOutChecklist;
 }
@@ -359,8 +363,46 @@ export interface OptOutChecklist {
   devicesOffboarded: boolean;
   devicesOffboardedAt?: string;
   devicesOffboardedBy?: string;
+  networkReset: boolean; // network returned to default / off stage
+  networkResetAt?: string;
+  networkResetBy?: string;
   allCompleted: boolean;
   completedAt?: string;
+}
+
+// ─── Feature: Dogfood Program Sign-ups ────────────────────────────────────────
+export type ProgramOfferingStatus = 'upcoming' | 'open' | 'closed';
+
+// A testing phase within a program (e.g. EVT, DVT) with its own schedule.
+export interface ProgramPhase {
+  name: string;        // e.g. "EVT", "DVT", "PRQ", "PVT", "Beta"
+  startDate?: string;  // ISO date
+  endDate?: string;    // ISO date — drives the "program ending" return trigger
+}
+
+export interface ProgramOffering {
+  id: string;
+  name: string;            // e.g., "Foghorn Outdoor Dogfood"
+  product: string;         // e.g., "Foghorn", "Merci"
+  description: string;
+  status: ProgramOfferingStatus;
+  startDate?: string;      // when testing begins (ISO date)
+  signupDeadline?: string; // last day to sign up (ISO date)
+  capacity?: number;       // max participants (optional)
+  requirements?: string;   // e.g., "Outdoor mounting location, 1G+ internet"
+  phases?: ProgramPhase[]; // per-phase schedule (start + finish dates)
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ProgramSignup {
+  id: string;
+  programId: string;
+  email: string;
+  name: string;
+  note?: string;           // optional note from the signer-up
+  status: 'interested' | 'accepted' | 'waitlisted' | 'declined';
+  signedUpAt: string;
 }
 
 export interface SyncMetadata {

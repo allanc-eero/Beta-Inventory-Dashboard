@@ -16,7 +16,7 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
 
   const checklist = record.checklist || {
-    adminRemoved: false, qualtricsRemoved: false, devicesOffboarded: false, allCompleted: false,
+    adminRemoved: false, qualtricsRemoved: false, devicesOffboarded: false, networkReset: false, allCompleted: false,
   };
 
   const profile = getTesterProfile(record.personEmail);
@@ -24,11 +24,11 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
   const adminId = profile?.adminId || '';
   const userName = currentUser?.name || 'Admin';
 
-  const handleCheck = (field: 'adminRemoved' | 'qualtricsRemoved' | 'devicesOffboarded') => {
+  const handleCheck = (field: 'adminRemoved' | 'qualtricsRemoved' | 'devicesOffboarded' | 'networkReset') => {
     updateOptOutChecklist(record.id, field, userName);
     // Check if all will be complete after this
     const updated = { ...checklist, [field]: true };
-    if (updated.adminRemoved && updated.qualtricsRemoved && updated.devicesOffboarded) {
+    if (updated.adminRemoved && updated.qualtricsRemoved && updated.devicesOffboarded && updated.networkReset) {
       setShowCompleteNotice(true);
       setTimeout(() => setShowCompleteNotice(false), 6000);
     }
@@ -64,6 +64,16 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
       doneBy: checklist.devicesOffboardedBy,
       link: undefined,
       linkLabel: undefined,
+    },
+    {
+      key: 'networkReset' as const,
+      label: 'Reset network to default (off stage)',
+      description: 'Move the network/group back to production and confirm it is no longer on the dogfood (stage) environment',
+      done: checklist.networkReset,
+      doneAt: checklist.networkResetAt,
+      doneBy: checklist.networkResetBy,
+      link: networkId ? `https://insight.eero.com/eeros/${networkId}` : undefined,
+      linkLabel: networkId ? 'Open in Insight' : undefined,
     },
   ];
 

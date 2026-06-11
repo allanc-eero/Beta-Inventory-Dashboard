@@ -26,6 +26,7 @@ export interface DogfoderProfile {
   productionEmail?: string;
   registeredAt?: string;
   firstLoginAt?: string;
+  welcomeSeen?: boolean;
 }
 
 export interface User {
@@ -73,6 +74,8 @@ interface AuthStore {
   disableUser: (email: string) => void;
   enableUser: (email: string) => void;
   changeRole: (email: string, role: UserRole) => void;
+  markWelcomeSeen: () => void;
+  updateProfile: (updates: Partial<DogfoderProfile>) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -157,6 +160,36 @@ export const useAuthStore = create<AuthStore>()(
       changeRole: (email, role) => set((state) => ({
         users: state.users.map((u) => u.email.toLowerCase() === email.toLowerCase() ? { ...u, role } : u),
       })),
+
+      markWelcomeSeen: () => set((state) => {
+        const current = state.currentUser;
+        if (!current) return {};
+        const updatedUser: User = {
+          ...current,
+          profile: { ...current.profile, welcomeSeen: true },
+        };
+        return {
+          currentUser: updatedUser,
+          users: state.users.map((u) =>
+            u.email.toLowerCase() === current.email.toLowerCase() ? updatedUser : u
+          ),
+        };
+      }),
+
+      updateProfile: (updates) => set((state) => {
+        const current = state.currentUser;
+        if (!current) return {};
+        const updatedUser: User = {
+          ...current,
+          profile: { ...current.profile, ...updates },
+        };
+        return {
+          currentUser: updatedUser,
+          users: state.users.map((u) =>
+            u.email.toLowerCase() === current.email.toLowerCase() ? updatedUser : u
+          ),
+        };
+      }),
     }),
     { name: 'auth-storage' }
   )
