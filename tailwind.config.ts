@@ -5,6 +5,18 @@ const config: Config = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/constants/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/store/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  // Safelist status badge colors so they're never purged, even when the class
+  // strings live in helper files (e.g. STATUS_CONFIG in src/constants).
+  safelist: [
+    'bg-green-100', 'text-green-800',
+    'bg-yellow-100', 'text-yellow-800',
+    'bg-red-100', 'text-red-800',
+    'bg-blue-100', 'text-blue-800',
+    'bg-orange-100', 'text-orange-700',
+    'bg-gray-100', 'text-gray-600',
   ],
   theme: {
     extend: {
