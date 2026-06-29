@@ -5,6 +5,28 @@ import { persist } from 'zustand/middleware';
 import { Device, Testbed, Location, Person, CheckoutRecord, DeviceStatus, Program, HistoryEntry, SpeedTestResult, JiraTicket, DeactivationRecord, OverdueAlert, FirmwareInfo, Shipment, ShipmentStatus, Carrier, Attachment, AttachmentType, SyncMetadata, ClosedProgramRecord, OptOutRecord, TesterProfile } from '@/types';
 import { getReturnEpic } from '@/constants';
 
+// Build a HistoryEntry with auto-filled id + timestamp. Consolidates the
+// repeated `{ id: crypto.randomUUID(), timestamp: new Date().toISOString(), ... }`
+// boilerplate scattered across store actions.
+function makeHistory(
+  deviceId: string,
+  action: string,
+  description: string,
+  opts: { user?: string; field?: string; oldValue?: string; newValue?: string } = {}
+): HistoryEntry {
+  return {
+    id: crypto.randomUUID(),
+    deviceId,
+    timestamp: new Date().toISOString(),
+    action,
+    description,
+    user: opts.user ?? 'System',
+    ...(opts.field !== undefined ? { field: opts.field } : {}),
+    ...(opts.oldValue !== undefined ? { oldValue: opts.oldValue } : {}),
+    ...(opts.newValue !== undefined ? { newValue: opts.newValue } : {}),
+  };
+}
+
 interface DeviceStore {
   devices: Device[];
   testbeds: Testbed[];
@@ -174,17 +196,9 @@ export const useDeviceStore = create<DeviceStore>()(
             const oldVal = String(currentDevice[field] || '');
             const newVal = String((updates as any)[field] || '');
             if (oldVal !== newVal && field !== 'updatedAt') {
-              entries.push({
-                id: crypto.randomUUID(),
-                deviceId: id,
-                timestamp: new Date().toISOString(),
-                action: 'field_updated',
-                field: field,
-                oldValue: oldVal,
-                newValue: newVal,
-                user: 'System',
-                description: `${field} changed from "${oldVal || '—'}" to "${newVal || '—'}"`,
-              });
+              entries.push(makeHistory(id, 'field_updated',
+                `${field} changed from "${oldVal || '—'}" to "${newVal || '—'}"`,
+                { field, oldValue: oldVal, newValue: newVal }));
             }
           });
           set((state) => ({
@@ -320,14 +334,8 @@ export const useDeviceStore = create<DeviceStore>()(
                 }
               : d
           ),
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: record.deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'checked_out',
-            user: 'System',
-            description: `Checked out to ${record.personName} (${record.personEmail})${record.dueDate ? ` — due ${record.dueDate}` : ''}`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(record.deviceId, 'checked_out',
+            `Checked out to ${record.personName} (${record.personEmail})${record.dueDate ? ` — due ${record.dueDate}` : ''}`)],
         })),
 
       checkinDevice: (deviceId) =>
@@ -350,14 +358,7 @@ export const useDeviceStore = create<DeviceStore>()(
                 }
               : d
           ),
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'checked_in',
-            user: 'System',
-            description: `Device checked back in`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(deviceId, 'checked_in', 'Device checked back in')],
         })),
 
       getCheckoutHistory: (deviceId) =>
@@ -372,17 +373,9 @@ export const useDeviceStore = create<DeviceStore>()(
           devices: state.devices.map((d) =>
             d.id === deviceId ? { ...d, firmwareVersion: version, updatedAt: new Date().toISOString() } : d
           ),
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'firmware_updated',
-            field: 'firmwareVersion',
-            oldValue: oldVersion,
-            newValue: version,
-            user: 'System',
-            description: `Firmware updated from ${oldVersion || 'unknown'} to ${version}`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(deviceId, 'firmware_updated',
+            `Firmware updated from ${oldVersion || 'unknown'} to ${version}`,
+            { field: 'firmwareVersion', oldValue: oldVersion, newValue: version })],
         }));
       },
 
@@ -412,16 +405,11 @@ export const useDeviceStore = create<DeviceStore>()(
         const finalResult = { ...result, flagged };
         set((state) => ({
           speedTests: [...state.speedTests, finalResult],
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: result.deviceId,
-            timestamp: new Date().toISOString(),
-            action: flagged ? 'health_regression' : 'speed_test',
-            user: 'System',
-            description: flagged
+          deviceHistory: [...state.deviceHistory, makeHistory(result.deviceId,
+            flagged ? 'health_regression' : 'speed_test',
+            flagged
               ? `⚠️ Performance regression detected: ${result.downloadMbps} Mbps down (was ${previousTests[0]?.downloadMbps} Mbps)`
-              : `Speed test: ${result.downloadMbps} Mbps down / ${result.uploadMbps} Mbps up`,
-          }],
+              : `Speed test: ${result.downloadMbps} Mbps down / ${result.uploadMbps} Mbps up`)],
         }));
 
         // Auto-create JIRA ticket for regressions
@@ -450,14 +438,8 @@ export const useDeviceStore = create<DeviceStore>()(
       createJiraTicket: (ticket) =>
         set((state) => ({
           jiraTickets: [...state.jiraTickets, ticket],
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: ticket.deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'jira_created',
-            user: 'System',
-            description: `JIRA ticket ${ticket.key} created: ${ticket.summary}`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(ticket.deviceId, 'jira_created',
+            `JIRA ticket ${ticket.key} created: ${ticket.summary}`)],
         })),
 
       updateJiraTicket: (id, updates) =>
@@ -474,14 +456,8 @@ export const useDeviceStore = create<DeviceStore>()(
           jiraTickets: state.jiraTickets.map((t) =>
             t.id === id ? { ...t, status: 'closed', resolvedAt: new Date().toISOString() } : t
           ),
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: ticket.deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'jira_closed',
-            user: 'System',
-            description: `JIRA ticket ${ticket.key} closed`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(ticket.deviceId, 'jira_closed',
+            `JIRA ticket ${ticket.key} closed`)],
         }));
       },
 
@@ -509,14 +485,9 @@ export const useDeviceStore = create<DeviceStore>()(
                 }
               : d
           ),
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: record.deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'deactivated',
-            user: record.deactivatedBy,
-            description: `Device deactivated — reason: ${record.reason.replace(/_/g, ' ')}. Initiated by ${record.deactivatedBy}. ${record.notes}`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(record.deviceId, 'deactivated',
+            `Device deactivated — reason: ${record.reason.replace(/_/g, ' ')}. Initiated by ${record.deactivatedBy}. ${record.notes}`,
+            { user: record.deactivatedBy })],
         }));
 
         // Always create a JIRA ticket for any return reason, under the logged-in user, in the correct epic
@@ -535,14 +506,9 @@ export const useDeviceStore = create<DeviceStore>()(
 
         // Log the JIRA creation with epic info to the device audit trail
         set((state) => ({
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId: record.deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'jira_created',
-            user: record.deactivatedBy,
-            description: `JIRA ${ticketKey} created under ${record.deactivatedBy} in epic ${epic} — reason: ${record.reason.replace(/_/g, ' ')}`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(record.deviceId, 'jira_created',
+            `JIRA ${ticketKey} created under ${record.deactivatedBy} in epic ${epic} — reason: ${record.reason.replace(/_/g, ' ')}`,
+            { user: record.deactivatedBy })],
         }));
       },
 
@@ -638,14 +604,8 @@ export const useDeviceStore = create<DeviceStore>()(
 
         // Log to history
         set((state) => ({
-          deviceHistory: [...state.deviceHistory, {
-            id: crypto.randomUUID(),
-            deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'overdue_reminder',
-            user: 'System',
-            description: `Overdue reminder sent to ${device.assignedEmail}`,
-          }],
+          deviceHistory: [...state.deviceHistory, makeHistory(deviceId, 'overdue_reminder',
+            `Overdue reminder sent to ${device.assignedEmail}`)],
         }));
       },
 
@@ -679,16 +639,10 @@ export const useDeviceStore = create<DeviceStore>()(
             get().updateDevice(device.id, updates);
 
             // Add history entry
-            get().addHistoryEntry({
-              id: crypto.randomUUID(),
-              deviceId: device.id,
-              timestamp: new Date().toISOString(),
-              action: leg === 1 ? 'shipped_to_fc' : 'shipped_to_tester',
-              user: 'System',
-              description: leg === 1
+            get().addHistoryEntry(makeHistory(device.id, leg === 1 ? 'shipped_to_fc' : 'shipped_to_tester',
+              leg === 1
                 ? `Shipped to FC ${shipment.destination} via ${shipment.carrier} (${shipment.trackingNumber})`
-                : `Shipped to ${shipment.destinationEmail || shipment.destination} via ${shipment.carrier} (${shipment.trackingNumber})`,
-            });
+                : `Shipped to ${shipment.destinationEmail || shipment.destination} via ${shipment.carrier} (${shipment.trackingNumber})`));
           }
         });
       },
@@ -710,16 +664,10 @@ export const useDeviceStore = create<DeviceStore>()(
             const newStatus: ShipmentStatus = shipment.leg === 1 ? 'at_fc' : 'delivered';
             get().updateDevice(device.id, { shipmentStatus: newStatus });
 
-            get().addHistoryEntry({
-              id: crypto.randomUUID(),
-              deviceId: device.id,
-              timestamp: new Date().toISOString(),
-              action: shipment.leg === 1 ? 'arrived_at_fc' : 'delivered_to_tester',
-              user: 'System',
-              description: shipment.leg === 1
+            get().addHistoryEntry(makeHistory(device.id, shipment.leg === 1 ? 'arrived_at_fc' : 'delivered_to_tester',
+              shipment.leg === 1
                 ? `Arrived at FC ${shipment.destination}`
-                : `Delivered to ${shipment.destinationEmail || shipment.destination}`,
-            });
+                : `Delivered to ${shipment.destinationEmail || shipment.destination}`));
           }
         });
       },
@@ -738,7 +686,7 @@ export const useDeviceStore = create<DeviceStore>()(
         const PRESERVED = new Set(['deactivated', 'in_repair', 'in_testing', 'pending_return']);
 
         let updated = 0;
-        const historyEntries: any[] = [];
+        const historyEntries: HistoryEntry[] = [];
 
         get().devices.forEach((device) => {
           if (device.deactivated || PRESERVED.has(device.status)) return;
@@ -759,17 +707,9 @@ export const useDeviceStore = create<DeviceStore>()(
                 : d
             ),
           }));
-          historyEntries.push({
-            id: crypto.randomUUID(),
-            deviceId: device.id,
-            timestamp: new Date().toISOString(),
-            action: isOnline ? 'came_online' : 'went_offline',
-            field: 'status',
-            oldValue: device.status,
-            newValue: newStatus,
-            user: 'Network Sync',
-            description: isOnline ? 'Device detected online (Databricks)' : 'Device not online (Databricks)',
-          });
+          historyEntries.push(makeHistory(device.id, isOnline ? 'came_online' : 'went_offline',
+            isOnline ? 'Device detected online (Databricks)' : 'Device not online (Databricks)',
+            { user: 'Network Sync', field: 'status', oldValue: device.status, newValue: newStatus }));
           updated++;
         });
 
@@ -815,14 +755,9 @@ export const useDeviceStore = create<DeviceStore>()(
 
         // Log to device history if attached to a device
         if (attachment.deviceId) {
-          get().addHistoryEntry({
-            id: crypto.randomUUID(),
-            deviceId: attachment.deviceId,
-            timestamp: new Date().toISOString(),
-            action: 'file_attached',
-            user: attachment.uploadedBy,
-            description: `File attached: ${attachment.fileName} (${attachment.attachmentType.replace(/_/g, ' ')})`,
-          });
+          get().addHistoryEntry(makeHistory(attachment.deviceId, 'file_attached',
+            `File attached: ${attachment.fileName} (${attachment.attachmentType.replace(/_/g, ' ')})`,
+            { user: attachment.uploadedBy }));
         }
       },
 
