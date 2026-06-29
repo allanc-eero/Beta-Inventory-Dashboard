@@ -18,8 +18,8 @@ function StatCard({ icon, value, label, iconBg }: { icon: string; value: number;
   );
 }
 
-function DonutChart({ title, items, total, size, strokeWidth, centerLabel }: {
-  title: string; items: { name: string; count: number; color: string }[]; total: number; size: number; strokeWidth: number; centerLabel: string;
+function DonutChart({ title, items, total, size, strokeWidth, centerLabel, centerValue }: {
+  title: string; items: { name: string; count: number; color: string }[]; total: number; size: number; strokeWidth: number; centerLabel: string; centerValue?: string | number;
 }) {
   const radius = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * radius;
@@ -43,9 +43,14 @@ function DonutChart({ title, items, total, size, strokeWidth, centerLabel }: {
                 strokeDasharray={`${arc.dash} ${circ - arc.dash}`} strokeDashoffset={-arc.offset} />
             ))}
           </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: size > 130 ? '20px' : '18px', fontWeight: 700 }}>{total > 0 ? total.toLocaleString() : items.length}</span>
-            <span style={{ fontSize: size > 130 ? '9px' : '8px', color: '#6b7280', textTransform: 'uppercase' }}>{centerLabel}</span>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 8px', textAlign: 'center' }}>
+            {(() => {
+              const display = centerValue !== undefined ? centerValue : (total > 0 ? total.toLocaleString() : items.length);
+              const isText = typeof display === 'string' && isNaN(Number(display));
+              const fontSize = isText ? (display.length > 8 ? '11px' : '13px') : (size > 130 ? '20px' : '18px');
+              return <span style={{ fontSize, fontWeight: 700, lineHeight: 1.1 }}>{display}</span>;
+            })()}
+            <span style={{ fontSize: size > 130 ? '9px' : '8px', color: '#6b7280', textTransform: 'uppercase', marginTop: '2px' }}>{centerLabel}</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: size > 130 ? '6px' : '4px', fontSize: size > 130 ? '12px' : '11px' }}>
@@ -172,9 +177,9 @@ export default function OverviewDashboard() {
 
       {/* ROW 2: Three Donut Charts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-        <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Total" />
-        <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" />
-        <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Models" />
+        <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Devices" />
+        <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" centerValue={regionItems.length} />
+        <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Top Model" centerValue={modelItems[0]?.name || '—'} />
       </div>
 
       {/* ROW 3: Service Orders */}
