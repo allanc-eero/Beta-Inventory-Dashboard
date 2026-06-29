@@ -15,6 +15,7 @@ import DashboardStats from '@/components/DashboardStats';
 import SeedDataProvider from '@/components/SeedDataProvider';
 import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
 import NetworkSyncButton from '@/components/NetworkSyncButton';
+import TesterRefreshButton from '@/components/TesterRefreshButton';
 import PendingReturnReminder from '@/components/PendingReturnReminder';
 import TodayBriefing from '@/components/TodayBriefing';
 import LoginPage from '@/components/LoginPage';
@@ -94,8 +95,9 @@ export default function Home() {
               <OverdueAlertsBanner />
               <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
               {canEdit() && (
-              <div className="mt-4">
+              <div className="mt-4 space-y-4">
                 <NetworkSyncButton />
+                <TesterRefreshButton />
               </div>
               )}
             </>

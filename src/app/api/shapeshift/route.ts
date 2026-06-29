@@ -141,10 +141,14 @@ export async function GET(request: NextRequest) {
   }
 
   // Status check: CLI present + admin tokens (stage AND prod) authenticated.
+  // NOTE: we use `whoami` (a real authenticated endpoint), NOT `about`.
+  // `about` returns version info even when unauthenticated, so it produces
+  // false "green" status. `whoami` returns 401 (non-zero exit) unless the
+  // token is actually valid — the only reliable health check.
   try {
     const version = await runEero(['--version']);
-    const stageAuth = await runEero(['api', 'admin', 'about']);
-    const prodAuth = await runEero(['api', 'admin', '--prod', 'about']);
+    const stageAuth = await runEero(['api', 'admin', 'whoami']);
+    const prodAuth = await runEero(['api', 'admin', '--prod', 'whoami']);
     const stageOk = stageAuth.code === 0;
     const prodOk = prodAuth.code === 0;
     return NextResponse.json({
@@ -152,8 +156,9 @@ export async function GET(request: NextRequest) {
       version: version.stdout.trim() || version.stderr.trim(),
       adminStageAuthenticated: stageOk,
       adminProdAuthenticated: prodOk,
-      // Shapeshift orchestrates through prod; prod token is the critical one.
-      ready: version.code === 0 && prodOk,
+      // A prod↔stage shapeshift reads on one side and registers on the other,
+      // so BOTH tokens must be valid for the move to complete. Require both.
+      ready: version.code === 0 && stageOk && prodOk,
       bin: EERO_BIN,
     });
   } catch (error: any) {

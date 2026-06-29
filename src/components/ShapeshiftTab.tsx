@@ -216,8 +216,12 @@ export default function ShapeshiftTab() {
               <span className="flex-1">
                 {!cliStatus.available
                   ? 'eero CLI not found on the server — shapeshifts can be queued but not executed.'
+                  : !cliStatus.adminStageAuthenticated && !cliStatus.adminProdAuthenticated
+                  ? 'Both admin tokens are stale. Run `eero api admin auth` (stage) and `eero api admin --prod auth` (prod) on the server, then re-check. Execution is disabled until then.'
                   : !cliStatus.adminProdAuthenticated
-                  ? 'Admin API token missing. Run `eero api admin --prod auth` (and `eero api admin auth` for stage) on the server, then re-check. Execution is disabled until then.'
+                  ? 'Prod admin token is stale. Run `eero api admin --prod auth` on the server, then re-check. Execution is disabled until then.'
+                  : !cliStatus.adminStageAuthenticated
+                  ? 'Stage admin token is stale. Run `eero api admin auth` on the server, then re-check. Execution is disabled until then.'
                   : 'eero CLI not ready — execution is disabled.'}
               </span>
             </>
