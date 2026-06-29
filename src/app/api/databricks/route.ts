@@ -30,8 +30,8 @@ const TOKEN = process.env.DATABRICKS_TOKEN || '';
 const WAREHOUSE_ID = process.env.DATABRICKS_WAREHOUSE_ID || '';
 const TESTER_TABLE = process.env.DATABRICKS_TESTER_TABLE || '';
 
-// Logical→physical column mapping. Defaults are guesses; override via env once
-// we discover the real schema. Only these columns are ever SELECTed.
+// Logical→physical column mapping for SINGLE-TABLE mode (used only if a
+// pre-joined view is configured via DATABRICKS_TESTER_TABLE). Override via env.
 const DEFAULT_COLS = {
   serial: 'serial_number',
   name: 'tester_name',
@@ -48,18 +48,29 @@ function cols(): typeof DEFAULT_COLS {
   }
 }
 
+// JOIN MODE (default when no pre-joined view is configured). The tester for a
+// device is the OWNER of the network the eero is on. Verified chain:
+//   node_sessions  (serial_number → network_id, where not revoked)
+//     → network_admins (network_id, role='network-owner' → user_id)
+//       → users         (id → name, email, city)
+// FQ table names are env-overridable; the JOIN STRUCTURE is fixed in code.
+const JOIN_TABLES = {
+  nodes: process.env.DATABRICKS_NODES_TABLE || 'redshift_catalog.core.node_sessions',
+  admins: process.env.DATABRICKS_ADMINS_TABLE || 'redshift_catalog.core.network_admins',
+  users: process.env.DATABRICKS_USERS_TABLE || 'redshift_catalog.core.users',
+};
+
 // Identifiers we build into SQL (table + column names) must be safe. Allow only
 // word chars, dots (for catalog.schema.table) and backticks-free segments.
 const SAFE_IDENT = /^[A-Za-z0-9_.]+$/;
 
 const SAFE_STATEMENT = /^\s*(SELECT|SHOW|DESCRIBE|DESC)\b/i;
 
-function configError(forLookup = false): string | null {
+function configError(): string | null {
   const missing: string[] = [];
   if (!HOST) missing.push('DATABRICKS_HOST');
   if (!TOKEN) missing.push('DATABRICKS_TOKEN');
   if (!WAREHOUSE_ID) missing.push('DATABRICKS_WAREHOUSE_ID');
-  if (forLookup && !TESTER_TABLE) missing.push('DATABRICKS_TESTER_TABLE');
   if (missing.length === 0) return null;
   return `Databricks not configured. Missing in .env.local: ${missing.join(', ')}.`;
 }
@@ -124,7 +135,7 @@ async function runReadOnly(
 //   /api/databricks?discover=schemas&in=catalog        → SHOW SCHEMAS
 //   /api/databricks?discover=columns&in=catalog.schema.table → DESCRIBE
 export async function GET(request: NextRequest) {
-  const cfgErr = configError(false);
+  const cfgErr = configError();
   if (cfgErr) return NextResponse.json({ configured: false, ready: false, error: cfgErr });
 
   const { searchParams } = new URL(request.url);
@@ -168,8 +179,11 @@ export async function GET(request: NextRequest) {
       host: HOST,
       identity,
       warehouseConfigured: !!WAREHOUSE_ID,
-      testerTableConfigured: !!TESTER_TABLE,
-      testerTable: TESTER_TABLE || null,
+      // Join mode works without a pre-joined view, so the lookup is always ready
+      // once connected. A configured view (TESTER_TABLE) just overrides the join.
+      testerTableConfigured: true,
+      mode: TESTER_TABLE ? 'view' : 'join',
+      testerTable: TESTER_TABLE || `${JOIN_TABLES.nodes} ⋈ network_admins ⋈ users`,
       warehouses,
     });
   } catch (error: any) {
@@ -181,7 +195,7 @@ export async function GET(request: NextRequest) {
 // Body: { serials: string[] }  →  returns tester rows keyed by serial.
 // This NEVER writes to Databricks; the client applies updates to its own store.
 export async function POST(request: NextRequest) {
-  const cfgErr = configError(true);
+  const cfgErr = configError();
   if (cfgErr) return NextResponse.json({ success: false, error: cfgErr }, { status: 400 });
 
   try {
@@ -197,15 +211,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Too many serials (max 500 per call).' }, { status: 400 });
     }
 
-    // Validate the configured identifiers before building SQL.
-    const C = cols();
-    const idents = [TESTER_TABLE, C.serial, C.name, C.email, C.network, C.location];
-    for (const id of idents) {
-      if (id && !SAFE_IDENT.test(id)) {
-        return NextResponse.json({ success: false, error: `Unsafe identifier in config: ${id}` }, { status: 500 });
-      }
-    }
-
     // Validate serial format (alphanumeric eero serials).
     const cleanSerials = serials.map((s) => String(s).trim()).filter(Boolean);
     for (const s of cleanSerials) {
@@ -218,10 +223,40 @@ export async function POST(request: NextRequest) {
     const placeholders = cleanSerials.map((_, i) => `:s${i}`).join(', ');
     const params = cleanSerials.map((value, i) => ({ name: `s${i}`, value, type: 'STRING' }));
 
-    const statement =
-      `SELECT ${C.serial} AS serial, ${C.name} AS name, ${C.email} AS email, ` +
-      `${C.network} AS network, ${C.location} AS location ` +
-      `FROM ${TESTER_TABLE} WHERE ${C.serial} IN (${placeholders})`;
+    let statement: string;
+
+    if (TESTER_TABLE) {
+      // ── VIEW MODE: a pre-joined view/table is configured. Single-table SELECT.
+      const C = cols();
+      for (const id of [TESTER_TABLE, C.serial, C.name, C.email, C.network, C.location]) {
+        if (id && !SAFE_IDENT.test(id)) {
+          return NextResponse.json({ success: false, error: `Unsafe identifier in config: ${id}` }, { status: 500 });
+        }
+      }
+      statement =
+        `SELECT ${C.serial} AS serial, ${C.name} AS name, ${C.email} AS email, ` +
+        `${C.network} AS network, ${C.location} AS location ` +
+        `FROM ${TESTER_TABLE} WHERE ${C.serial} IN (${placeholders})`;
+    } else {
+      // ── JOIN MODE (default): resolve serial → network → owner (the tester).
+      // Structure is fixed here; only the serial VALUES are client-supplied
+      // (bound as parameters). Read-only. A tester may own multiple devices on
+      // the same network; we de-dupe to one row per serial via the network owner.
+      for (const id of Object.values(JOIN_TABLES)) {
+        if (!SAFE_IDENT.test(id)) {
+          return NextResponse.json({ success: false, error: `Unsafe table identifier in config: ${id}` }, { status: 500 });
+        }
+      }
+      statement =
+        `SELECT ns.serial_number AS serial, u.name AS name, u.email AS email, ` +
+        `CAST(ns.network_id AS STRING) AS network, u.city AS location ` +
+        `FROM ${JOIN_TABLES.nodes} ns ` +
+        `JOIN ${JOIN_TABLES.admins} na ON na.network_id = ns.network_id ` +
+        `AND na.role = 'network-owner' AND na.deleted IS NULL ` +
+        `JOIN ${JOIN_TABLES.users} u ON u.id = na.user_id ` +
+        `WHERE ns.revoked IS NULL AND ns.serial_number IN (${placeholders}) ` +
+        `QUALIFY ROW_NUMBER() OVER (PARTITION BY ns.serial_number ORDER BY ns.created DESC) = 1`;
+    }
 
     const out = await runReadOnly(statement, params);
 
@@ -242,6 +277,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      mode: TESTER_TABLE ? 'view' : 'join',
       requested: cleanSerials.length,
       matched: found.length,
       testers: found,

@@ -27,6 +27,38 @@ for the devices on the platform, from Databricks, on demand.
 - Durable upgrade path: pull the token from AWS Secrets Manager (the project already
   has the AWS SDK) instead of a flat file.
 
+## How the lookup resolves serial → tester
+
+The tester for a device is the **owner of the network** the eero is on. The route
+runs ONE fixed, parameterized, read-only join (verified against real devices):
+
+```
+core.node_sessions   (serial_number → network_id, where revoked IS NULL)
+  → core.network_admins (network_id, role='network-owner', not deleted → user_id)
+    → core.users        (id → name, email, city)
+```
+
+It returns one row per serial (most recent session wins via QUALIFY ROW_NUMBER).
+Fields mapped to the platform:
+
+| Databricks | Platform field |
+|---|---|
+| `users.name` | `assignedTo` |
+| `users.email` | `assignedEmail` |
+| `node_sessions.network_id` | `network` |
+| `users.city` | `location` |
+
+This required NO permission changes and NO new Databricks objects — the read-only
+token already reads these `core` tables. Table names are env-overridable
+(`DATABRICKS_NODES_TABLE`, `DATABRICKS_ADMINS_TABLE`, `DATABRICKS_USERS_TABLE`) but
+the join structure is fixed in code, so the client can never run arbitrary SQL.
+
+### Optional: pre-joined view (cleaner, single-table mode)
+If your team later creates a view (e.g. `core.beta_device_testers`) exposing
+`serial_number, tester_name, tester_email, network, location`, set
+`DATABRICKS_TESTER_TABLE` to it and the route switches to single-table mode
+automatically. Not required — the join works as-is.
+
 ## One-time setup
 
 ### 1. Get the three connection values
@@ -43,8 +75,8 @@ for the devices on the platform, from Databricks, on demand.
 DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
 DATABRICKS_TOKEN=dapi********************************
 DATABRICKS_WAREHOUSE_ID=<warehouse id>
-DATABRICKS_TESTER_TABLE=          # set after discovery (step 4)
-DATABRICKS_TESTER_COLUMNS=        # optional column remap (step 4)
+# DATABRICKS_TESTER_TABLE / DATABRICKS_TESTER_COLUMNS — leave blank to use the
+# built-in network-owner join (default). Only set these if you create a view.
 ```
 
 Restart `npm run dev` after editing env.
@@ -52,40 +84,36 @@ Restart `npm run dev` after editing env.
 ### 3. Verify the connection
 
 In the dashboard, the **Tester Info Refresh** card (below Network Status Sync) →
-click **↻ Re-check**. Green "Connected" = token valid. It also shows your identity.
+click **↻ Re-check**. Green "Connected" = token valid + ready. It shows your identity.
 
 Or from a terminal:
 ```
 curl -s localhost:3000/api/databricks | jq
 ```
 
-### 4. Discover the tester table (read-only)
+That's it — the lookup works immediately via the built-in join. The discovery
+endpoints below are only needed if the schema changes and you need to re-map.
 
-You don't need to know the table name up front — find it with read-only metadata
-queries (all safe; they only list structure):
+### 4. (Only if needed) Read-only schema discovery
+
+If table names ever change, find the new ones with read-only metadata queries:
 
 ```
-# list catalogs
 curl -s "localhost:3000/api/databricks?discover=catalogs" | jq '.rows'
-
-# list schemas in a catalog
 curl -s "localhost:3000/api/databricks?discover=schemas&in=<catalog>" | jq '.rows'
-
-# list tables in a schema
 curl -s "localhost:3000/api/databricks?discover=tables&in=<catalog>.<schema>" | jq '.rows'
-
-# inspect a table's columns
 curl -s "localhost:3000/api/databricks?discover=columns&in=<catalog>.<schema>.<table>" | jq '.rows'
 ```
 
-Look for the table that maps **device serial → tester**. Note its fully-qualified
-name and the actual column names.
+Then override `DATABRICKS_NODES_TABLE` / `DATABRICKS_ADMINS_TABLE` /
+`DATABRICKS_USERS_TABLE` in `.env.local` if the join tables moved.
 
-### 5. Configure table + columns
+### 5. (Optional) Configure a pre-joined view
 
 Set the table:
 ```
 DATABRICKS_TESTER_TABLE=<catalog>.<schema>.<table>
+
 ```
 
 If the column names differ from the defaults
