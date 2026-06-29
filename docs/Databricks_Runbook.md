@@ -27,6 +27,25 @@ for the devices on the platform, from Databricks, on demand.
 - Durable upgrade path: pull the token from AWS Secrets Manager (the project already
   has the AWS SDK) instead of a flat file.
 
+## Online status (Network Status Sync)
+
+The dashboard's **Network Status Sync** button now uses REAL device liveness from
+Databricks (`core.node_sessions`), replacing the previous random simulation.
+
+- Endpoint: `POST /api/databricks { "op": "status", "serials": [...] }`
+- Per serial it returns `online` (bool), `state` (`online` / `offline` /
+  `never_online`), `rawStatus`, `lastAlive`, and `updated` (last ingest time).
+- A serial with no session row = **never online**.
+
+Caveat: `node_sessions` reflects Databricks' last ingest, which can lag real time
+by minutes-to-hours depending on the pipeline. So it's "recently online," not
+live-to-the-second.
+
+Cold-start note: the SQL warehouse auto-stops when idle and takes ~1-2 min to spin
+back up. The first query after idle is slow; the route polls up to ~2 min for it to
+finish, so a status check right after a quiet period may take a minute. Subsequent
+checks are fast while the warehouse stays warm.
+
 ## How the lookup resolves serial → tester
 
 The tester for a device is the **owner of the network** the eero is on. The route

@@ -8,40 +8,37 @@ const SYNC_STALE_HOURS = 24;
 const RATE_LIMIT_BACKOFF_MS = 60 * 1000; // 60 second backoff on rate limit
 
 /**
- * Simulates calling the eero Partner API to check which devices are online.
- * In production, replace with actual fetch() calls.
+ * Fetches REAL online status from Databricks (core.node_sessions liveness).
+ * Replaces the old random simulation. Returns the serials currently online.
+ * `onError` is called with a message if the lookup fails (e.g. cold warehouse).
  */
 async function fetchOnlineDevicesFromAPI(
   devices: { serialNumber: string; network: string }[],
-  onRateLimit: () => void
+  onError: (msg: string) => void
 ): Promise<string[]> {
-  // Simulate API latency
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+  try {
+    const serials = devices.map((d) => d.serialNumber).filter(Boolean);
+    if (serials.length === 0) return [];
 
-  // In production:
-  // try {
-  //   const response = await fetch('https://api-user.e2ro.com/2.2/organizations/self/networks/administered', {
-  //     headers: { 'X-User-Token': API_TOKEN, 'Accept': 'application/json' }
-  //   });
-  //   if (response.status === 400) {
-  //     const body = await response.json();
-  //     if (body.meta?.error === 'error.rate.limit') {
-  //       onRateLimit();
-  //       return [];
-  //     }
-  //   }
-  //   // ... process networks and eeros ...
-  // } catch (e) { ... }
+    const res = await fetch('/api/databricks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'status', serials }),
+    });
+    const data = await res.json();
 
-  // Simulation: randomly mark ~30% of not_online devices as now online
-  const onlineSerials: string[] = [];
-  devices.forEach((d) => {
-    if (Math.random() < 0.3) {
-      onlineSerials.push(d.serialNumber);
+    if (!data.success) {
+      onError(data.error || 'Databricks status check failed.');
+      return [];
     }
-  });
-
-  return onlineSerials;
+    // Return serials Databricks reports as currently alive/online.
+    return (data.statuses || [])
+      .filter((s: any) => s.online)
+      .map((s: any) => s.serial);
+  } catch (e: any) {
+    onError(e?.message || 'Could not reach Databricks.');
+    return [];
+  }
 }
 
 function getTimeSinceSync(lastSync: string | null): string {
@@ -93,20 +90,11 @@ export default function NetworkSyncButton() {
     try {
       const onlineSerials = await fetchOnlineDevicesFromAPI(
         notOnlineDevices.map((d) => ({ serialNumber: d.serialNumber, network: d.network })),
-        () => {
-          // Rate limit handler
-          updateSyncMetadata({
-            rateLimitedUntil: new Date(Date.now() + RATE_LIMIT_BACKOFF_MS).toISOString(),
-            syncInProgress: false,
-          });
-          setError('API rate limit hit — backing off for 60 seconds');
-        }
+        (msg) => setError(msg)
       );
 
-      if (!isRateLimited()) {
-        const updated = syncNetworkStatus(onlineSerials);
-        setSyncResult({ updated, checked: notOnlineDevices.length });
-      }
+      const updated = syncNetworkStatus(onlineSerials);
+      setSyncResult({ updated, checked: notOnlineDevices.length });
     } catch (e) {
       setError('Sync failed — will retry on next attempt');
       updateSyncMetadata({ syncInProgress: false });
@@ -129,7 +117,7 @@ export default function NetworkSyncButton() {
             )}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            Polls the eero Partner API to detect devices that have come online. Auto-syncs every 24h.
+            Checks real device liveness in Databricks (node_sessions) and flips devices that have come online. Auto-syncs every 24h.
           </p>
         </div>
         <button

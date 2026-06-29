@@ -114,8 +114,32 @@ async function runReadOnly(
     const msg = typeof exec.body === 'object' ? exec.body?.message || JSON.stringify(exec.body) : exec.body;
     throw new Error(`Databricks ${exec.status}: ${msg}`);
   }
-  const r = exec.body;
-  const state = r?.status?.state;
+  let r = exec.body;
+  let state = r?.status?.state;
+
+  // The statement may not finish within wait_timeout (returns PENDING/RUNNING).
+  // Poll until it reaches a terminal state — otherwise we'd treat an unfinished
+  // query as "empty results", which would be silently wrong (e.g. reporting
+  // online devices as offline). Cap the polling so we never hang forever.
+  const statementId = r?.statement_id;
+  let polls = 0;
+  // Allow generous headroom: a cold SQL warehouse can take 1-2 min to spin up
+  // compute after idle. 80 × 1.5s ≈ 2 min before we give up.
+  while ((state === 'PENDING' || state === 'RUNNING') && statementId && polls < 80) {
+    await new Promise((res) => setTimeout(res, 1500));
+    polls++;
+    const poll = await dbx(`/api/2.0/sql/statements/${statementId}`, { method: 'GET' });
+    if (!poll.ok) {
+      const msg = typeof poll.body === 'object' ? poll.body?.message || JSON.stringify(poll.body) : poll.body;
+      throw new Error(`Databricks ${poll.status}: ${msg}`);
+    }
+    r = poll.body;
+    state = r?.status?.state;
+  }
+
+  if (state === 'PENDING' || state === 'RUNNING') {
+    throw new Error('Query still running after timeout — the SQL warehouse may be cold/slow. Try again in a moment.');
+  }
   if (state === 'FAILED' || state === 'CANCELED' || state === 'CLOSED') {
     throw new Error(r?.status?.error?.message || `Statement ${state}`);
   }
@@ -222,6 +246,56 @@ export async function POST(request: NextRequest) {
     // Build a parameterized IN (...) with named params :s0, :s1, ...
     const placeholders = cleanSerials.map((_, i) => `:s${i}`).join(', ');
     const params = cleanSerials.map((value, i) => ({ name: `s${i}`, value, type: 'STRING' }));
+
+    // ── OP: online-status check (real liveness from node_sessions) ────────────
+    // Returns one row per serial that HAS a session, with alive/status/last-seen.
+    // Serials with no session row are treated as "never online".
+    if (body?.op === 'status') {
+      if (!SAFE_IDENT.test(JOIN_TABLES.nodes)) {
+        return NextResponse.json({ success: false, error: `Unsafe table identifier: ${JOIN_TABLES.nodes}` }, { status: 500 });
+      }
+      const statusStmt =
+        `SELECT serial_number AS serial, alive, status, ` +
+        `CAST(alive_at AS STRING) AS alive_at, CAST(dead_at AS STRING) AS dead_at, ` +
+        `CAST(aliveness_updated AS STRING) AS updated ` +
+        `FROM ${JOIN_TABLES.nodes} WHERE serial_number IN (${placeholders}) ` +
+        `QUALIFY ROW_NUMBER() OVER (PARTITION BY serial_number ORDER BY created DESC) = 1`;
+
+      const out = await runReadOnly(statusStmt, params);
+      const idx: Record<string, number> = {};
+      out.columns.forEach((c: any, i: number) => { idx[c.name] = i; });
+
+      const seen = new Set<string>();
+      const statuses = (out.rows as any[]).map((row) => {
+        const serial = row[idx['serial']];
+        seen.add(String(serial).toUpperCase());
+        const aliveRaw = row[idx['alive']];
+        const isAlive = aliveRaw === true || aliveRaw === 'true';
+        return {
+          serial,
+          online: isAlive,
+          state: isAlive ? 'online' : 'offline',
+          rawStatus: row[idx['status']] ?? null,
+          lastAlive: row[idx['alive_at']] ?? null,
+          deadAt: row[idx['dead_at']] ?? null,
+          updated: row[idx['updated']] ?? null,
+        };
+      });
+
+      // Serials with no session row → never online.
+      const neverOnline = cleanSerials
+        .filter((s) => !seen.has(s.toUpperCase()))
+        .map((serial) => ({ serial, online: false, state: 'never_online', rawStatus: null, lastAlive: null, deadAt: null, updated: null }));
+
+      const all = [...statuses, ...neverOnline];
+      return NextResponse.json({
+        success: true,
+        op: 'status',
+        requested: cleanSerials.length,
+        onlineCount: all.filter((s) => s.online).length,
+        statuses: all,
+      });
+    }
 
     let statement: string;
 
