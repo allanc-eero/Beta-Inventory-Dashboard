@@ -215,8 +215,91 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── POST: refresh tester info by serial (the ONLY write-adjacent action) ──────
-// Body: { serials: string[] }  →  returns tester rows keyed by serial.
+// ─── Read-only lookup helpers (shared by status / tester / combined sync) ─────
+
+async function lookupStatus(cleanSerials: string[], placeholders: string, params: any[]) {
+  if (!SAFE_IDENT.test(JOIN_TABLES.nodes)) {
+    throw new Error(`Unsafe table identifier: ${JOIN_TABLES.nodes}`);
+  }
+  const statusStmt =
+    `SELECT serial_number AS serial, alive, status, ` +
+    `CAST(alive_at AS STRING) AS alive_at, CAST(dead_at AS STRING) AS dead_at, ` +
+    `CAST(aliveness_updated AS STRING) AS updated ` +
+    `FROM ${JOIN_TABLES.nodes} WHERE serial_number IN (${placeholders}) ` +
+    `QUALIFY ROW_NUMBER() OVER (PARTITION BY serial_number ORDER BY created DESC) = 1`;
+
+  const out = await runReadOnly(statusStmt, params);
+  const idx: Record<string, number> = {};
+  out.columns.forEach((c: any, i: number) => { idx[c.name] = i; });
+
+  const seen = new Set<string>();
+  const statuses = (out.rows as any[]).map((row) => {
+    const serial = row[idx['serial']];
+    seen.add(String(serial).toUpperCase());
+    const aliveRaw = row[idx['alive']];
+    const isAlive = aliveRaw === true || aliveRaw === 'true';
+    return {
+      serial,
+      online: isAlive,
+      state: isAlive ? 'online' : 'offline',
+      rawStatus: row[idx['status']] ?? null,
+      lastAlive: row[idx['alive_at']] ?? null,
+      deadAt: row[idx['dead_at']] ?? null,
+      updated: row[idx['updated']] ?? null,
+    };
+  });
+  const neverOnline = cleanSerials
+    .filter((s) => !seen.has(s.toUpperCase()))
+    .map((serial) => ({ serial, online: false, state: 'never_online', rawStatus: null, lastAlive: null, deadAt: null, updated: null }));
+
+  return [...statuses, ...neverOnline];
+}
+
+async function lookupTesters(cleanSerials: string[], placeholders: string, params: any[]) {
+  let statement: string;
+  if (TESTER_TABLE) {
+    const C = cols();
+    for (const id of [TESTER_TABLE, C.serial, C.name, C.email, C.network, C.location]) {
+      if (id && !SAFE_IDENT.test(id)) throw new Error(`Unsafe identifier in config: ${id}`);
+    }
+    statement =
+      `SELECT ${C.serial} AS serial, ${C.name} AS name, ${C.email} AS email, ` +
+      `${C.network} AS network, ${C.location} AS location ` +
+      `FROM ${TESTER_TABLE} WHERE ${C.serial} IN (${placeholders})`;
+  } else {
+    for (const id of Object.values(JOIN_TABLES)) {
+      if (!SAFE_IDENT.test(id)) throw new Error(`Unsafe table identifier in config: ${id}`);
+    }
+    statement =
+      `SELECT ns.serial_number AS serial, u.name AS name, u.email AS email, ` +
+      `CAST(ns.network_id AS STRING) AS network, u.city AS location ` +
+      `FROM ${JOIN_TABLES.nodes} ns ` +
+      `JOIN ${JOIN_TABLES.admins} na ON na.network_id = ns.network_id ` +
+      `AND na.role = 'network-owner' AND na.deleted IS NULL ` +
+      `JOIN ${JOIN_TABLES.users} u ON u.id = na.user_id ` +
+      `WHERE ns.revoked IS NULL AND ns.serial_number IN (${placeholders}) ` +
+      `QUALIFY ROW_NUMBER() OVER (PARTITION BY ns.serial_number ORDER BY ns.created DESC) = 1`;
+  }
+
+  const out = await runReadOnly(statement, params);
+  const colIdx: Record<string, number> = {};
+  out.columns.forEach((c: any, i: number) => { colIdx[c.name] = i; });
+  return (out.rows as any[])
+    .map((row) => ({
+      serial: row[colIdx['serial']] ?? null,
+      name: row[colIdx['name']] ?? null,
+      email: row[colIdx['email']] ?? null,
+      network: row[colIdx['network']] ?? null,
+      location: row[colIdx['location']] ?? null,
+    }))
+    .filter((t) => t.serial);
+}
+
+// ─── POST: combined sync (status + tester), or a single op ────────────────────
+// Body:
+//   { op: 'sync',   serials }  → BOTH liveness + tester info in one call (default for the button)
+//   { op: 'status', serials }  → liveness only
+//   { serials }                → tester info only (back-compat)
 // This NEVER writes to Databricks; the client applies updates to its own store.
 export async function POST(request: NextRequest) {
   const cfgErr = configError();
@@ -247,115 +330,48 @@ export async function POST(request: NextRequest) {
     const placeholders = cleanSerials.map((_, i) => `:s${i}`).join(', ');
     const params = cleanSerials.map((value, i) => ({ name: `s${i}`, value, type: 'STRING' }));
 
-    // ── OP: online-status check (real liveness from node_sessions) ────────────
-    // Returns one row per serial that HAS a session, with alive/status/last-seen.
-    // Serials with no session row are treated as "never online".
-    if (body?.op === 'status') {
-      if (!SAFE_IDENT.test(JOIN_TABLES.nodes)) {
-        return NextResponse.json({ success: false, error: `Unsafe table identifier: ${JOIN_TABLES.nodes}` }, { status: 500 });
-      }
-      const statusStmt =
-        `SELECT serial_number AS serial, alive, status, ` +
-        `CAST(alive_at AS STRING) AS alive_at, CAST(dead_at AS STRING) AS dead_at, ` +
-        `CAST(aliveness_updated AS STRING) AS updated ` +
-        `FROM ${JOIN_TABLES.nodes} WHERE serial_number IN (${placeholders}) ` +
-        `QUALIFY ROW_NUMBER() OVER (PARTITION BY serial_number ORDER BY created DESC) = 1`;
-
-      const out = await runReadOnly(statusStmt, params);
-      const idx: Record<string, number> = {};
-      out.columns.forEach((c: any, i: number) => { idx[c.name] = i; });
-
-      const seen = new Set<string>();
-      const statuses = (out.rows as any[]).map((row) => {
-        const serial = row[idx['serial']];
-        seen.add(String(serial).toUpperCase());
-        const aliveRaw = row[idx['alive']];
-        const isAlive = aliveRaw === true || aliveRaw === 'true';
-        return {
-          serial,
-          online: isAlive,
-          state: isAlive ? 'online' : 'offline',
-          rawStatus: row[idx['status']] ?? null,
-          lastAlive: row[idx['alive_at']] ?? null,
-          deadAt: row[idx['dead_at']] ?? null,
-          updated: row[idx['updated']] ?? null,
-        };
+    // ── COMBINED: status + tester in one response ────────────────────────────
+    if (body?.op === 'sync') {
+      const [statuses, testers] = await Promise.all([
+        lookupStatus(cleanSerials, placeholders, params),
+        lookupTesters(cleanSerials, placeholders, params),
+      ]);
+      const matchedSerials = new Set(testers.map((t) => String(t.serial).toUpperCase()));
+      return NextResponse.json({
+        success: true,
+        op: 'sync',
+        mode: TESTER_TABLE ? 'view' : 'join',
+        requested: cleanSerials.length,
+        onlineCount: statuses.filter((s) => s.online).length,
+        statuses,
+        matched: testers.length,
+        testers,
+        notFound: cleanSerials.filter((s) => !matchedSerials.has(s.toUpperCase())),
       });
+    }
 
-      // Serials with no session row → never online.
-      const neverOnline = cleanSerials
-        .filter((s) => !seen.has(s.toUpperCase()))
-        .map((serial) => ({ serial, online: false, state: 'never_online', rawStatus: null, lastAlive: null, deadAt: null, updated: null }));
-
-      const all = [...statuses, ...neverOnline];
+    // ── OP: online-status only ───────────────────────────────────────────────
+    if (body?.op === 'status') {
+      const statuses = await lookupStatus(cleanSerials, placeholders, params);
       return NextResponse.json({
         success: true,
         op: 'status',
         requested: cleanSerials.length,
-        onlineCount: all.filter((s) => s.online).length,
-        statuses: all,
+        onlineCount: statuses.filter((s) => s.online).length,
+        statuses,
       });
     }
 
-    let statement: string;
-
-    if (TESTER_TABLE) {
-      // ── VIEW MODE: a pre-joined view/table is configured. Single-table SELECT.
-      const C = cols();
-      for (const id of [TESTER_TABLE, C.serial, C.name, C.email, C.network, C.location]) {
-        if (id && !SAFE_IDENT.test(id)) {
-          return NextResponse.json({ success: false, error: `Unsafe identifier in config: ${id}` }, { status: 500 });
-        }
-      }
-      statement =
-        `SELECT ${C.serial} AS serial, ${C.name} AS name, ${C.email} AS email, ` +
-        `${C.network} AS network, ${C.location} AS location ` +
-        `FROM ${TESTER_TABLE} WHERE ${C.serial} IN (${placeholders})`;
-    } else {
-      // ── JOIN MODE (default): resolve serial → network → owner (the tester).
-      // Structure is fixed here; only the serial VALUES are client-supplied
-      // (bound as parameters). Read-only. A tester may own multiple devices on
-      // the same network; we de-dupe to one row per serial via the network owner.
-      for (const id of Object.values(JOIN_TABLES)) {
-        if (!SAFE_IDENT.test(id)) {
-          return NextResponse.json({ success: false, error: `Unsafe table identifier in config: ${id}` }, { status: 500 });
-        }
-      }
-      statement =
-        `SELECT ns.serial_number AS serial, u.name AS name, u.email AS email, ` +
-        `CAST(ns.network_id AS STRING) AS network, u.city AS location ` +
-        `FROM ${JOIN_TABLES.nodes} ns ` +
-        `JOIN ${JOIN_TABLES.admins} na ON na.network_id = ns.network_id ` +
-        `AND na.role = 'network-owner' AND na.deleted IS NULL ` +
-        `JOIN ${JOIN_TABLES.users} u ON u.id = na.user_id ` +
-        `WHERE ns.revoked IS NULL AND ns.serial_number IN (${placeholders}) ` +
-        `QUALIFY ROW_NUMBER() OVER (PARTITION BY ns.serial_number ORDER BY ns.created DESC) = 1`;
-    }
-
-    const out = await runReadOnly(statement, params);
-
-    // Map rows → objects keyed by serial.
-    const colIdx: Record<string, number> = {};
-    out.columns.forEach((c: any, i: number) => { colIdx[c.name] = i; });
-    const testers = (out.rows as any[]).map((row) => ({
-      serial: row[colIdx['serial']] ?? null,
-      name: row[colIdx['name']] ?? null,
-      email: row[colIdx['email']] ?? null,
-      network: row[colIdx['network']] ?? null,
-      location: row[colIdx['location']] ?? null,
-    }));
-
-    const found = testers.filter((t) => t.serial);
-    const matchedSerials = new Set(found.map((t) => String(t.serial).toUpperCase()));
-    const notFound = cleanSerials.filter((s) => !matchedSerials.has(s.toUpperCase()));
-
+    // ── Default: tester info only (back-compat) ──────────────────────────────
+    const testers = await lookupTesters(cleanSerials, placeholders, params);
+    const matchedSerials = new Set(testers.map((t) => String(t.serial).toUpperCase()));
     return NextResponse.json({
       success: true,
       mode: TESTER_TABLE ? 'view' : 'join',
       requested: cleanSerials.length,
-      matched: found.length,
-      testers: found,
-      notFound,
+      matched: testers.length,
+      testers,
+      notFound: cleanSerials.filter((s) => !matchedSerials.has(s.toUpperCase())),
     });
   } catch (error: any) {
     console.error('[Databricks tester lookup]', error);

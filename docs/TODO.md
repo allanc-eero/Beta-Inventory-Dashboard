@@ -176,9 +176,11 @@ Network (from Partner API)
 All features currently run with simulated API calls (setTimeout delays). When launching for real, replace these simulations with actual API integrations:
 
 ### Partner API Connections
-- [ ] **Network Status Sync** — Replace `fetchOnlineDevicesFromAPI()` in `NetworkSyncButton.tsx` with real `fetch()` calls to:
-  - `GET /2.2/organizations/self/networks/administered`
-  - `GET /2.2/networks/:id/eeros` (check `status === 'green'`)
+- [x] **Network Status Sync** — DONE. Replaced the random simulation in `NetworkSyncButton.tsx` with real device liveness from Databricks (`core.node_sessions` via `POST /api/databricks {op:status}`). Online = alive, everything else = not_online.
+- [ ] **Daily server-side cron for Network Status Sync** — The 24h auto-sync is currently *browser-triggered* (fires only when someone opens the dashboard and last sync >24h old). For a true unattended daily refresh, add a server-side scheduler that calls the sync on a cron:
+  - Options: Vercel Cron (if deployed there) hitting a protected `/api/cron/sync-status` route; or a node-cron job; or an external scheduler (EventBridge/GitHub Actions) calling the endpoint.
+  - The route should run the same `op:status` Databricks lookup and persist results — note this requires a real backend/DB, since status currently lives in browser localStorage (see DB migration triggers).
+  - Guard the cron route with a secret header so it can't be triggered publicly.
 - [ ] **Auto-populate Admin ID & Network ID on sync** — When the sync discovers a device online:
   - Extract `network_id` and `unit_id` (UID) from the API response for each eero
   - Save to the device record (`network`, `unitId` fields)

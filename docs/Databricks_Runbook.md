@@ -27,6 +27,22 @@ for the devices on the platform, from Databricks, on demand.
 - Durable upgrade path: pull the token from AWS Secrets Manager (the project already
   has the AWS SDK) instead of a flat file.
 
+## One button: Databricks Sync
+
+The dashboard has a single **Databricks Sync** card. One click (`op:sync`) does both:
+1. **Online status** — real liveness from `core.node_sessions`. Online = alive,
+   everything else = not_online. Lifecycle states (deactivated/in_repair/
+   in_testing/pending_return) are left untouched.
+2. **Tester info** — current name / email / network / location (the network owner).
+
+Both run in one API call (parallel queries) and apply to the device records, each
+field change logged to the device timeline. Auto-runs daily (last sync >24h).
+
+API ops on `POST /api/databricks`:
+- `{ op: 'sync', serials }` → both (used by the button)
+- `{ op: 'status', serials }` → liveness only
+- `{ serials }` → tester info only (back-compat)
+
 ## Online status (Network Status Sync)
 
 The dashboard's **Network Status Sync** button now uses REAL device liveness from
