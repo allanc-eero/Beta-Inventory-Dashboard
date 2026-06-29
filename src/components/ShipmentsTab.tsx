@@ -264,6 +264,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             assignedEmail: row.email || (row.alias ? `${row.alias}@eero.com` : ''),
             checkedOutTo: row.name,
             network: row.networkId || undefined,
+            country: row.country || existing.country,
             leg2Tracking: row.tracking,
             leg2Carrier: carrier,
             leg2Date: shipDate,
