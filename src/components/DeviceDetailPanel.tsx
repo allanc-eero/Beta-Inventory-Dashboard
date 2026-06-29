@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Device, DeviceStatus } from '@/types';
-import { ExternalLink, RefreshCw, Edit2, Clock, Download } from 'lucide-react';
+import { Edit2, Clock, Download } from 'lucide-react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import FirmwarePanel from './FirmwarePanel';
@@ -142,8 +142,6 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
           </div>
           <div className="flex items-center gap-2">
             <ActionButton onClick={() => exportDeviceCSV(device)} icon={<Download size={14} />} label="Export" />
-            <ActionButton icon={<ExternalLink size={13} />} label="Admin panel" />
-            <ActionButton icon={<RefreshCw size={14} />} label="Refresh from admin" />
             {canEdit() && (
               <button onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
                 <Edit2 size={14} /> Edit details
