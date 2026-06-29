@@ -37,6 +37,7 @@ const DEFAULT_COLS = {
   name: 'tester_name',
   email: 'tester_email',
   network: 'network_link',
+  country: 'country',
   location: 'location',
 };
 function cols(): typeof DEFAULT_COLS {
@@ -58,6 +59,7 @@ const JOIN_TABLES = {
   nodes: process.env.DATABRICKS_NODES_TABLE || 'redshift_catalog.core.node_sessions',
   admins: process.env.DATABRICKS_ADMINS_TABLE || 'redshift_catalog.core.network_admins',
   users: process.env.DATABRICKS_USERS_TABLE || 'redshift_catalog.core.users',
+  networks: process.env.DATABRICKS_NETWORKS_TABLE || 'redshift_catalog.core.networks',
 };
 
 // Identifiers we build into SQL (table + column names) must be safe. Allow only
@@ -259,12 +261,12 @@ async function lookupTesters(cleanSerials: string[], placeholders: string, param
   let statement: string;
   if (TESTER_TABLE) {
     const C = cols();
-    for (const id of [TESTER_TABLE, C.serial, C.name, C.email, C.network, C.location]) {
+    for (const id of [TESTER_TABLE, C.serial, C.name, C.email, C.network, C.country, C.location]) {
       if (id && !SAFE_IDENT.test(id)) throw new Error(`Unsafe identifier in config: ${id}`);
     }
     statement =
       `SELECT ${C.serial} AS serial, ${C.name} AS name, ${C.email} AS email, ` +
-      `${C.network} AS network, ${C.location} AS location ` +
+      `${C.network} AS network, ${C.country} AS country, ${C.location} AS location ` +
       `FROM ${TESTER_TABLE} WHERE ${C.serial} IN (${placeholders})`;
   } else {
     for (const id of Object.values(JOIN_TABLES)) {
@@ -272,11 +274,13 @@ async function lookupTesters(cleanSerials: string[], placeholders: string, param
     }
     statement =
       `SELECT ns.serial_number AS serial, u.name AS name, u.email AS email, ` +
-      `CAST(ns.network_id AS STRING) AS network, u.city AS location ` +
+      `CAST(ns.network_id AS STRING) AS network, ` +
+      `nw.country AS country, COALESCE(nw.city, u.city) AS location ` +
       `FROM ${JOIN_TABLES.nodes} ns ` +
       `JOIN ${JOIN_TABLES.admins} na ON na.network_id = ns.network_id ` +
       `AND na.role = 'network-owner' AND na.deleted IS NULL ` +
       `JOIN ${JOIN_TABLES.users} u ON u.id = na.user_id ` +
+      `LEFT JOIN ${JOIN_TABLES.networks} nw ON nw.id = ns.network_id ` +
       `WHERE ns.revoked IS NULL AND ns.serial_number IN (${placeholders}) ` +
       `QUALIFY ROW_NUMBER() OVER (PARTITION BY ns.serial_number ORDER BY ns.created DESC) = 1`;
   }
@@ -290,6 +294,7 @@ async function lookupTesters(cleanSerials: string[], placeholders: string, param
       name: row[colIdx['name']] ?? null,
       email: row[colIdx['email']] ?? null,
       network: row[colIdx['network']] ?? null,
+      country: row[colIdx['country']] ?? null,
       location: row[colIdx['location']] ?? null,
     }))
     .filter((t) => t.serial);

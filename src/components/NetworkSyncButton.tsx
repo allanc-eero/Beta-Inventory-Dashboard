@@ -98,6 +98,9 @@ export default function NetworkSyncButton() {
         if (t.email && t.email !== device.assignedEmail) updates.assignedEmail = t.email;
         if (t.network && t.network !== device.network) updates.network = t.network;
         if (t.location && t.location !== device.location) updates.location = t.location;
+        // Country: CSV is the source of truth. Only fill from Databricks when the
+        // device has no country yet — never overwrite a value you uploaded.
+        if (t.country && !device.country) updates.country = t.country;
         if (Object.keys(updates).length > 0) { updateDevice(device.id, updates as any); testerUpdates++; }
       });
 

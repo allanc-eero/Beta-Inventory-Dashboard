@@ -71,6 +71,7 @@ runs ONE fixed, parameterized, read-only join (verified against real devices):
 core.node_sessions   (serial_number → network_id, where revoked IS NULL)
   → core.network_admins (network_id, role='network-owner', not deleted → user_id)
     → core.users        (id → name, email, city)
+  → core.networks       (id = network_id → country, region, city)  [LEFT JOIN]
 ```
 
 It returns one row per serial (most recent session wins via QUALIFY ROW_NUMBER).
@@ -81,7 +82,13 @@ Fields mapped to the platform:
 | `users.name` | `assignedTo` |
 | `users.email` | `assignedEmail` |
 | `node_sessions.network_id` | `network` |
-| `users.city` | `location` |
+| `networks.country` | `country` (only when blank — CSV wins) |
+| `networks.city` (fallback `users.city`) | `location` |
+
+Country source of truth: the **CSV intake** you upload. Databricks `networks.country`
+(real geo-IP-derived country, e.g. "Australia") only fills the device's `country`
+when it's still blank — a sync never overwrites a country you provided. This drives
+the Top Regions chart.
 
 This required NO permission changes and NO new Databricks objects — the read-only
 token already reads these `core` tables. Table names are env-overridable
