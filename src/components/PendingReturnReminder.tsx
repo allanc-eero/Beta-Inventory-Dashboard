@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
+import { daysSince } from '@/constants';
 
 interface PendingReturnReminderProps {
   onNavigateToReturns: () => void;
@@ -13,11 +14,7 @@ export default function PendingReturnReminder({ onNavigateToReturns }: PendingRe
   const [shown, setShown] = useState(false);
 
   const pendingDevices = devices.filter((d) => d.status === 'pending_return' && d.returnEmailSentAt);
-  const now = Date.now();
-  const needsFollowUp = pendingDevices.filter((d) => {
-    const daysSince = Math.floor((now - new Date(d.returnEmailSentAt!).getTime()) / (1000 * 60 * 60 * 24));
-    return daysSince >= 7;
-  });
+  const needsFollowUp = pendingDevices.filter((d) => daysSince(d.returnEmailSentAt) >= 7);
 
   // Show once per session when there are devices needing follow-up
   useEffect(() => {
@@ -32,14 +29,8 @@ export default function PendingReturnReminder({ onNavigateToReturns }: PendingRe
 
   if (!shown || dismissed || needsFollowUp.length === 0) return null;
 
-  const week1 = needsFollowUp.filter((d) => {
-    const days = Math.floor((now - new Date(d.returnEmailSentAt!).getTime()) / (1000 * 60 * 60 * 24));
-    return days >= 7 && days < 14;
-  });
-  const week2 = needsFollowUp.filter((d) => {
-    const days = Math.floor((now - new Date(d.returnEmailSentAt!).getTime()) / (1000 * 60 * 60 * 24));
-    return days >= 14;
-  });
+  const week1 = needsFollowUp.filter((d) => { const days = daysSince(d.returnEmailSentAt); return days >= 7 && days < 14; });
+  const week2 = needsFollowUp.filter((d) => daysSince(d.returnEmailSentAt) >= 14);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

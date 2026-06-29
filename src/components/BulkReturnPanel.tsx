@@ -5,7 +5,7 @@ import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
-import { isDomesticCountry, getReturnEpic } from '@/constants';
+import { isDomesticCountry, getReturnEpic, downloadCSV, todayStamp } from '@/constants';
 
 interface BulkReturnPanelProps {
   devices: Device[];
@@ -283,14 +283,7 @@ Beta Team`;
           new Date().toLocaleDateString(),
         ]);
       });
-      const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bulk-return-${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadCSV(`bulk-return-${todayStamp()}.csv`, rows);
     };
 
     return (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
+import { timeAgo } from '@/constants';
 
 // ─── Databricks Sync (one button: online status + tester info) ────────────────
 // A single click pulls BOTH real device liveness and current tester info from
@@ -19,16 +20,7 @@ interface SyncResult {
   notFound: number;
 }
 
-function getTimeSinceSync(lastSync: string | null): string {
-  if (!lastSync) return 'Never synced';
-  const ms = Date.now() - new Date(lastSync).getTime();
-  const minutes = Math.floor(ms / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
+// (relative time provided by shared timeAgo helper)
 
 export default function NetworkSyncButton() {
   const { devices, syncNetworkStatus, updateDevice, getDeviceBySerial, syncMetadata, updateSyncMetadata, isSyncStale } = useDeviceStore();
@@ -162,7 +154,7 @@ export default function NetworkSyncButton() {
 
       {/* Status row */}
       <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
-        <span>Last synced: {getTimeSinceSync(syncMetadata.lastFullSync)}</span>
+        <span>Last synced: {timeAgo(syncMetadata.lastFullSync)}</span>
         {syncMetadata.lastSyncOnlineCount > 0 && <span>·  {syncMetadata.lastSyncOnlineCount} online at last check</span>}
         {ready && identity && <span>·  {identity}</span>}
       </div>

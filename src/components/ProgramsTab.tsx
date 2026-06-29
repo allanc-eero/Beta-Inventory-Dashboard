@@ -6,6 +6,7 @@ import { Device, Program } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import BulkReturnPanel from './BulkReturnPanel';
 import { useAuthStore } from '@/store/authStore';
+import { downloadCSV, todayStamp } from '@/constants';
 
 type DeviceAction = 'return' | 'archive' | 'brick_and_return';
 
@@ -413,14 +414,7 @@ Device Management Team`
             selectedDevices.forEach((d) => {
               rows.push([d.serialNumber, d.assignedTo || '', d.assignedEmail || '', d.country || '', d.status, deviceActions[d.id] || 'archive', selectedProgram || '']);
             });
-            const csv = rows.map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `close-program-preview-${selectedProgram}-${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
+            downloadCSV(`close-program-preview-${selectedProgram}-${todayStamp()}.csv`, rows);
           };
 
           return (

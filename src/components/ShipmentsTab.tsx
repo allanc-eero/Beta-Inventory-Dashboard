@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
 import { createJiraIssue } from '@/services/jiraService';
-import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl } from '@/constants';
+import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
 
 interface ParsedRow {
   name: string;
@@ -855,10 +855,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                   {pendingReturnDevices
                     .sort((a, b) => new Date(a.returnEmailSentAt || '').getTime() - new Date(b.returnEmailSentAt || '').getTime())
                     .map((d) => {
-                      const daysSince = d.returnEmailSentAt
-                        ? Math.floor((Date.now() - new Date(d.returnEmailSentAt).getTime()) / (1000 * 60 * 60 * 24))
-                        : 0;
-                      const isOverdue = daysSince >= 14;
+                      const daysOut = daysSinceFn(d.returnEmailSentAt);
+                      const isOverdue = daysOut >= 14;
                       return (
                         <tr key={d.id} className={isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'}>
                           <td className="px-4 py-3 font-mono text-xs font-medium text-blue-700">{d.serialNumber}</td>
@@ -880,10 +878,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                           <td className="px-4 py-3">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                               isOverdue ? 'bg-red-100 text-red-700' :
-                              daysSince >= 7 ? 'bg-yellow-100 text-yellow-700' :
+                              daysOut >= 7 ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-600'
                             }`}>
-                              {daysSince} day{daysSince !== 1 ? 's' : ''}
+                              {daysOut} day{daysOut !== 1 ? 's' : ''}
                               {isOverdue && ' — OVERDUE'}
                             </span>
                           </td>

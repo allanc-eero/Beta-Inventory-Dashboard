@@ -10,6 +10,7 @@ import {
 } from '@/types';
 import { Kanban, Plus, ExternalLink, User, MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { REGIONS } from '@/constants';
+import { timeAgo } from '@/constants';
 
 const columns: { id: ServiceOrderStatus; label: string }[] = [
   { id: 'intake', label: 'INTAKE' },
@@ -48,14 +49,7 @@ const priorityColors: Record<ServiceOrderPriority, string> = {
 };
 
 function getTimeInColumn(columnEnteredAt: string): string {
-  const now = new Date().getTime();
-  const entered = new Date(columnEnteredAt).getTime();
-  const diffMs = now - entered;
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays > 0) return `${diffDays}d`;
-  if (diffHours > 0) return `${diffHours}h`;
-  return 'today';
+  return timeAgo(columnEnteredAt, 'short');
 }
 
 export default function ServiceBoard() {
@@ -119,7 +113,7 @@ export default function ServiceBoard() {
     setShowNewForm(false);
     setNewTitle('');
     setNewDescription('');
-    setNewType('swap');
+    setNewType('returned_to_eero');
     setNewPriority('P2');
     setNewAssignee('');
     setNewSite('SFO38');

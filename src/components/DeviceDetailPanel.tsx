@@ -12,7 +12,7 @@ import JiraPanel from './JiraPanel';
 import DeactivateDeviceModal from './DeactivateDeviceModal';
 import AttachmentsPanel from './AttachmentsPanel';
 import SalesforcePanel from './SalesforcePanel';
-import { STATUS_CONFIG as SHARED_STATUS_CONFIG } from '@/constants';
+import { STATUS_CONFIG as SHARED_STATUS_CONFIG, downloadCSV, daysSince } from '@/constants';
 
 interface DeviceDetailPanelProps {
   device: Device;
@@ -79,16 +79,7 @@ function exportDeviceCSV(device: Device) {
     ['Tracking', device.tracking], ['Testbed', device.testbedName],
     ['Due Date', device.dueDate], ['Notes', device.notes],
   ];
-  const csv = [['Field', 'Value'], ...rows]
-    .map((r) => r.map((v) => `"${(v || '').replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${device.serialNumber}_device_info.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadCSV(`${device.serialNumber}_device_info.csv`, [['Field', 'Value'], ...rows]);
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -213,7 +204,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
             {(device.returnEmailSentAt || device.status === 'deactivated' || device.status === 'pending_return') && (
               <SectionBlock title="RETURN STATUS">
                 {device.returnEmailSentAt && (() => {
-                  const daysSinceSent = Math.floor((Date.now() - new Date(device.returnEmailSentAt).getTime()) / (1000 * 60 * 60 * 24));
+                  const daysSinceSent = daysSince(device.returnEmailSentAt);
                   const isWeek1 = daysSinceSent >= 7 && daysSinceSent < 14;
                   const isWeek2 = daysSinceSent >= 14;
                   return (

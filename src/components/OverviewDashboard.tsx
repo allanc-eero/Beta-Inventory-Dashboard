@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
+import { daysSince, OVERDUE_DAYS } from '@/constants';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export default function OverviewDashboard() {
   const countries = new Set(devices.map((d) => d.country).filter(Boolean)).size;
   const programs = new Set(devices.filter((d) => d.status !== 'deactivated').map((d) => d.program)).size;
   const people = new Set(devices.map((d) => d.assignedEmail).filter(Boolean)).size;
-  const overdue = devices.filter((d) => d.status === 'pending_return' && d.returnEmailSentAt && (Date.now() - new Date(d.returnEmailSentAt).getTime()) >= 14 * 24 * 60 * 60 * 1000).length;
+  const overdue = devices.filter((d) => d.status === 'pending_return' && daysSince(d.returnEmailSentAt) >= OVERDUE_DAYS).length;
 
   const regionItems = useMemo(() => groupAndSort(devices, (d) => d.country || 'Unknown', REGION_COLORS), [devices]);
   const modelItems = useMemo(() => groupAndSort(devices, (d) => d.product || d.internalName || d.model || 'Unknown', MODEL_COLORS), [devices]);
