@@ -732,28 +732,50 @@ export const useDeviceStore = create<DeviceStore>()(
 
       // ─── Network Sync ───────────────────────────────────────────────────────
       syncNetworkStatus: (onlineSerials) => {
+        const onlineSet = new Set(onlineSerials.map((s) => s.toUpperCase()));
+        // Statuses that represent a lifecycle stage, not network presence — these
+        // are NOT overridden by a network sync (a device in repair/return stays so).
+        const PRESERVED = new Set(['deactivated', 'in_repair', 'in_testing', 'pending_return']);
+
         let updated = 0;
-        onlineSerials.forEach((serial) => {
-          const device = get().devices.find((d) => d.serialNumber.toUpperCase() === serial.toUpperCase());
-          if (device && device.status !== 'online' && device.status !== 'deactivated') {
-            set((state) => ({
-              devices: state.devices.map((d) =>
-                d.id === device.id
-                  ? { ...d, status: 'online' as DeviceStatus, shipmentStatus: 'online' as ShipmentStatus, updatedAt: new Date().toISOString() }
-                  : d
-              ),
-              deviceHistory: [...state.deviceHistory, {
-                id: crypto.randomUUID(),
-                deviceId: device.id,
-                timestamp: new Date().toISOString(),
-                action: 'came_online',
-                user: 'Network Sync',
-                description: `Device detected online on network`,
-              }],
-            }));
-            updated++;
-          }
+        const historyEntries: any[] = [];
+
+        get().devices.forEach((device) => {
+          if (device.deactivated || PRESERVED.has(device.status)) return;
+
+          const isOnline = onlineSet.has(device.serialNumber.toUpperCase());
+          const newStatus: DeviceStatus = isOnline ? 'online' : 'not_online';
+          if (device.status === newStatus) return; // no change
+
+          set((state) => ({
+            devices: state.devices.map((d) =>
+              d.id === device.id
+                ? {
+                    ...d,
+                    status: newStatus,
+                    shipmentStatus: isOnline ? ('online' as ShipmentStatus) : d.shipmentStatus,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : d
+            ),
+          }));
+          historyEntries.push({
+            id: crypto.randomUUID(),
+            deviceId: device.id,
+            timestamp: new Date().toISOString(),
+            action: isOnline ? 'came_online' : 'went_offline',
+            field: 'status',
+            oldValue: device.status,
+            newValue: newStatus,
+            user: 'Network Sync',
+            description: isOnline ? 'Device detected online (Databricks)' : 'Device not online (Databricks)',
+          });
+          updated++;
         });
+
+        if (historyEntries.length > 0) {
+          set((state) => ({ deviceHistory: [...state.deviceHistory, ...historyEntries] }));
+        }
 
         // Update sync metadata
         const onlineCount = get().devices.filter((d) => d.status === 'online').length;

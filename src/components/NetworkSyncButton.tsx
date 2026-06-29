@@ -9,16 +9,16 @@ const RATE_LIMIT_BACKOFF_MS = 60 * 1000; // 60 second backoff on rate limit
 
 /**
  * Fetches REAL online status from Databricks (core.node_sessions liveness).
- * Replaces the old random simulation. Returns the serials currently online.
- * `onError` is called with a message if the lookup fails (e.g. cold warehouse).
+ * Returns { ok, onlineSerials }. `ok:false` means the lookup failed and the
+ * result must NOT be applied (otherwise we'd wrongly mark everything offline).
  */
 async function fetchOnlineDevicesFromAPI(
   devices: { serialNumber: string; network: string }[],
   onError: (msg: string) => void
-): Promise<string[]> {
+): Promise<{ ok: boolean; onlineSerials: string[] }> {
   try {
     const serials = devices.map((d) => d.serialNumber).filter(Boolean);
-    if (serials.length === 0) return [];
+    if (serials.length === 0) return { ok: true, onlineSerials: [] };
 
     const res = await fetch('/api/databricks', {
       method: 'POST',
@@ -29,15 +29,15 @@ async function fetchOnlineDevicesFromAPI(
 
     if (!data.success) {
       onError(data.error || 'Databricks status check failed.');
-      return [];
+      return { ok: false, onlineSerials: [] };
     }
-    // Return serials Databricks reports as currently alive/online.
-    return (data.statuses || [])
-      .filter((s: any) => s.online)
-      .map((s: any) => s.serial);
+    return {
+      ok: true,
+      onlineSerials: (data.statuses || []).filter((s: any) => s.online).map((s: any) => s.serial),
+    };
   } catch (e: any) {
     onError(e?.message || 'Could not reach Databricks.');
-    return [];
+    return { ok: false, onlineSerials: [] };
   }
 }
 
@@ -60,13 +60,16 @@ export default function NetworkSyncButton() {
   const [error, setError] = useState('');
   const [autoSyncTriggered, setAutoSyncTriggered] = useState(false);
 
-  const notOnlineDevices = devices.filter((d) => d.status === 'not_online' && !d.deactivated);
+  // Devices whose status is network-driven (exclude deactivated + lifecycle states).
+  const checkableDevices = devices.filter(
+    (d) => !d.deactivated && !['in_repair', 'in_testing', 'pending_return'].includes(d.status)
+  );
   const stale = isSyncStale();
   const rateLimited = isRateLimited();
 
-  // Auto-sync on page load if stale (>24h since last sync)
+  // Auto-sync on page load if stale (>24h since last sync). Runs daily.
   useEffect(() => {
-    if (stale && !autoSyncTriggered && !rateLimited && notOnlineDevices.length > 0) {
+    if (stale && !autoSyncTriggered && !rateLimited && checkableDevices.length > 0) {
       setAutoSyncTriggered(true);
       handleSync(true);
     }
@@ -88,13 +91,19 @@ export default function NetworkSyncButton() {
     updateSyncMetadata({ syncInProgress: true });
 
     try {
-      const onlineSerials = await fetchOnlineDevicesFromAPI(
-        notOnlineDevices.map((d) => ({ serialNumber: d.serialNumber, network: d.network })),
+      const result = await fetchOnlineDevicesFromAPI(
+        checkableDevices.map((d) => ({ serialNumber: d.serialNumber, network: d.network })),
         (msg) => setError(msg)
       );
 
-      const updated = syncNetworkStatus(onlineSerials);
-      setSyncResult({ updated, checked: notOnlineDevices.length });
+      // Only apply if the lookup succeeded — never mark everything offline on a
+      // failed/timed-out query (that would be a false-negative wipe).
+      if (result.ok) {
+        const updated = syncNetworkStatus(result.onlineSerials);
+        setSyncResult({ updated, checked: checkableDevices.length });
+      } else {
+        updateSyncMetadata({ syncInProgress: false });
+      }
     } catch (e) {
       setError('Sync failed — will retry on next attempt');
       updateSyncMetadata({ syncInProgress: false });
@@ -117,15 +126,15 @@ export default function NetworkSyncButton() {
             )}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            Checks real device liveness in Databricks (node_sessions) and flips devices that have come online. Auto-syncs every 24h.
+            Checks real device liveness in Databricks (node_sessions). Online devices show Online; everything else shows Not Online. Auto-syncs every 24h.
           </p>
         </div>
         <button
           onClick={() => handleSync(false)}
-          disabled={syncing || rateLimited || notOnlineDevices.length === 0}
+          disabled={syncing || rateLimited || checkableDevices.length === 0}
           className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {syncing ? 'Syncing...' : `Sync Now (${notOnlineDevices.length} to check)`}
+          {syncing ? 'Syncing...' : `Sync Now (${checkableDevices.length} devices)`}
         </button>
       </div>
 
@@ -144,7 +153,7 @@ export default function NetworkSyncButton() {
       {syncResult && (
         <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs text-blue-700">
-            Checked {syncResult.checked} device(s) — <span className="font-semibold">{syncResult.updated} came online</span>
+            Checked {syncResult.checked} device(s) — <span className="font-semibold">{syncResult.updated} status change(s)</span>
           </p>
         </div>
       )}
