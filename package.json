@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@amzn/eero-web-design-components": "^2.21.5",
+    "@amzn/eero-web-design-foundation": "^0.5.1",
     "@aws-sdk/client-bedrock-runtime": "^3.1063.0",
     "@aws-sdk/credential-providers": "^3.1063.0",
     "d3-scale": "^4.0.2",

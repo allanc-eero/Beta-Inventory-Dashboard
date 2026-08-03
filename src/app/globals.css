@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── EDS fonts (Centra No2) ─────────────────────────────────────────────────
+   Declared locally because the foundation package's fonts.css uses Vite-style
+   url() paths that Next.js webpack can't resolve. Files served from
+   public/fonts/eero/ (copied from @amzn/eero-web-design-foundation/fonts). */
+@font-face {
+  font-family: 'Centra No2';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/eero/CentraNo2-Book.ttf') format('truetype');
+  font-display: fallback;
+}
+@font-face {
+  font-family: 'Centra No2';
+  font-style: normal;
+  font-weight: 500;
+  src: url('/fonts/eero/CentraNo2-Medium.ttf') format('truetype');
+  font-display: fallback;
+}
+@font-face {
+  font-family: 'Twemoji Country Flags';
+  font-style: normal;
+  font-weight: normal;
+  src: url('/fonts/eero/TwemojiCountryFlags.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+}
+
 @layer base {
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
