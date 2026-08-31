@@ -9,6 +9,7 @@ import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
 import { createJiraIssue } from '@/services/jiraService';
 import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
+import { Button, Select, Input, Tag, Card, Segmented } from '@amzn/eero-web-design-components';
 
 interface ParsedRow {
   name: string;
@@ -512,40 +513,36 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         />
       )}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Device Ingestion & Returns</h2>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setActiveView('upload')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeView === 'upload' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Upload Allocation
-          </button>
-          <button
-            onClick={() => setActiveView('history')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${activeView === 'history' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Ingestion History ({allShipments.length})
-          </button>
-          <button
-            onClick={() => setActiveView('pending_returns')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${activeView === 'pending_returns' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${pendingReturnDevices.length > 0 ? 'text-orange-600' : ''}`}
-          >
-            Pending Returns {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
-            {testerShippedDevices.length > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-blue-600 rounded-full" title={`${testerShippedDevices.length} shipped by tester`}>
-                {testerShippedDevices.length}
-              </span>
-            )}
-          </button>
-        </div>
+        <h2 className="text-lg font-bold text-[var(--ui-text-text-primary)]">Device Ingestion & Returns</h2>
+        <Segmented
+          value={activeView}
+          onChange={(val) => setActiveView(val as 'upload' | 'history' | 'pending_returns')}
+          items={[
+            { value: 'upload', label: 'Upload Allocation' },
+            { value: 'history', label: `Ingestion History (${allShipments.length})` },
+            {
+              value: 'pending_returns',
+              label: (
+                <span className="flex items-center gap-1.5">
+                  Pending Returns {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
+                  {testerShippedDevices.length > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold text-white bg-[var(--ui-core-periwinkle-periwinkle-6)] rounded-full" title={`${testerShippedDevices.length} shipped by tester`}>
+                      {testerShippedDevices.length}
+                    </span>
+                  )}
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {activeView === 'upload' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Upload form */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="font-semibold text-gray-900 mb-1">Upload Allocation List</h3>
-            <p className="text-xs text-gray-500 mb-4">
+          <div className="lg:col-span-2">
+          <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Upload Allocation List</span>}>
+            <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-4">
               Upload an Excel file (.xlsx) or paste directly from your spreadsheet. Columns auto-detected: ShipTo, TrackingNumber, Alias, DSN 1, DSN 2, etc.
             </p>
 
@@ -568,7 +565,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                   }
                 }
               }}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+              className="border-2 border-dashed border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg p-6 text-center cursor-pointer hover:border-[var(--ui-core-periwinkle-periwinkle-6)] hover:bg-[var(--ui-support-fill-support-info)] transition-colors"
             >
               <input
                 ref={fileInputRef}
@@ -579,8 +576,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
               />
               {fileName ? (
                 <div>
-                  <p className="text-sm font-medium text-gray-900">📄 {fileName}</p>
-                  <p className="text-xs text-green-600 mt-1">✓ File loaded — {parsedRows.length} row(s) parsed</p>
+                  <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">📄 {fileName}</p>
+                  <p className="text-xs text-[var(--ui-core-green-green-6)] mt-1">✓ File loaded — {parsedRows.length} row(s) parsed</p>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -588,31 +585,31 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                       setParsedRows([]);
                       if (fileInputRef.current) fileInputRef.current.value = '';
                     }}
-                    className="mt-2 text-xs text-red-600 hover:text-red-800 font-medium"
+                    className="mt-2 text-xs text-[var(--ui-core-red-red-6)] hover:text-[var(--ui-support-text-support-error)] font-medium"
                   >
                     ✕ Cancel upload
                   </button>
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm text-gray-600">Drop an Excel file here or click to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">Supports .xlsx, .xls, .csv</p>
+                  <p className="text-sm text-[var(--ui-text-text-tertiary)]">Drop an Excel file here or click to browse</p>
+                  <p className="text-xs text-[var(--ui-text-text-placeholder)] mt-1">Supports .xlsx, .xls, .csv</p>
                 </div>
               )}
             </div>
 
             {/* Program/Product detection from filename */}
             {fileName && detectedProgram && detectedProgram !== program && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                <p className="text-xs text-blue-800">
+              <div className="mt-3 p-3 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-lg flex items-center justify-between">
+                <p className="text-xs text-[var(--ui-support-text-icon-support-info)]">
                   Detected phase: <strong>{detectedProgram.toUpperCase()}</strong> from filename. Currently set to <strong>{program.toUpperCase()}</strong>.
                 </p>
-                <button
+                <Button
+                  type="default"
+                  size="medium"
                   onClick={() => setProgram(detectedProgram)}
-                  className="px-3 py-1 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-100"
-                >
-                  Switch to {detectedProgram.toUpperCase()}
-                </button>
+                  label={`Switch to ${detectedProgram.toUpperCase()}`}
+                />
               </div>
             )}
             {fileName && detectedProduct && detectedProduct !== productName && (
@@ -620,81 +617,83 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 <p className="text-xs text-purple-800">
                   Detected product: <strong>{detectedProduct}</strong> from filename.{productName ? ` Currently set to "${productName}".` : ' No product set yet.'}
                 </p>
-                <button
+                <Button
+                  type="default"
+                  size="medium"
                   onClick={() => setProductName(detectedProduct)}
-                  className="px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-md hover:bg-purple-100"
-                >
-                  Set to {detectedProduct}
-                </button>
+                  label={`Set to ${detectedProduct}`}
+                />
               </div>
             )}
 
             {/* Shipment metadata */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Direction</label>
-                <select
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Direction</label>
+                <Select
+                  id="shipment-direction"
                   value={shipDirection}
-                  onChange={(e) => setShipDirection(e.target.value as 'outgoing' | 'incoming')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium"
-                >
-                  <option value="outgoing">Outgoing (to testers)</option>
-                  <option value="incoming">Incoming (to lab/warehouse)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Carrier</label>
-                <select
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value as Carrier)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                >
-                  {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Ship Date</label>
-                <input
-                  type="date"
-                  value={shipDate}
-                  onChange={(e) => setShipDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  onChange={(val) => setShipDirection(val as 'outgoing' | 'incoming')}
+                  options={[
+                    { value: 'outgoing', label: 'Outgoing (to testers)' },
+                    { value: 'incoming', label: 'Incoming (to lab/warehouse)' },
+                  ]}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">From FC</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Carrier</label>
+                <Select
+                  id="shipment-carrier"
+                  value={carrier}
+                  onChange={(val) => setCarrier(val as Carrier)}
+                  options={CARRIERS.map((c) => ({ value: c, label: c }))}
+                />
+              </div>
+              <div>
+                <Input
+                  id="shipment-ship-date"
+                  label="Ship Date"
+                  layout="vertical"
+                  type="date"
+                  value={shipDate}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShipDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Input
+                  id="shipment-from-fc"
+                  label="From FC"
+                  layout="vertical"
                   value={fcLocation}
-                  onChange={(e) => setFcLocation(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFcLocation(e.target.value)}
                   placeholder="FC-SFO"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Phase</label>
-                <select
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Phase</label>
+                <Select
+                  id="shipment-phase"
                   value={program}
-                  onChange={(e) => setProgram(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                >
-                  <option value="beta">Beta</option>
-                  <option value="dogfood">Dogfood</option>
-                  <option value="prq">PRQ</option>
-                  <option value="pvt">PVT</option>
-                  <option value="evt">EVT</option>
-                  <option value="dvt">DVT</option>
-                  <option value="other">Other</option>
-                </select>
+                  onChange={(val) => setProgram(val)}
+                  options={[
+                    { value: 'beta', label: 'Beta' },
+                    { value: 'dogfood', label: 'Dogfood' },
+                    { value: 'prq', label: 'PRQ' },
+                    { value: 'pvt', label: 'PVT' },
+                    { value: 'evt', label: 'EVT' },
+                    { value: 'dvt', label: 'DVT' },
+                    { value: 'other', label: 'Other' },
+                  ]}
+                />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Product</label>
-                <input
-                  type="text"
+                <Input
+                  id="shipment-product"
+                  label="Product"
+                  layout="vertical"
                   value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProductName(e.target.value)}
                   list="product-suggestions"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                   placeholder="e.g. Foghorn, Merci"
                 />
                 <datalist id="product-suggestions">
@@ -709,39 +708,39 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             {parsedRows.length > 0 && (
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">
                     Preview: {parsedRows.length} tester(s), {totalSerials} device(s)
                   </p>
-                  <button
+                  <Button
+                    type="text"
+                    size="medium"
                     onClick={() => setParsedRows([])}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Edit
-                  </button>
+                    label="Edit"
+                  />
                 </div>
 
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                <div className="border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50 sticky top-0">
+                    <thead className="bg-[var(--ui-background-layer-layer-page-hover)] sticky top-0">
                       <tr>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Name</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Alias</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Tracking</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Serial(s)</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                        <th className="text-left px-3 py-2 font-medium text-[var(--ui-text-text-tertiary)]">Name</th>
+                        <th className="text-left px-3 py-2 font-medium text-[var(--ui-text-text-tertiary)]">Alias</th>
+                        <th className="text-left px-3 py-2 font-medium text-[var(--ui-text-text-tertiary)]">Tracking</th>
+                        <th className="text-left px-3 py-2 font-medium text-[var(--ui-text-text-tertiary)]">Serial(s)</th>
+                        <th className="text-left px-3 py-2 font-medium text-[var(--ui-text-text-tertiary)]">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                       {parsedRows.map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
+                        <tr key={i} className="hover:bg-[var(--ui-background-layer-layer-page-hover)]">
                           <td className="px-3 py-2">{row.name}</td>
-                          <td className="px-3 py-2 text-gray-500">{row.alias}</td>
+                          <td className="px-3 py-2 text-[var(--ui-text-text-tertiary)]">{row.alias}</td>
                           <td className="px-3 py-2 font-mono">{row.tracking}</td>
                           <td className="px-3 py-2 font-mono">{row.serials.join(', ')}</td>
                           <td className="px-3 py-2">
                             {row.serials.some((s) => devices.find((d) => d.serialNumber.toUpperCase() === s.toUpperCase()))
-                              ? <span className="text-blue-600">Update</span>
-                              : <span className="text-green-600">New</span>
+                              ? <Tag color="periwinkle" size="regular">Update</Tag>
+                              : <Tag color="green" size="regular">New</Tag>
                             }
                           </td>
                         </tr>
@@ -750,40 +749,41 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                   </table>
                 </div>
 
-                <button
-                  onClick={handleImport}
-                  className="mt-4 w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Import {totalSerials} Device(s) to System
-                </button>
+                <div className="mt-4">
+                  <Button
+                    type="primary"
+                    fullWidth
+                    onClick={handleImport}
+                    label={`Import ${totalSerials} Device(s) to System`}
+                  />
+                </div>
               </div>
             )}
 
             {successMsg && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-700 font-medium">{successMsg}</p>
-                <p className="text-xs text-green-600 mt-1">Devices are now visible in the Devices tab with tracking info attached.</p>
+              <div className="mt-4 p-3 bg-[var(--ui-support-fill-support-success)] border border-[var(--ui-support-border-support-success)] rounded-lg">
+                <p className="text-sm text-[var(--ui-support-text-support-success)] font-medium">{successMsg}</p>
+                <p className="text-xs text-[var(--ui-core-green-green-6)] mt-1">Devices are now visible in the Devices tab with tracking info attached.</p>
               </div>
             )}
+          </Card>
           </div>
 
           {/* Right sidebar — Pipeline + info */}
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Pipeline</h3>
+            <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Pipeline</span>}>
               <PipelineSummary />
-            </div>
+            </Card>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">How it works</h3>
-              <ol className="space-y-2 text-xs text-gray-600">
-                <li className="flex gap-2"><span className="font-bold text-gray-400">1.</span> Upload the Excel file or paste the allocation list</li>
-                <li className="flex gap-2"><span className="font-bold text-gray-400">2.</span> Set the carrier, ship date, and FC origin</li>
-                <li className="flex gap-2"><span className="font-bold text-gray-400">3.</span> Preview to verify names + serials parsed correctly</li>
-                <li className="flex gap-2"><span className="font-bold text-gray-400">4.</span> Import — devices appear in the Devices tab with tracking</li>
-                <li className="flex gap-2"><span className="font-bold text-gray-400">5.</span> Daily sync auto-detects when devices come online</li>
+            <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">How it works</span>}>
+              <ol className="space-y-2 text-xs text-[var(--ui-text-text-tertiary)]">
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">1.</span> Upload the Excel file or paste the allocation list</li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">2.</span> Set the carrier, ship date, and FC origin</li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">3.</span> Preview to verify names + serials parsed correctly</li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">4.</span> Import — devices appear in the Devices tab with tracking</li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">5.</span> Daily sync auto-detects when devices come online</li>
               </ol>
-            </div>
+            </Card>
           </div>
         </div>
       )}
@@ -796,11 +796,11 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         <div className="space-y-4">
           {/* Shipped-by-tester alert — devices the tester confirmed shipped with a tracking # */}
           {testerShippedDevices.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-2">
+            <div className="bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-info)] mb-1 flex items-center gap-2">
                 📦 Shipped by Tester ({testerShippedDevices.length})
               </h3>
-              <p className="text-xs text-blue-700 mb-3">
+              <p className="text-xs text-[var(--ui-support-text-icon-support-info)] mb-3">
                 These testers clicked "mark as returned" in their portal and provided a tracking number. Track the package, then confirm receipt below — from there you can archive or brick the device.
               </p>
               <div className="space-y-2">
@@ -809,13 +809,13 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                   const tn = d.returnTrackingNumber || '';
                   const trackUrl = getTrackingUrl(carrier, tn);
                   return (
-                    <div key={d.id} className="flex items-center justify-between gap-3 bg-white border border-blue-100 rounded-lg px-3 py-2">
+                    <div key={d.id} className="flex items-center justify-between gap-3 bg-[var(--ui-background-layer-layer-page)] border border-[var(--ui-support-border-support-info)] rounded-lg px-3 py-2">
                       <div className="min-w-0">
-                        <span className="font-mono text-xs font-medium text-blue-700">{d.serialNumber}</span>
-                        <span className="text-xs text-gray-500 ml-2">{d.assignedTo || d.assignedEmail || 'unassigned'}</span>
-                        {d.returnShippedAt && <span className="text-xs text-gray-400 ml-2">· marked shipped {new Date(d.returnShippedAt).toLocaleDateString()}</span>}
+                        <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</span>
+                        <span className="text-xs text-[var(--ui-text-text-tertiary)] ml-2">{d.assignedTo || d.assignedEmail || 'unassigned'}</span>
+                        {d.returnShippedAt && <span className="text-xs text-[var(--ui-text-text-placeholder)] ml-2">· marked shipped {new Date(d.returnShippedAt).toLocaleDateString()}</span>}
                       </div>
-                      <a href={trackUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-blue-600 hover:text-blue-800 hover:underline shrink-0">
+                      <a href={trackUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline shrink-0">
                         {tn} ↗
                       </a>
                     </div>
@@ -826,68 +826,66 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           )}
 
           {/* Explanation */}
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-orange-800 mb-1">Pending Device Returns</h3>
-            <p className="text-xs text-orange-700">
+          <div className="bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-warning)] mb-1">Pending Device Returns</h3>
+            <p className="text-xs text-[var(--ui-support-text-icon-support-warning)]">
               These devices have been requested for return — a return email was sent to the tester. They remain here until you confirm the device has been physically received back. Devices overdue by 2+ weeks are highlighted in red.
             </p>
           </div>
 
           {pendingReturnDevices.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-              <p className="text-gray-400 text-sm">No devices pending return</p>
+            <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
+              <p className="text-[var(--ui-text-text-placeholder)] text-sm">No devices pending return</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tester</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Return Tracking</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email Sent</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Days Waiting</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
+                  <tr className="bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Serial</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Tester</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Return Tracking</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Email Sent</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Days Waiting</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                   {pendingReturnDevices
                     .sort((a, b) => new Date(a.returnEmailSentAt || '').getTime() - new Date(b.returnEmailSentAt || '').getTime())
                     .map((d) => {
                       const daysOut = daysSinceFn(d.returnEmailSentAt);
                       const isOverdue = daysOut >= 14;
                       return (
-                        <tr key={d.id} className={isOverdue ? 'bg-red-50' : 'hover:bg-gray-50'}>
-                          <td className="px-4 py-3 font-mono text-xs font-medium text-blue-700">{d.serialNumber}</td>
-                          <td className="px-4 py-3 text-gray-700">{d.assignedTo || '—'}</td>
-                          <td className="px-4 py-3 text-gray-500 text-xs">{d.assignedEmail || '—'}</td>
+                        <tr key={d.id} className={isOverdue ? 'bg-[var(--ui-support-fill-support-error)]' : 'hover:bg-[var(--ui-background-layer-layer-page-hover)]'}>
+                          <td className="px-4 py-3 font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</td>
+                          <td className="px-4 py-3 text-[var(--ui-text-text-secondary)]">{d.assignedTo || '—'}</td>
+                          <td className="px-4 py-3 text-[var(--ui-text-text-tertiary)] text-xs">{d.assignedEmail || '—'}</td>
                           <td className="px-4 py-3 text-xs">
                             {d.returnTrackingNumber ? (
-                              <span className="font-mono text-blue-700 font-medium">{d.returnTrackingNumber}</span>
+                              <span className="font-mono text-[var(--ui-core-periwinkle-periwinkle-6)] font-medium">{d.returnTrackingNumber}</span>
                             ) : (
-                              <span className="text-gray-400">not shipped yet</span>
+                              <span className="text-[var(--ui-text-text-placeholder)]">not shipped yet</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
+                          <td className="px-4 py-3 text-xs text-[var(--ui-text-text-tertiary)]">
                             {d.returnEmailSentAt ? new Date(d.returnEmailSentAt).toLocaleDateString() : '—'}
                             {d.returnEmailCount && d.returnEmailCount > 1 && (
-                              <span className="ml-1 text-orange-600">({d.returnEmailCount}× sent)</span>
+                              <span className="ml-1 text-[var(--ui-core-orange-orange-6)]">({d.returnEmailCount}× sent)</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              isOverdue ? 'bg-red-100 text-red-700' :
-                              daysOut >= 7 ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
+                            <Tag color={isOverdue ? 'red' : daysOut >= 7 ? 'orange' : 'grey'} size="regular">
                               {daysOut} day{daysOut !== 1 ? 's' : ''}
                               {isOverdue && ' — OVERDUE'}
-                            </span>
+                            </Tag>
                           </td>
                           <td className="px-4 py-3">
                             {canEdit() ? (
-                              <button
+                              <Button
+                                type="default"
+                                size="medium"
                                 onClick={() => {
                                   updateDevice(d.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
                                   addHistoryEntry({
@@ -899,12 +897,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                                     description: 'Device return confirmed. Removed from pending returns and marked as deactivated.',
                                   });
                                 }}
-                                className="px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
-                              >
-                                ✓ Confirm Received
-                              </button>
+                                label="✓ Confirm Received"
+                              />
                             ) : (
-                              <span className="text-xs text-gray-400">View only</span>
+                              <span className="text-xs text-[var(--ui-text-text-placeholder)]">View only</span>
                             )}
                           </td>
                         </tr>
@@ -929,20 +925,20 @@ function PipelineSummary() {
     not_online: devices.filter((d) => d.status === 'not_online').length,
   };
 
-  const stages = [
-    { key: 'in_transit_to_tester', label: 'In Transit → Tester', color: 'bg-purple-100 text-purple-700' },
-    { key: 'not_online', label: 'Not Online', color: 'bg-yellow-100 text-yellow-700' },
-    { key: 'online', label: 'Online', color: 'bg-green-200 text-green-800' },
+  const stages: { key: string; label: string; color: 'purple' | 'orange' | 'green' }[] = [
+    { key: 'in_transit_to_tester', label: 'In Transit → Tester', color: 'purple' },
+    { key: 'not_online', label: 'Not Online', color: 'orange' },
+    { key: 'online', label: 'Online', color: 'green' },
   ];
 
   return (
     <div className="space-y-3">
       {stages.map((stage) => (
         <div key={stage.key} className="flex items-center justify-between">
-          <span className={`text-xs font-medium px-2 py-1 rounded-full ${stage.color}`}>
+          <Tag color={stage.color} size="regular">
             {stage.label}
-          </span>
-          <span className="text-sm font-bold text-gray-900">
+          </Tag>
+          <span className="text-sm font-bold text-[var(--ui-text-text-primary)]">
             {counts[stage.key as keyof typeof counts]}
           </span>
         </div>
@@ -956,9 +952,9 @@ function ShipmentHistory({ shipments, onMarkDelivered }: { shipments: Shipment[]
 
   if (shipments.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-        <p className="text-gray-400 text-sm">No uploads yet</p>
-        <p className="text-gray-300 text-xs mt-1">Upload an allocation list to get started</p>
+      <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
+        <p className="text-[var(--ui-text-text-placeholder)] text-sm">No uploads yet</p>
+        <p className="text-[var(--ui-text-text-disabled)] text-xs mt-1">Upload an allocation list to get started</p>
       </div>
     );
   }
@@ -967,84 +963,84 @@ function ShipmentHistory({ shipments, onMarkDelivered }: { shipments: Shipment[]
     <div className="space-y-4">
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{shipments.length}</p>
-          <p className="text-xs text-gray-500">Total Uploads</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{shipments.reduce((sum, s) => sum + s.serials.length, 0)}</p>
-          <p className="text-xs text-gray-500">Total Devices</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{shipments.filter((s) => s.status === 'in_transit').length}</p>
-          <p className="text-xs text-gray-500">In Transit</p>
-        </div>
+        <Card size={3} className="text-center">
+          <p className="text-2xl font-bold text-[var(--ui-text-text-primary)]">{shipments.length}</p>
+          <p className="text-xs text-[var(--ui-text-text-tertiary)]">Total Uploads</p>
+        </Card>
+        <Card size={3} className="text-center">
+          <p className="text-2xl font-bold text-[var(--ui-text-text-primary)]">{shipments.reduce((sum, s) => sum + s.serials.length, 0)}</p>
+          <p className="text-xs text-[var(--ui-text-text-tertiary)]">Total Devices</p>
+        </Card>
+        <Card size={3} className="text-center">
+          <p className="text-2xl font-bold text-[var(--ui-text-text-primary)]">{shipments.filter((s) => s.status === 'in_transit').length}</p>
+          <p className="text-xs text-[var(--ui-text-text-tertiary)]">In Transit</p>
+        </Card>
       </div>
 
       {/* Upload history list */}
       <div className="space-y-3">
         {shipments.map((shipment) => (
-          <div key={shipment.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div key={shipment.id} className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
             {/* Header row */}
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-lg">📄</span>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">
                       {shipment.fileName || 'Manual Import'}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[var(--ui-text-text-tertiary)]">
                       Uploaded {new Date(shipment.createdAt).toLocaleString()} by Admin
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${shipment.status === 'in_transit' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                  <Tag color={shipment.status === 'in_transit' ? 'periwinkle' : 'green'} size="regular">
                     {shipment.status === 'in_transit' ? 'In Transit' : 'Delivered'}
-                  </span>
+                  </Tag>
                   {shipment.program && (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                    <Tag color="purple" size="regular">
                       {shipment.program}
-                    </span>
+                    </Tag>
                   )}
                   {shipment.status === 'in_transit' && (
-                    <button
+                    <Button
+                      type="primary"
+                      size="medium"
                       onClick={() => onMarkDelivered(shipment.id)}
-                      className="text-xs font-medium px-2.5 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-                    >
-                      Mark Delivered
-                    </button>
+                      label="Mark Delivered"
+                    />
                   )}
                 </div>
               </div>
 
               {/* Stats row */}
-              <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+              <div className="flex items-center gap-4 mt-3 text-xs text-[var(--ui-text-text-tertiary)]">
                 <span className="flex items-center gap-1">
-                  <span className="font-medium text-gray-700">{shipment.deviceCount || shipment.serials.length}</span> devices
+                  <span className="font-medium text-[var(--ui-text-text-secondary)]">{shipment.deviceCount || shipment.serials.length}</span> devices
                 </span>
                 {shipment.testerCount && (
                   <span className="flex items-center gap-1">
-                    <span className="font-medium text-gray-700">{shipment.testerCount}</span> testers
+                    <span className="font-medium text-[var(--ui-text-text-secondary)]">{shipment.testerCount}</span> testers
                   </span>
                 )}
                 <span>{shipment.carrier}</span>
                 <span>Shipped: {new Date(shipment.shippedDate).toLocaleDateString()}</span>
                 {shipment.origin && <span>From: {shipment.origin}</span>}
                 {shipment.deliveredDate && (
-                  <span className="text-green-600">Delivered: {new Date(shipment.deliveredDate).toLocaleDateString()}</span>
+                  <span className="text-[var(--ui-core-green-green-6)]">Delivered: {new Date(shipment.deliveredDate).toLocaleDateString()}</span>
                 )}
               </div>
 
               {shipment.notes && (
-                <p className="mt-2 text-xs text-gray-400">{shipment.notes}</p>
+                <p className="mt-2 text-xs text-[var(--ui-text-text-placeholder)]">{shipment.notes}</p>
               )}
 
               {/* Expand/collapse serials */}
               <button
                 onClick={() => setExpandedId(expandedId === shipment.id ? null : shipment.id)}
-                className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                className="mt-2 text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] font-medium"
               >
                 {expandedId === shipment.id ? 'Hide devices ▲' : `Show ${shipment.serials.length} devices ▼`}
               </button>
@@ -1052,10 +1048,10 @@ function ShipmentHistory({ shipments, onMarkDelivered }: { shipments: Shipment[]
 
             {/* Expanded serial list */}
             {expandedId === shipment.id && (
-              <div className="border-t border-gray-100 bg-gray-50 p-4 max-h-48 overflow-y-auto">
+              <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] bg-[var(--ui-background-layer-layer-page-hover)] p-4 max-h-48 overflow-y-auto">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {shipment.serials.map((serial) => (
-                    <span key={serial} className="text-xs font-mono bg-white px-2 py-1 rounded border border-gray-200">
+                    <span key={serial} className="text-xs font-mono bg-[var(--ui-background-layer-layer-page)] px-2 py-1 rounded border border-[var(--ui-background-layer-border-border-layer-page)]">
                       {serial}
                     </span>
                   ))}

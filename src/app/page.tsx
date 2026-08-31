@@ -55,12 +55,12 @@ export default function Home() {
   // Prevent hydration mismatch — don't render data-dependent content until client is ready
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-12">
+      <div className="min-h-screen bg-[var(--ui-background-layer-background-page)]">
+        <div className="max-w-7xl mx-auto px-6 py-6 mt-12">
           <div className="animate-pulse space-y-4">
-            <div className="h-24 bg-gray-200 rounded-xl" />
-            <div className="h-12 bg-gray-200 rounded-xl" />
-            <div className="h-96 bg-gray-200 rounded-xl" />
+            <div className="h-24 bg-[var(--ui-background-layer-layer-page-backplate)] rounded-xl" />
+            <div className="h-12 bg-[var(--ui-background-layer-layer-page-backplate)] rounded-xl" />
+            <div className="h-96 bg-[var(--ui-background-layer-layer-page-backplate)] rounded-xl" />
           </div>
         </div>
       </div>
@@ -79,41 +79,36 @@ export default function Home() {
 
   return (
     <SeedDataProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab} />
-        <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-12">
-          <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
-          {activeTab === 'devices' && canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
-          {activeTab === 'devices' && !canEdit() && (
-            <>
-              <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
-            </>
-          )}
-          {activeTab !== 'devices' && activeTab !== 'overview' && (
-            <>
-              <OverdueAlertsBanner />
-              <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
-              {canEdit() && (
+      <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab}>
+        <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
+        {activeTab === 'devices' && canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
+        {activeTab === 'devices' && !canEdit() && (
+          <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
+        )}
+        {activeTab !== 'devices' && activeTab !== 'overview' && (
+          <>
+            <OverdueAlertsBanner />
+            <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
+            {canEdit() && (
               <div className="mt-4">
                 <NetworkSyncButton />
               </div>
-              )}
-            </>
-          )}
-          <div className="mt-6">
-            {activeTab === 'overview' && <OverviewDashboard />}
-            {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
-            {activeTab === 'testbeds' && <ProgramsTab />}
-            {activeTab === 'packages' && <PackagesTab />}
-            {activeTab === 'shapeshift' && <ShapeshiftTab />}
-            {activeTab === 'dogfood' && <DogfoodOnboarding />}
-            {activeTab === 'program_signups' && <ProgramSignupsTab />}
-            {activeTab === 'locations' && <LocationsTab />}
-            {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
-            {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
-          </div>
-        </main>
-      </div>
+            )}
+          </>
+        )}
+        <div className="mt-6">
+          {activeTab === 'overview' && <OverviewDashboard />}
+          {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
+          {activeTab === 'testbeds' && <ProgramsTab />}
+          {activeTab === 'packages' && <PackagesTab />}
+          {activeTab === 'shapeshift' && <ShapeshiftTab />}
+          {activeTab === 'dogfood' && <DogfoodOnboarding />}
+          {activeTab === 'program_signups' && <ProgramSignupsTab />}
+          {activeTab === 'locations' && <LocationsTab />}
+          {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
+          {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
+        </div>
+      </Navbar>
     </SeedDataProvider>
   );
 }

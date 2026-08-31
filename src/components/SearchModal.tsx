@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X } from 'lucide-react';
+import { Modal, Tag, Input } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
@@ -18,7 +18,7 @@ type SearchResult = {
   title: string;
   subtitle: string;
   badge?: string;
-  badgeColor?: string;
+  badgeColor?: 'grey' | 'green' | 'orange' | 'periwinkle' | 'red' | 'yellow' | 'navy';
   device?: Device;
 };
 
@@ -65,7 +65,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
           title: d.serialNumber,
           subtitle: `${d.model} · ${d.assignedTo || d.assignedEmail || 'Unassigned'}`,
           badge: d.status === 'online' ? 'Online' : 'Not Online',
-          badgeColor: d.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700',
+          badgeColor: d.status === 'online' ? 'green' : 'orange',
           device: d,
         });
       });
@@ -87,7 +87,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
           title: d.serialNumber,
           subtitle: `${d.model} · ${d.assignedTo || d.assignedEmail || 'Unassigned'}`,
           badge: 'Archived',
-          badgeColor: 'bg-gray-100 text-gray-600',
+          badgeColor: 'grey',
           device: d,
         });
       });
@@ -114,7 +114,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
           title: p.name,
           subtitle: p.email,
           badge: `${p.deviceCount} device(s)`,
-          badgeColor: 'bg-blue-100 text-blue-700',
+          badgeColor: 'periwinkle',
         });
       });
 
@@ -129,7 +129,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
           title: o.personName,
           subtitle: o.personEmail,
           badge: 'Opted Out',
-          badgeColor: 'bg-orange-100 text-orange-700',
+          badgeColor: 'orange',
         });
       });
 
@@ -144,7 +144,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
           title: `Program: ${cp.program}`,
           subtitle: `Closed ${new Date(cp.closedAt).toLocaleDateString()} · ${cp.totalDevices} devices`,
           badge: 'Archived',
-          badgeColor: 'bg-gray-100 text-gray-600',
+          badgeColor: 'grey',
         });
       });
 
@@ -163,7 +163,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
           title: s.fileName || `Shipment ${new Date(s.createdAt).toLocaleDateString()}`,
           subtitle: `${s.serials.length} devices · ${s.carrier} · ${s.origin || ''} → ${s.destination}`,
           badge: s.status === 'in_transit' ? 'In Transit' : 'Delivered',
-          badgeColor: s.status === 'in_transit' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700',
+          badgeColor: s.status === 'in_transit' ? 'periwinkle' : 'green',
         });
       });
 
@@ -191,75 +191,68 @@ export default function SearchModal({ onClose }: SearchModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden">
-          {/* Search input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b">
-            <Search size={20} className="text-gray-400" />
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Search devices, people, programs, shipments..."
-              className="flex-1 text-base outline-none placeholder:text-gray-400"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-              <X size={18} className="text-gray-400" />
-            </button>
-          </div>
-
-          {/* Results */}
-          {results.length > 0 && (
-            <div className="max-h-[450px] overflow-y-auto p-2">
-              {Object.entries(grouped).map(([type, items]) => (
-                <div key={type} className="mb-3">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 py-1">
-                    {typeLabels[type as ResultType]} ({items.length})
-                  </p>
-                  {items.map((result) => (
-                    <button
-                      key={`${result.type}-${result.id}`}
-                      onClick={() => {
-                        if (result.device) {
-                          setViewDevice(result.device);
-                          onClose();
-                        }
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors text-left"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-gray-900 truncate">{result.title}</p>
-                        <p className="text-xs text-gray-500 truncate">{result.subtitle}</p>
-                      </div>
-                      {result.badge && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${result.badgeColor}`}>
-                          {result.badge}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {query && results.length === 0 && (
-            <div className="p-8 text-center text-gray-500">
-              <p className="text-sm">No results found for &ldquo;{query}&rdquo;</p>
-              <p className="text-xs text-gray-400 mt-1">Try searching by serial number, name, email, or program</p>
-            </div>
-          )}
-
-          {!query && (
-            <div className="p-6 text-center text-gray-400 text-sm">
-              <p>Search across all devices, people, archived programs, and shipments</p>
-              <p className="text-xs mt-2 text-gray-300">Includes deactivated devices and opted-out testers</p>
-            </div>
-          )}
+      <Modal isOpen title="Search" onCancel={onClose} hideFooter>
+        {/* Search input */}
+        <div className="mb-4">
+          <Input
+            id="global-search"
+            ref={inputRef}
+            placeholder="Search devices, people, programs, shipments..."
+            value={query}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+            autoFocus
+          />
         </div>
-      </div>
+
+        {/* Results */}
+        {results.length > 0 && (
+          <div className="max-h-[450px] overflow-y-auto">
+            {Object.entries(grouped).map(([type, items]) => (
+              <div key={type} className="mb-3">
+                <p className="text-xs font-semibold text-[var(--ui-text-text-placeholder)] uppercase tracking-wider px-1 py-1">
+                  {typeLabels[type as ResultType]} ({items.length})
+                </p>
+                {items.map((result) => (
+                  <button
+                    key={`${result.type}-${result.id}`}
+                    onClick={() => {
+                      if (result.device) {
+                        setViewDevice(result.device);
+                        onClose();
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-[var(--ui-text-text-primary)] truncate">{result.title}</p>
+                      <p className="text-xs text-[var(--ui-text-text-tertiary)] truncate">{result.subtitle}</p>
+                    </div>
+                    {result.badge && (
+                      <Tag color={result.badgeColor || 'grey'} size="regular">
+                        {result.badge}
+                      </Tag>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {query && results.length === 0 && (
+          <div className="p-8 text-center text-[var(--ui-text-text-tertiary)]">
+            <p className="text-sm">No results found for &ldquo;{query}&rdquo;</p>
+            <p className="text-xs text-[var(--ui-text-text-placeholder)] mt-1">Try searching by serial number, name, email, or program</p>
+          </div>
+        )}
+
+        {!query && (
+          <div className="p-6 text-center text-[var(--ui-text-text-placeholder)] text-sm">
+            <p>Search across all devices, people, archived programs, and shipments</p>
+            <p className="text-xs mt-2 text-[var(--ui-text-text-disabled)]">Includes deactivated devices and opted-out testers</p>
+          </div>
+        )}
+      </Modal>
 
       {/* Device Detail Panel (opens when clicking a device result) */}
       {viewDevice && <DeviceDetailPanel device={viewDevice} onClose={() => setViewDevice(null)} />}

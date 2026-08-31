@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useAuthStore, User, DogfoderProfile } from '@/store/authStore';
-import { Dog, Search, ChevronDown, ExternalLink } from 'lucide-react';
+import { Button, Input, TextArea, Select, Checkbox, Card } from '@amzn/eero-web-design-components';
+import { Dog, Search } from 'lucide-react';
 
 type OnboardingStatus = 'new' | 'contacted' | 'hardware_ordered' | 'waiting_scheduling' | 'scheduled_shapeshift' | 'complete' | 'unresponsive' | 'reclaim';
 
@@ -33,16 +34,7 @@ const STATUS_LABELS: Record<OnboardingStatus, string> = {
   reclaim: 'Reclaim Units',
 };
 
-const STATUS_COLORS: Record<OnboardingStatus, string> = {
-  new: 'bg-purple-100 text-purple-700',
-  contacted: 'bg-blue-100 text-blue-700',
-  hardware_ordered: 'bg-yellow-100 text-yellow-700',
-  waiting_scheduling: 'bg-orange-100 text-orange-700',
-  scheduled_shapeshift: 'bg-cyan-100 text-cyan-700',
-  complete: 'bg-green-100 text-green-700',
-  unresponsive: 'bg-red-100 text-red-700',
-  reclaim: 'bg-gray-100 text-gray-700',
-};
+const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
 export default function DogfoodOnboarding() {
   const { users } = useAuthStore();
@@ -114,15 +106,15 @@ export default function DogfoodOnboarding() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <Dog className="w-5 h-5 text-[#2c3e7a]" />
+          <h2 className="text-xl font-semibold text-[var(--ui-text-text-primary)] flex items-center gap-2">
+            <Dog className="w-5 h-5 text-[var(--ui-core-periwinkle-periwinkle-6)]" />
             Dogfood Onboarding Pipeline
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Track dogfooders from registration through to fully onboarded.</p>
+          <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">Track dogfooders from registration through to fully onboarded.</p>
         </div>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats cards — distinct status hues (decorative, no direct token equivalent) */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <StatCard label="Total" count={stats.total} color="bg-gray-50 border-gray-200" />
         <StatCard label="New" count={stats.new} color="bg-purple-50 border-purple-200" onClick={() => setFilterStatus(filterStatus === 'new' ? 'all' : 'new')} active={filterStatus === 'new'} />
@@ -136,32 +128,33 @@ export default function DogfoodOnboarding() {
 
       {/* Search + filter bar */}
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
+        <div className="flex-1 max-w-sm">
+          <Input
+            id="onboarding-search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
             placeholder="Search by name or email..."
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            prefix={<Search size={16} className="text-[var(--ui-text-text-placeholder)]" />}
           />
         </div>
         {filterStatus !== 'all' && (
-          <button onClick={() => setFilterStatus('all')} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Clear filter</button>
+          <Button type="text" label="Clear filter" onClick={() => setFilterStatus('all')} />
         )}
-        <span className="text-xs text-gray-400 ml-auto">{filteredRows.length} of {rows.length} shown</span>
+        <span className="text-xs text-[var(--ui-text-text-placeholder)] ml-auto">{filteredRows.length} of {rows.length} shown</span>
       </div>
 
       {/* Table */}
       {filteredRows.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Dog size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">{rows.length === 0 ? 'No dogfooders have registered yet.' : 'No results match your filter.'}</p>
-        </div>
+        <Card size={3}>
+          <div className="p-12 text-center">
+            <Dog size={48} className="mx-auto text-[var(--ui-text-text-disabled)] mb-4" />
+            <p className="text-[var(--ui-text-text-tertiary)]">{rows.length === 0 ? 'No dogfooders have registered yet.' : 'No results match your filter.'}</p>
+          </div>
+        </Card>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-500 uppercase border-b border-gray-200">
+            <thead className="bg-[var(--ui-background-layer-layer-page-hover)] text-xs text-[var(--ui-text-text-tertiary)] uppercase border-b border-[var(--ui-background-layer-border-border-layer-page)]">
               <tr>
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Email</th>
@@ -172,7 +165,7 @@ export default function DogfoodOnboarding() {
                 <th className="px-4 py-3 text-left">Notes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
               {filteredRows.map((row) => (
                 <TableRow
                   key={row.email}
@@ -195,10 +188,10 @@ function StatCard({ label, count, color, onClick, active }: { label: string; cou
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg border p-3 text-left transition-all ${color} ${active ? 'ring-2 ring-blue-400' : ''} ${onClick ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'}`}
+      className={`rounded-lg border p-3 text-left transition-all ${color} ${active ? 'ring-2 ring-[var(--ui-core-periwinkle-periwinkle-6)]' : ''} ${onClick ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'}`}
     >
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-xl font-bold text-gray-900">{count}</p>
+      <p className="text-xs text-[var(--ui-text-text-tertiary)]">{label}</p>
+      <p className="text-xl font-bold text-[var(--ui-text-text-primary)]">{count}</p>
     </button>
   );
 }
@@ -214,35 +207,34 @@ function TableRow({ row, expanded, onToggle, onUpdate }: {
 
   return (
     <>
-      <tr className="hover:bg-gray-50 cursor-pointer" onClick={onToggle}>
-        <td className="px-4 py-3 font-medium text-gray-900">{row.user.name}</td>
-        <td className="px-4 py-3 text-gray-600">{row.email}</td>
+      <tr className="hover:bg-[var(--ui-background-layer-layer-page-hover)] cursor-pointer" onClick={onToggle}>
+        <td className="px-4 py-3 font-medium text-[var(--ui-text-text-primary)]">{row.user.name}</td>
+        <td className="px-4 py-3 text-[var(--ui-text-text-tertiary)]">{row.email}</td>
         <td className="px-4 py-3"><span className="text-xs">{profile?.phoneOS || '—'}</span></td>
         <td className="px-4 py-3"><span className="text-xs">{profile?.testGroup === 'Latest and greatest firmware' ? '🚀 Latest' : profile?.testGroup === 'More mature firmware' ? '🛡️ Mature' : '—'}</span></td>
         <td className="px-4 py-3">
-          <select
-            value={row.status}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onUpdate({ status: e.target.value as OnboardingStatus })}
-            className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${STATUS_COLORS[row.status]}`}
-          >
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          <div className="w-52" onClick={(e) => e.stopPropagation()}>
+            <Select
+              id={`onboarding-status-${row.email}`}
+              value={row.status}
+              onChange={(val: OnboardingStatus) => onUpdate({ status: val })}
+              options={STATUS_OPTIONS}
+              size="small"
+            />
+          </div>
         </td>
-        <td className="px-4 py-3 text-xs text-gray-500">{profile?.registeredAt ? new Date(profile.registeredAt).toLocaleDateString() : '—'}</td>
-        <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px] truncate">{row.notes || '—'}</td>
+        <td className="px-4 py-3 text-xs text-[var(--ui-text-text-tertiary)]">{profile?.registeredAt ? new Date(profile.registeredAt).toLocaleDateString() : '—'}</td>
+        <td className="px-4 py-3 text-xs text-[var(--ui-text-text-tertiary)] max-w-[200px] truncate">{row.notes || '—'}</td>
       </tr>
 
       {/* Expanded detail row */}
       {expanded && (
         <tr>
-          <td colSpan={7} className="px-4 py-4 bg-gray-50 border-t border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <td colSpan={7} className="px-4 py-4 bg-[var(--ui-background-layer-layer-page-hover)] border-t border-[var(--ui-background-layer-border-border-layer-page)]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6" onClick={(e) => e.stopPropagation()}>
               {/* Column 1: Contact & Address */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase">Contact & Address</h4>
+                <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Contact & Address</h4>
                 <InfoRow label="Phone" value={profile?.phoneNumber} />
                 <InfoRow label="Address" value={[profile?.streetAddress, profile?.aptUnit, profile?.city, profile?.state, profile?.zipCode].filter(Boolean).join(', ')} />
                 {profile?.preferWorkAddress && <InfoRow label="Work Address" value={[profile?.workStreet, profile?.workFloor, profile?.workCity, profile?.workState, profile?.workZip].filter(Boolean).join(', ')} />}
@@ -254,48 +246,23 @@ function TableRow({ row, expanded, onToggle, onUpdate }: {
 
               {/* Column 2: Hardware & App */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase">Hardware & App Access</h4>
-                <div>
-                  <label className="text-xs text-gray-500">Hardware Order #</label>
-                  <input type="text" value={row.hardwareOrder} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ hardwareOrder: e.target.value })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" placeholder="SO-123456" />
+                <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Hardware & App Access</h4>
+                <Input id={`onboarding-hw-${row.email}`} label="Hardware Order #" value={row.hardwareOrder} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ hardwareOrder: e.target.value })} placeholder="SO-123456" layout="vertical" />
+                <Input id={`onboarding-tracking-${row.email}`} label="Tracking #" value={row.trackingNumber} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ trackingNumber: e.target.value })} placeholder="1Z884AR..." layout="vertical" />
+                <Input id={`onboarding-invite-${row.email}`} type="date" label="App Invite Sent" value={row.appInviteSent} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ appInviteSent: e.target.value })} layout="vertical" />
+                <div className="mt-2">
+                  <Checkbox checked={row.appProvisioned} onChange={(e: { target: { checked: boolean } }) => onUpdate({ appProvisioned: e.target.checked })} label="App provisioned & installed" />
                 </div>
-                <div>
-                  <label className="text-xs text-gray-500">Tracking #</label>
-                  <input type="text" value={row.trackingNumber} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ trackingNumber: e.target.value })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" placeholder="1Z884AR..." />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">App Invite Sent</label>
-                  <input type="date" value={row.appInviteSent} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ appInviteSent: e.target.value })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" />
-                </div>
-                <label className="flex items-center gap-2 text-xs text-gray-600 mt-2">
-                  <input type="checkbox" checked={row.appProvisioned} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ appProvisioned: e.target.checked })} className="rounded border-gray-300" />
-                  App provisioned & installed
-                </label>
-                <div>
-                  <label className="text-xs text-gray-500">Network Link</label>
-                  <input type="text" value={row.networkLink} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ networkLink: e.target.value })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" placeholder="https://admin.e2ro.com/networks/..." />
-                </div>
+                <Input id={`onboarding-network-${row.email}`} label="Network Link" value={row.networkLink} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ networkLink: e.target.value })} placeholder="https://admin.e2ro.com/networks/..." layout="vertical" />
               </div>
 
               {/* Column 3: Scheduling & Notes */}
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase">Scheduling & Notes</h4>
-                <div>
-                  <label className="text-xs text-gray-500">Follow-up Date</label>
-                  <input type="date" value={row.followUpDate} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ followUpDate: e.target.value })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">Shapeshift Scheduled</label>
-                  <input type="datetime-local" value={row.shapeshiftDate} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ shapeshiftDate: e.target.value })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">Outreach Count</label>
-                  <input type="number" min={0} value={row.outreachCount} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ outreachCount: parseInt(e.target.value) || 0 })} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">Notes</label>
-                  <textarea value={row.notes} onClick={(e) => e.stopPropagation()} onChange={(e) => onUpdate({ notes: e.target.value })} rows={3} className="w-full mt-1 px-2 py-1.5 border border-gray-200 rounded text-xs resize-none" placeholder="Add notes..." />
-                </div>
+                <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Scheduling & Notes</h4>
+                <Input id={`onboarding-followup-${row.email}`} type="date" label="Follow-up Date" value={row.followUpDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ followUpDate: e.target.value })} layout="vertical" />
+                <Input id={`onboarding-shapeshift-${row.email}`} type="datetime-local" label="Shapeshift Scheduled" value={row.shapeshiftDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ shapeshiftDate: e.target.value })} layout="vertical" />
+                <Input id={`onboarding-outreach-${row.email}`} type="number" min={0} label="Outreach Count" value={row.outreachCount} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUpdate({ outreachCount: parseInt(e.target.value) || 0 })} layout="vertical" />
+                <TextArea id={`onboarding-notes-${row.email}`} label="Notes" value={row.notes} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onUpdate({ notes: e.target.value })} rows={3} placeholder="Add notes..." layout="vertical" />
               </div>
             </div>
           </td>
@@ -310,8 +277,8 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
     <div>
-      <span className="text-xs text-gray-400">{label}:</span>
-      <span className="text-xs text-gray-700 ml-1">{value}</span>
+      <span className="text-xs text-[var(--ui-text-text-placeholder)]">{label}:</span>
+      <span className="text-xs text-[var(--ui-text-text-secondary)] ml-1">{value}</span>
     </div>
   );
 }

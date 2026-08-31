@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Button, Modal } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { daysSince } from '@/constants';
 
@@ -33,56 +34,53 @@ export default function PendingReturnReminder({ onNavigateToReturns }: PendingRe
   const week2 = needsFollowUp.filter((d) => daysSince(d.returnEmailSentAt) >= 14);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={() => setDismissed(true)} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
-        <div className="text-center mb-4">
-          <span className="text-4xl">⏰</span>
-        </div>
-        <h2 className="text-lg font-bold text-gray-900 text-center mb-2">
-          You have {needsFollowUp.length} device(s) needing follow-up reminders
-        </h2>
-        <p className="text-sm text-gray-600 text-center mb-6">
-          Have they been returned? If so, make sure to archive program/devices or brick them if necessary.
-        </p>
-
-        {/* Breakdown */}
-        <div className="space-y-3 mb-6">
-          {week2.length > 0 && (
-            <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <span className="text-red-600 font-bold text-lg">🚨</span>
-              <div>
-                <p className="text-sm font-medium text-red-800">{week2.length} device(s) overdue 2+ weeks</p>
-                <p className="text-xs text-red-600">Consider bricking or escalating directly with the tester</p>
-              </div>
-            </div>
-          )}
-          {week1.length > 0 && (
-            <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <span className="text-yellow-600 font-bold text-lg">⏰</span>
-              <div>
-                <p className="text-sm font-medium text-yellow-800">{week1.length} device(s) waiting 1–2 weeks</p>
-                <p className="text-xs text-yellow-600">Send a follow-up reminder email</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={() => setDismissed(true)}
-            className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Dismiss for Today
-          </button>
-          <button
-            onClick={() => { setDismissed(true); onNavigateToReturns(); }}
-            className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-          >
-            View Pending Returns →
-          </button>
-        </div>
+    <Modal
+      isOpen
+      title={`You have ${needsFollowUp.length} device(s) needing follow-up reminders`}
+      onCancel={() => setDismissed(true)}
+      hideFooter
+    >
+      <div className="text-center mb-4">
+        <span className="text-4xl">⏰</span>
       </div>
-    </div>
+      <p className="text-sm text-[var(--ui-text-text-tertiary)] text-center mb-6">
+        Have they been returned? If so, make sure to archive program/devices or brick them if necessary.
+      </p>
+
+      {/* Breakdown */}
+      <div className="space-y-3 mb-6">
+        {week2.length > 0 && (
+          <div className="flex items-center gap-3 p-3 bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-lg">
+            <span className="text-[var(--ui-core-red-red-6)] font-bold text-lg">🚨</span>
+            <div>
+              <p className="text-sm font-medium text-[var(--ui-support-text-support-error)]">{week2.length} device(s) overdue 2+ weeks</p>
+              <p className="text-xs text-[var(--ui-core-red-red-6)]">Consider bricking or escalating directly with the tester</p>
+            </div>
+          </div>
+        )}
+        {week1.length > 0 && (
+          <div className="flex items-center gap-3 p-3 bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-lg">
+            <span className="text-[var(--ui-support-text-icon-support-warning)] font-bold text-lg">⏰</span>
+            <div>
+              <p className="text-sm font-medium text-[var(--ui-support-text-icon-support-warning)]">{week1.length} device(s) waiting 1–2 weeks</p>
+              <p className="text-xs text-[var(--ui-support-text-icon-support-warning)]">Send a follow-up reminder email</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-3">
+        <Button
+          type="default"
+          label="Dismiss for Today"
+          onClick={() => setDismissed(true)}
+        />
+        <Button
+          type="primary"
+          label="View Pending Returns →"
+          onClick={() => { setDismissed(true); onNavigateToReturns(); }}
+        />
+      </div>
+    </Modal>
   );
 }

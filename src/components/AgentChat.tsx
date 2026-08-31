@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
+import { Button, Input } from '@amzn/eero-web-design-components';
 import { Sparkles, Send, X } from 'lucide-react';
 
 // Simple markdown-like formatting for agent responses
@@ -159,11 +160,11 @@ export default function AgentChat() {
       <div className="relative flex-1 min-w-[250px]">
         <button
           onClick={() => setIsOpen(true)}
-          className="w-full flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-all bg-white"
+          className="w-full flex items-center gap-2 px-4 py-2 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg text-sm text-[var(--ui-text-text-tertiary)] hover:border-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-6)] transition-all bg-[var(--ui-background-layer-layer-page)]"
         >
-          <Sparkles size={16} className="text-blue-500" />
+          <Sparkles size={16} className="text-[var(--ui-core-periwinkle-periwinkle-6)]" />
           Ask the AI agent anything...
-          <kbd className="ml-auto hidden sm:inline-flex items-center px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-400">⌘K</kbd>
+          <kbd className="ml-auto hidden sm:inline-flex items-center px-1.5 py-0.5 bg-[var(--ui-background-layer-layer-page-hover)] rounded text-xs text-[var(--ui-text-text-placeholder)]">⌘K</kbd>
         </button>
       </div>
     );
@@ -172,9 +173,9 @@ export default function AgentChat() {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[8vh]">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[75vh]">
+      <div className="relative w-full max-w-2xl bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[75vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-[#2c3e7a] to-blue-600">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] bg-gradient-to-r from-[var(--ui-core-periwinkle-periwinkle-6)] to-[var(--ui-core-periwinkle-periwinkle-7)]">
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-white" />
             <span className="text-sm font-medium text-white">AI Agent</span>
@@ -189,8 +190,8 @@ export default function AgentChat() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[200px]">
           {messages.length === 0 && (
             <div className="text-center py-8">
-              <Sparkles size={32} className="mx-auto mb-3 text-blue-300" />
-              <p className="text-sm text-gray-500 mb-4">Ask me anything about your devices, testers, programs, or processes.</p>
+              <Sparkles size={32} className="mx-auto mb-3 text-[var(--ui-core-periwinkle-periwinkle-6)]" />
+              <p className="text-sm text-[var(--ui-text-text-tertiary)] mb-4">Ask me anything about your devices, testers, programs, or processes.</p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {[
                   'How many devices are online?',
@@ -201,7 +202,7 @@ export default function AgentChat() {
                   <button
                     key={q}
                     onClick={() => { setInput(q); inputRef.current?.focus(); }}
-                    className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                    className="px-3 py-1.5 text-xs bg-[var(--ui-background-layer-layer-page-hover)] text-[var(--ui-text-text-tertiary)] rounded-full hover:bg-[var(--ui-support-fill-support-info)] hover:text-[var(--ui-core-periwinkle-periwinkle-6)] transition-colors"
                   >
                     {q}
                   </button>
@@ -214,8 +215,8 @@ export default function AgentChat() {
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-[var(--ui-core-periwinkle-periwinkle-6)] text-white'
+                  : 'bg-[var(--ui-background-layer-layer-page-hover)] text-[var(--ui-text-text-secondary)]'
               }`}>
                 <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
               </div>
@@ -224,7 +225,7 @@ export default function AgentChat() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg px-3 py-2 text-sm text-gray-500">
+              <div className="bg-[var(--ui-background-layer-layer-page-hover)] rounded-lg px-3 py-2 text-sm text-[var(--ui-text-text-tertiary)]">
                 <span className="inline-flex gap-1">
                   <span className="animate-bounce">●</span>
                   <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>●</span>
@@ -238,25 +239,27 @@ export default function AgentChat() {
         </div>
 
         {/* Input */}
-        <div className="border-t px-4 py-3">
-          <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about devices, testers, programs..."
-              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={loading}
-            />
-            <button
-              type="submit"
+        <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Input
+                id="agent-chat-input"
+                ref={inputRef}
+                value={input}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+                onPressEnter={() => handleSubmit()}
+                placeholder="Ask about devices, testers, programs..."
+                disabled={loading}
+              />
+            </div>
+            <Button
+              type="primary"
+              onClick={() => handleSubmit()}
               disabled={!input.trim() || loading}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send size={16} />
-            </button>
-          </form>
+              ariaLabel="Send message"
+              label={<Send size={16} />}
+            />
+          </div>
         </div>
       </div>
     </div>

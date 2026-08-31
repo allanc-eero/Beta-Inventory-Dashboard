@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Button, Tag, Input, Select } from '@amzn/eero-web-design-components';
 import { Device, DeviceStatus } from '@/types';
 import { Edit2, Clock, Download } from 'lucide-react';
 import { useDeviceStore } from '@/store/deviceStore';
@@ -97,7 +98,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
   }, []);
 
   const handleSave = () => { updateDevice(device.id, editData); setIsEditing(false); };
-  const statusInfo = STATUS_CONFIG[device.status] || { class: 'bg-gray-100 text-gray-600', label: device.status };
+  const statusInfo = STATUS_CONFIG[device.status] || { color: 'grey' as const, label: device.status };
 
   const renderFields = (fields: FieldDef[], editable = true) =>
     fields.map(({ label, field, linkUrl, options }) => (
@@ -125,23 +126,18 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
         {/* Status bar + actions */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <span className={`status-badge ${statusInfo.class}`}>
-              <span className="w-2 h-2 rounded-full bg-current" />
+            <Tag color={statusInfo.color} size="regular" showIcon>
               {statusInfo.label}
-            </span>
-            {device.country && <span className="text-sm text-red-600 font-medium">📍 {device.country}</span>}
+            </Tag>
+            {device.country && <span className="text-sm text-[var(--ui-core-red-red-6)] font-medium">📍 {device.country}</span>}
           </div>
           <div className="flex items-center gap-2">
-            <ActionButton onClick={() => exportDeviceCSV(device)} icon={<Download size={14} />} label="Export" />
+            <Button type="default" label={<span className="flex items-center gap-1.5"><Download size={14} /> Export</span>} ariaLabel="Export device CSV" onClick={() => exportDeviceCSV(device)} />
             {canEdit() && (
-              <button onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-                <Edit2 size={14} /> Edit details
-              </button>
+              <Button type="primary" label="Edit details" onClick={() => setIsEditing(!isEditing)} />
             )}
             {canEdit() && device.status !== 'deactivated' && (
-              <button onClick={() => setShowDeactivateModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
-                Return to eero
-              </button>
+              <Button type="primary" danger label="Return to eero" onClick={() => setShowDeactivateModal(true)} />
             )}
           </div>
         </div>
@@ -299,8 +295,8 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
         {/* Edit actions */}
         {isEditing && (
           <div className="flex justify-end gap-2 mt-8">
-            <button onClick={() => { setIsEditing(false); setEditData(device); }} className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSave} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save Changes</button>
+            <Button type="default" label="Cancel" onClick={() => { setIsEditing(false); setEditData(device); }} />
+            <Button type="primary" label="Save Changes" onClick={handleSave} />
           </div>
         )}
 
@@ -314,10 +310,10 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
         </div>
 
         {/* Timeline */}
-        <div className="mt-10 border-t border-gray-200 pt-8 pb-12">
+        <div className="mt-10 border-t border-[var(--ui-background-layer-border-border-layer-page)] pt-8 pb-12">
           <div className="flex items-center gap-2 mb-4">
-            <Clock size={18} className="text-gray-500" />
-            <h3 className="text-lg font-semibold text-gray-900">Device Timeline</h3>
+            <Clock size={18} className="text-[var(--ui-text-text-tertiary)]" />
+            <h3 className="text-lg font-semibold text-[var(--ui-text-text-primary)]">Device Timeline</h3>
           </div>
           <DeviceTimeline deviceId={device.id} />
         </div>
@@ -329,18 +325,10 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function ActionButton({ onClick, icon, label }: { onClick?: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button onClick={onClick} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
-      {icon} {label}
-    </button>
-  );
-}
-
 function SectionBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">{title}</h3>
+      <h3 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] pb-2">{title}</h3>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -353,30 +341,33 @@ function DetailField({ label, value, editing, field, editData, setEditData, link
   if (editing) {
     return (
       <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">{label}</span>
-        {options ? (
-          <select
-            value={(editData[field] as string) || ''}
-            onChange={(e) => setEditData({ ...editData, [field]: e.target.value })}
-            className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {options.map((opt) => (
-              <option key={opt} value={opt}>{opt === '' ? '— not set —' : opt}</option>
-            ))}
-          </select>
-        ) : (
-          <input type="text" value={(editData[field] as string) || ''} onChange={(e) => setEditData({ ...editData, [field]: e.target.value })} className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-        )}
+        <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">{label}</span>
+        <div className="flex-1">
+          {options ? (
+            <Select
+              id={`edit-${String(field)}`}
+              value={(editData[field] as string) || ''}
+              onChange={(v) => setEditData({ ...editData, [field]: v })}
+              options={options.map((opt) => ({ value: opt, label: opt === '' ? '— not set —' : opt }))}
+            />
+          ) : (
+            <Input
+              id={`edit-${String(field)}`}
+              value={(editData[field] as string) || ''}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({ ...editData, [field]: e.target.value })}
+            />
+          )}
+        </div>
       </div>
     );
   }
   return (
     <div className="flex items-baseline gap-3">
-      <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">{label}</span>
+      <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">{label}</span>
       {linkUrl && value ? (
-        <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{value} ↗</a>
+        <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{value} ↗</a>
       ) : (
-        <span className="text-sm text-gray-900">{value || '—'}</span>
+        <span className="text-sm text-[var(--ui-text-text-primary)]">{value || '—'}</span>
       )}
     </div>
   );

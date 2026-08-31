@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleLinear } from 'd3-scale';
+import { Select, Tag } from '@amzn/eero-web-design-components';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -73,6 +74,7 @@ export default function LocationsTab() {
 
   const colorScale = scaleLinear<string>()
     .domain([0, maxDevices / 2, maxDevices])
+    // d3 color ramp — hexes map to periwinkle-2/5/9; kept as raw hex because d3 interpolates them
     .range(['#dbeafe', '#3b82f6', '#1e3a8a']);
 
   const sizeScale = scaleLinear()
@@ -88,51 +90,59 @@ export default function LocationsTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Device Map</h2>
+        <h2 className="text-lg font-bold text-[var(--ui-text-text-primary)]">Device Map</h2>
         <div className="flex items-center gap-3">
           {/* Status filter */}
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as FilterMode)}
-            className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Devices</option>
-            <option value="online">Online Only</option>
-            <option value="offline">Offline Only</option>
-            <option value="deactivated">Deactivated</option>
-          </select>
+          <div className="w-40">
+            <Select
+              id="locations-status-filter"
+              ariaLabel="Filter by status"
+              value={filter}
+              onChange={(val) => setFilter(val as FilterMode)}
+              options={[
+                { value: 'all', label: 'All Devices' },
+                { value: 'online', label: 'Online Only' },
+                { value: 'offline', label: 'Offline Only' },
+                { value: 'deactivated', label: 'Deactivated' },
+              ]}
+            />
+          </div>
 
           {/* Program filter */}
-          <select
-            value={programFilter}
-            onChange={(e) => setProgramFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Programs</option>
-            {programs.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <div className="w-40">
+            <Select
+              id="locations-program-filter"
+              ariaLabel="Filter by program"
+              value={programFilter}
+              onChange={(val) => setProgramFilter(val as string)}
+              options={[
+                { value: 'all', label: 'All Programs' },
+                ...programs.map((p) => ({ value: p, label: p })),
+              ]}
+            />
+          </div>
         </div>
       </div>
 
       {/* Map */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 overflow-hidden relative">
-        {/* Zoom controls */}
+      <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-4 overflow-hidden relative">
+        {/* Zoom controls (plain icon-only map controls — token-mapped colors only) */}
         <div className="absolute top-6 right-6 z-10 flex flex-col gap-1">
           <button
             onClick={() => setZoom((z) => Math.min(z * 1.5, 20))}
-            className="w-8 h-8 bg-white border border-gray-300 rounded-lg shadow-sm flex items-center justify-center text-gray-700 hover:bg-gray-50 text-lg font-bold"
+            className="w-8 h-8 bg-[var(--ui-background-layer-layer-page)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg shadow-sm flex items-center justify-center text-[var(--ui-text-text-secondary)] hover:bg-[var(--ui-background-layer-layer-page-hover)] text-lg font-bold"
           >
             +
           </button>
           <button
             onClick={() => setZoom((z) => Math.max(z / 1.5, 1))}
-            className="w-8 h-8 bg-white border border-gray-300 rounded-lg shadow-sm flex items-center justify-center text-gray-700 hover:bg-gray-50 text-lg font-bold"
+            className="w-8 h-8 bg-[var(--ui-background-layer-layer-page)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg shadow-sm flex items-center justify-center text-[var(--ui-text-text-secondary)] hover:bg-[var(--ui-background-layer-layer-page-hover)] text-lg font-bold"
           >
             −
           </button>
           <button
             onClick={() => { setZoom(1); setCenter([20, 20]); }}
-            className="w-8 h-8 bg-white border border-gray-300 rounded-lg shadow-sm flex items-center justify-center text-gray-700 hover:bg-gray-50 text-xs"
+            className="w-8 h-8 bg-[var(--ui-background-layer-layer-page)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg shadow-sm flex items-center justify-center text-[var(--ui-text-text-secondary)] hover:bg-[var(--ui-background-layer-layer-page-hover)] text-xs"
           >
             ⟲
           </button>
@@ -206,12 +216,13 @@ export default function LocationsTab() {
 
         {/* Legend */}
         <div className="flex items-center justify-between mt-3 px-2">
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-200" /> Low density</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500" /> Medium</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-900" /> High density</span>
+          <div className="flex items-center gap-4 text-xs text-[var(--ui-text-text-tertiary)]">
+            {/* swatches mirror the d3 colorScale ramp (periwinkle-2/5/9) */}
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-2)]" /> Low density</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-5)]" /> Medium</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-9)]" /> High density</span>
           </div>
-          <p className="text-xs text-gray-400">{filteredDevices.length} devices across {countryData.size} countries</p>
+          <p className="text-xs text-[var(--ui-text-text-placeholder)]">{filteredDevices.length} devices across {countryData.size} countries</p>
         </div>
       </div>
 
@@ -225,18 +236,18 @@ export default function LocationsTab() {
               <div
                 key={country}
                 onClick={() => setSelectedCountry(country)}
-                className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-sm ${selectedCountry === country ? 'border-blue-400 ring-1 ring-blue-200' : 'border-gray-200'}`}
+                className={`bg-[var(--ui-background-layer-layer-page)] rounded-xl border p-4 cursor-pointer transition-all hover:shadow-sm ${selectedCountry === country ? 'border-[var(--ui-core-periwinkle-periwinkle-5)] ring-1 ring-[var(--ui-core-periwinkle-periwinkle-2)]' : 'border-[var(--ui-background-layer-border-border-layer-page)]'}`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-semibold text-gray-900">{country}</h4>
-                  <span className="text-xs text-gray-400">{data.total}</span>
+                  <h4 className="text-sm font-semibold text-[var(--ui-text-text-primary)]">{country}</h4>
+                  <span className="text-xs text-[var(--ui-text-text-placeholder)]">{data.total}</span>
                 </div>
                 {/* Health bar */}
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
-                  <div className="h-full bg-green-500 rounded-full" style={{ width: `${onlinePercent}%` }} />
+                <div className="w-full h-2 bg-[var(--ui-background-layer-layer-page-hover)] rounded-full overflow-hidden mb-2">
+                  <div className="h-full bg-[var(--ui-core-green-green-6)] rounded-full" style={{ width: `${onlinePercent}%` }} />
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span className="text-green-600">{data.online} online</span>
+                <div className="flex items-center justify-between text-xs text-[var(--ui-text-text-tertiary)]">
+                  <span className="text-[var(--ui-core-green-green-6)]">{data.online} online</span>
                   <span>{onlinePercent}% healthy</span>
                 </div>
               </div>
@@ -246,37 +257,37 @@ export default function LocationsTab() {
 
       {/* Country detail */}
       {selectedCountry && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900">{selectedCountry} — {countryDevices.length} devices</h3>
-            <button onClick={() => setSelectedCountry(null)} className="text-xs text-gray-500 hover:text-gray-700">Close ×</button>
+        <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
+          <div className="p-4 border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[var(--ui-text-text-primary)]">{selectedCountry} — {countryDevices.length} devices</h3>
+            <button onClick={() => setSelectedCountry(null)} className="text-xs text-[var(--ui-text-text-tertiary)] hover:text-[var(--ui-text-text-secondary)]">Close ×</button>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50">
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Model</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Assigned To</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Program</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+              <tr className="bg-[var(--ui-background-layer-layer-page-hover)]">
+                <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Serial</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Model</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Assigned To</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Program</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
               {countryDevices.slice(0, 20).map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50">
+                <tr key={d.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)]">
                   <td className="px-4 py-2 font-mono text-xs">{d.serialNumber}</td>
-                  <td className="px-4 py-2 text-gray-600">{d.model}</td>
-                  <td className="px-4 py-2 text-gray-600">{d.assignedTo || d.assignedEmail || '—'}</td>
-                  <td className="px-4 py-2"><span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{d.program}</span></td>
+                  <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.model}</td>
+                  <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.assignedTo || d.assignedEmail || '—'}</td>
+                  <td className="px-4 py-2"><Tag color="periwinkle" size="regular">{d.program}</Tag></td>
                   <td className="px-4 py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${d.status === 'online' ? 'bg-green-100 text-green-700' : d.status === 'deactivated' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                    <Tag color={d.status === 'online' ? 'green' : d.status === 'deactivated' ? 'grey' : 'orange'} size="regular">
                       {d.status.replace(/_/g, ' ')}
-                    </span>
+                    </Tag>
                   </td>
                 </tr>
               ))}
               {countryDevices.length > 20 && (
-                <tr><td colSpan={5} className="px-4 py-2 text-xs text-gray-400 text-center">+ {countryDevices.length - 20} more devices</td></tr>
+                <tr><td colSpan={5} className="px-4 py-2 text-xs text-[var(--ui-text-text-placeholder)] text-center">+ {countryDevices.length - 20} more devices</td></tr>
               )}
             </tbody>
           </table>

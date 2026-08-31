@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { Modal, Input, Select, TextArea, Button } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, DeviceStatus, Program } from '@/types';
 
@@ -36,9 +36,7 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = () => {
     const email = formData.assignedEmail.trim().toLowerCase();
     const profile = email ? getTesterProfile(email) : undefined;
 
@@ -118,139 +116,111 @@ export default function AddDeviceModal({ onClose }: AddDeviceModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-bold">Add Device</h2>
-            <p className="text-xs text-gray-500 mt-0.5">MAC, firmware, and location will auto-populate on next API sync.</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-            <X size={18} />
-          </button>
+    <Modal
+      isOpen
+      title="Add Device"
+      onCancel={onClose}
+      onOk={handleSubmit}
+      okText="Add Device"
+      cancelText="Cancel"
+      okButtonProps={{ disabled: !formData.serialNumber }}
+    >
+      <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-4">
+        MAC, firmware, and location will auto-populate on next API sync.
+      </p>
+
+      <div className="space-y-4">
+        {/* Serial */}
+        <Input
+          id="add-serial"
+          label="Serial Number"
+          value={formData.serialNumber}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, serialNumber: e.target.value })}
+          placeholder="e.g. GGC54MX36114006L"
+          layout="vertical"
+        />
+
+        {/* Model + Internal Name */}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            id="add-model"
+            label="Model"
+            value={formData.model}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, model: e.target.value })}
+            placeholder="eero Max 7"
+            layout="vertical"
+          />
+          <Input
+            id="add-internal-name"
+            label="Internal Name"
+            value={formData.internalName}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, internalName: e.target.value })}
+            placeholder="e.g. Merci"
+            layout="vertical"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Serial */}
+        {/* Program */}
+        <Select
+          id="add-program"
+          label="Program"
+          value={formData.program}
+          onChange={(value) => setFormData({ ...formData, program: value as Program })}
+          options={[
+            { value: 'beta', label: 'Beta' },
+            { value: 'dogfood', label: 'Dogfood' },
+            { value: 'prq', label: 'PRQ' },
+            { value: 'pvt', label: 'PVT' },
+            { value: 'evt', label: 'EVT' },
+            { value: 'dvt', label: 'DVT' },
+            { value: 'other', label: 'Other' },
+          ]}
+          layout="vertical"
+        />
+
+        {/* Assigned To */}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            id="add-assigned-to"
+            label="Assigned To"
+            value={formData.assignedTo}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, assignedTo: e.target.value })}
+            placeholder="John Smith"
+            layout="vertical"
+          />
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Serial Number *</label>
-            <input
-              type="text"
-              required
-              value={formData.serialNumber}
-              onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. GGC54MX36114006L"
+            <Input
+              id="add-email"
+              label="Email"
+              value={formData.assignedEmail}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, assignedEmail: e.target.value })}
+              onBlur={handleEmailBlur}
+              placeholder="jsmith@amazon.com"
+              layout="vertical"
             />
+            {profileApplied && (
+              <p className="text-xs text-[var(--ui-core-green-green-6)] mt-1">✓ Known tester — profile data will be applied</p>
+            )}
           </div>
+        </div>
 
-          {/* Model + Internal Name */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Model</label>
-              <input
-                type="text"
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="eero Max 7"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Internal Name</label>
-              <input
-                type="text"
-                value={formData.internalName}
-                onChange={(e) => setFormData({ ...formData, internalName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. Merci"
-              />
-            </div>
-          </div>
+        {/* Notes */}
+        <TextArea
+          id="add-notes"
+          label="Notes"
+          value={formData.notes}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
+          placeholder="e.g. Replacement for defective unit GGC54MX..."
+          layout="vertical"
+        />
 
-          {/* Program */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Program</label>
-            <select
-              value={formData.program}
-              onChange={(e) => setFormData({ ...formData, program: e.target.value as Program })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="beta">Beta</option>
-              <option value="dogfood">Dogfood</option>
-              <option value="prq">PRQ</option>
-              <option value="pvt">PVT</option>
-              <option value="evt">EVT</option>
-              <option value="dvt">DVT</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          {/* Assigned To */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Assigned To</label>
-              <input
-                type="text"
-                value={formData.assignedTo}
-                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="John Smith"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input
-                type="email"
-                value={formData.assignedEmail}
-                onChange={(e) => setFormData({ ...formData, assignedEmail: e.target.value })}
-                onBlur={handleEmailBlur}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="jsmith@amazon.com"
-              />
-              {profileApplied && (
-                <p className="text-xs text-green-600 mt-1">✓ Known tester — profile data will be applied</p>
-              )}
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-16"
-              placeholder="e.g. Replacement for defective unit GGC54MX..."
-            />
-          </div>
-
-          {/* Info box */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-700">
-              Once added, the next daily API sync will fetch the full device details (MAC address, firmware version, network status, location) from the Partner API automatically.
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-            >
-              Add Device
-            </button>
-          </div>
-        </form>
+        {/* Info box */}
+        <div className="p-3 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-lg">
+          <p className="text-xs text-[var(--ui-support-text-icon-support-info)]">
+            Once added, the next daily API sync will fetch the full device details (MAC address, firmware version, network status, location) from the Partner API automatically.
+          </p>
+        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

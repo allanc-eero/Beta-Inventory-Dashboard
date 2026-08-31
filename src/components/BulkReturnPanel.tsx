@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { Button, Select, Checkbox, Tag, Modal } from '@amzn/eero-web-design-components';
 import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
@@ -287,7 +288,7 @@ Beta Team`;
     };
 
     return (
-      <div className="fixed inset-0 top-12 z-40 bg-gray-50 overflow-y-auto">
+      <div className="fixed inset-0 top-12 z-40 bg-[var(--ui-background-layer-background-page)] overflow-y-auto">
         {/* JIRA Toast Notification */}
         {jiraToast && (
           <JiraToast
@@ -298,25 +299,23 @@ Beta Team`;
           />
         )}
         <div className="max-w-[900px] mx-auto px-6 py-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
             <p className="text-4xl mb-4">✓</p>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Bulk Return Complete</h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <h2 className="text-xl font-bold text-[var(--ui-text-text-primary)] mb-2">Bulk Return Complete</h2>
+            <p className="text-sm text-[var(--ui-text-text-tertiary)] mb-6">
               {uniqueDevices.length} device(s) processed. JIRA tickets created. {requiresReturn ? `${assigneeCount} return email(s) generated.` : ''}
             </p>
             <div className="flex items-center justify-center gap-3">
-              <button
+              <Button
+                type="default"
+                label="Export Batch Report (CSV)"
                 onClick={exportBatchCSV}
-                className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
-              >
-                Export Batch Report (CSV)
-              </button>
-              <button
+              />
+              <Button
+                type="primary"
+                label="Back to Devices"
                 onClick={onClose}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-              >
-                Back to Devices
-              </button>
+              />
             </div>
           </div>
         </div>
@@ -325,51 +324,51 @@ Beta Team`;
   }
 
   return (
-    <div className="fixed inset-0 top-12 z-40 bg-gray-50 overflow-y-auto">
+    <div className="fixed inset-0 top-12 z-40 bg-[var(--ui-background-layer-background-page)] overflow-y-auto">
       <div className="max-w-[900px] mx-auto px-6 py-8">
         {/* Back link */}
         <p
-          className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium mb-2"
+          className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] cursor-pointer font-medium mb-2"
           onClick={onClose}
         >
           ← Back to devices
         </p>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Bulk Return to eero</h1>
-        <p className="text-sm text-gray-500 mb-8">
+        <h1 className="text-2xl font-bold text-[var(--ui-text-text-primary)] mb-1">Bulk Return to eero</h1>
+        <p className="text-sm text-[var(--ui-text-text-tertiary)] mb-8">
           Process {uniqueDevices.length} device(s) for return. Emails will be grouped by tester.
         </p>
 
         {/* Devices summary table */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-5 mb-8">
+          <h3 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3">
             Devices Being Returned ({uniqueDevices.length})
           </h3>
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-gray-50">
+              <thead className="sticky top-0 bg-[var(--ui-background-layer-layer-page-hover)]">
                 <tr>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Serial</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Model</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Assigned To</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Status</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Program</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--ui-text-text-tertiary)]">Serial</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--ui-text-text-tertiary)]">Model</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--ui-text-text-tertiary)]">Assigned To</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--ui-text-text-tertiary)]">Status</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-[var(--ui-text-text-tertiary)]">Program</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                 {uniqueDevices.map((d) => (
                   <tr key={d.id}>
                     <td className="px-3 py-2 font-mono text-xs">{d.serialNumber}</td>
-                    <td className="px-3 py-2 text-gray-600">{d.model}</td>
-                    <td className="px-3 py-2 text-gray-600">{d.assignedTo || d.assignedEmail || '—'}</td>
+                    <td className="px-3 py-2 text-[var(--ui-text-text-tertiary)]">{d.model}</td>
+                    <td className="px-3 py-2 text-[var(--ui-text-text-tertiary)]">{d.assignedTo || d.assignedEmail || '—'}</td>
                     <td className="px-3 py-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${d.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      <Tag color={d.status === 'online' ? 'green' : 'orange'} size="regular">
                         {d.status.replace(/_/g, ' ')}
-                      </span>
+                      </Tag>
                     </td>
                     <td className="px-3 py-2">
-                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{d.program}</span>
+                      <Tag color="periwinkle" size="regular">{d.program}</Tag>
                     </td>
                   </tr>
                 ))}
@@ -379,58 +378,53 @@ Beta Team`;
         </div>
 
         {/* Return details form */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Return Details</h3>
+        <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-6 mb-8">
+          <h3 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-5">Return Details</h3>
 
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (applies to all)</label>
-                <select
+                <label className="block text-sm font-medium text-[var(--ui-text-text-secondary)] mb-1">Reason (applies to all)</label>
+                <Select
+                  id="bulk-return-reason"
                   value={reason}
-                  onChange={(e) => setReason(e.target.value as typeof reason)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="returned_to_eero">Returned to eero</option>
-                  <option value="defective">Defective / Hardware issue</option>
-                  <option value="end_of_program">End of program phase</option>
-                  <option value="lost">Lost / Unrecoverable</option>
-                </select>
+                  onChange={(val) => setReason(val as typeof reason)}
+                  options={[
+                    { value: 'returned_to_eero', label: 'Returned to eero' },
+                    { value: 'defective', label: 'Defective / Hardware issue' },
+                    { value: 'end_of_program', label: 'End of program phase' },
+                    { value: 'lost', label: 'Lost / Unrecoverable' },
+                  ]}
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Testers affected</label>
+                <label className="block text-sm font-medium text-[var(--ui-text-text-secondary)] mb-1">Testers affected</label>
                 <input
                   type="text"
                   readOnly
                   value={`${assigneeCount} tester(s) — ${Object.keys(groupedByAssignee).filter((k) => k !== 'unassigned').join(', ') || 'none assigned'}`}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600"
+                  className="w-full px-3 py-2.5 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg text-sm bg-[var(--ui-background-layer-layer-page-hover)] text-[var(--ui-text-text-tertiary)]"
                 />
               </div>
             </div>
             {/* Brick option for end of program */}
             {reason === 'end_of_program' && (
-              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={brickDevices}
-                    onChange={(e) => setBrickDevices(e.target.checked)}
-                    className="rounded border-orange-300 mt-0.5"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-orange-800">Also brick these devices</span>
-                    <p className="text-xs text-orange-600 mt-0.5">Remotely deactivate all devices via the Partner API so they can never connect to a network again. Use this when devices should not be reused.</p>
-                  </div>
-                </label>
+              <div className="p-3 bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-lg">
+                <Checkbox
+                  checked={brickDevices}
+                  onChange={(e: { target: { checked: boolean } }) => setBrickDevices(e.target.checked)}
+                  label="Also brick these devices"
+                />
+                <p className="text-xs text-[var(--ui-core-orange-orange-6)] mt-0.5 ml-6">Remotely deactivate all devices via the Partner API so they can never connect to a network again. Use this when devices should not be reused.</p>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Internal Notes <span className="font-normal text-gray-400">(not sent to testers — for your team's records only)</span></label>
+              <label className="block text-sm font-medium text-[var(--ui-text-text-secondary)] mb-1">Internal Notes <span className="font-normal text-[var(--ui-text-text-placeholder)]">(not sent to testers — for your team's records only)</span></label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-20"
+                className="w-full px-3 py-2.5 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ui-core-periwinkle-periwinkle-6)] resize-none h-20"
                 placeholder="Internal reason for bulk return, context for the team..."
               />
             </div>
@@ -439,14 +433,16 @@ Beta Team`;
 
         {/* Email Template + Region-Grouped Emails */}
         {requiresReturn && Object.keys(groupedByAssignee).filter((k) => k !== 'unassigned').length > 0 && (
-          <div className="bg-white rounded-xl border border-blue-200 p-6 mb-8">
-            <h3 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">📧 Emails to Testers — Grouped by Region</h3>
-            <p className="text-xs text-gray-500 mb-2">
+          <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-support-border-support-info)] p-6 mb-8">
+            <h3 className="text-xs font-semibold text-[var(--ui-core-periwinkle-periwinkle-6)] uppercase tracking-wider mb-1">📧 Emails to Testers — Grouped by Region</h3>
+            <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-2">
               Emails are grouped by region since return instructions differ per country. Edit each region's template independently. Sent from: <strong>beta-team@eero.com</strong>
             </p>
 
             <div className="mb-4">
-              <button
+              <Button
+                type="text"
+                label="↻ Reset all emails from template"
                 onClick={() => {
                   const reset: Record<string, string> = {};
                   Object.entries(groupedByAssignee).forEach(([email, assigneeDevices]) => {
@@ -460,10 +456,7 @@ Beta Team`;
                   });
                   setPerTesterEmails(reset);
                 }}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-              >
-                ↻ Reset all emails from template
-              </button>
+              />
             </div>
 
             {/* Group by region */}
@@ -481,34 +474,34 @@ Beta Team`;
               return (
                 <div className="space-y-6 max-h-[600px] overflow-y-auto">
                   {regions.map((region) => (
-                    <div key={region} className="border border-gray-200 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                    <div key={region} className="border border-[var(--ui-background-layer-border-border-layer-page)] rounded-xl overflow-hidden">
+                      <div className="px-4 py-3 bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-700">📍 {region}</span>
-                          <span className="text-xs text-gray-400">{regionEmails[region].length} tester(s) · {regionEmails[region].reduce((sum, t) => sum + t.devices.length, 0)} device(s)</span>
+                          <span className="text-sm font-semibold text-[var(--ui-text-text-secondary)]">📍 {region}</span>
+                          <span className="text-xs text-[var(--ui-text-text-placeholder)]">{regionEmails[region].length} tester(s) · {regionEmails[region].reduce((sum, t) => sum + t.devices.length, 0)} device(s)</span>
                         </div>
-                        <span className="text-xs text-gray-400">From: beta-team@eero.com</span>
+                        <span className="text-xs text-[var(--ui-text-text-placeholder)]">From: beta-team@eero.com</span>
                       </div>
 
-                      <div className="divide-y divide-gray-100">
+                      <div className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                         {regionEmails[region].map(({ email, devices: testerDevices }) => (
                           <div key={email} className="p-4">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-gray-700">To: {email}</span>
-                              <span className="text-xs text-gray-400">{testerDevices.length} device(s)</span>
+                              <span className="text-sm font-medium text-[var(--ui-text-text-secondary)]">To: {email}</span>
+                              <span className="text-xs text-[var(--ui-text-text-placeholder)]">{testerDevices.length} device(s)</span>
                             </div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                            <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Subject</label>
                             <input
                               type="text"
                               value={(perTesterSubjects[email] || emailSubject).replace(/\{count\}/g, String(testerDevices.length))}
                               onChange={(e) => setPerTesterSubjects({ ...perTesterSubjects, [email]: e.target.value })}
-                              className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full px-3 py-1.5 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-md text-sm mb-2 focus:outline-none focus:ring-1 focus:ring-[var(--ui-core-periwinkle-periwinkle-6)]"
                             />
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
+                            <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Message</label>
                             <textarea
                               value={perTesterEmails[email] || ''}
                               onChange={(e) => setPerTesterEmails({ ...perTesterEmails, [email]: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm font-mono resize-none h-32 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-full px-3 py-2 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-md text-sm font-mono resize-none h-32 focus:outline-none focus:ring-1 focus:ring-[var(--ui-core-periwinkle-periwinkle-6)]"
                             />
                           </div>
                         ))}
@@ -522,149 +515,141 @@ Beta Team`;
         )}
 
         {/* What will happen */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">What will happen</h3>
+        <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-6 mb-8">
+          <h3 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-4">What will happen</h3>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <p className="text-sm text-gray-700"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as {willBrick ? 'deactivated (bricked)' : 'pending return'}</p>
+              <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>
+              <p className="text-sm text-[var(--ui-text-text-secondary)]"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as {willBrick ? 'deactivated (bricked)' : 'pending return'}</p>
             </div>
             <div className="flex items-start gap-3">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <p className="text-sm text-gray-700"><span className="font-medium">1</span> consolidated JIRA ticket created covering all {uniqueDevices.length} device(s)</p>
+              <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>
+              <p className="text-sm text-[var(--ui-text-text-secondary)]"><span className="font-medium">1</span> consolidated JIRA ticket created covering all {uniqueDevices.length} device(s)</p>
             </div>
             {requiresReturn && (
               <>
                 <div className="flex items-start gap-3">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <p className="text-sm text-gray-700"><span className="font-medium">{assigneeCount}</span> return email(s) drafted (grouped by tester — one email per person)</p>
+                  <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>
+                  <p className="text-sm text-[var(--ui-text-text-secondary)]"><span className="font-medium">{assigneeCount}</span> return email(s) drafted (grouped by tester — one email per person)</p>
                 </div>
               </>
             )}
             {reason === 'lost' && (
               <div className="flex items-start gap-3">
-                <span className="text-red-500 mt-0.5">⚠️</span>
-                <p className="text-sm text-red-700 font-medium">{uniqueDevices.length} device(s) will be remotely bricked — they will never connect to a network again</p>
+                <span className="text-[var(--ui-core-red-red-6)] mt-0.5">⚠️</span>
+                <p className="text-sm text-[var(--ui-support-text-support-error)] font-medium">{uniqueDevices.length} device(s) will be remotely bricked — they will never connect to a network again</p>
               </div>
             )}
             {reason === 'end_of_program' && brickDevices && (
               <div className="flex items-start gap-3">
-                <span className="text-red-500 mt-0.5">⚠️</span>
-                <p className="text-sm text-red-700 font-medium">{uniqueDevices.length} device(s) will be remotely bricked via the Partner API — they will never connect to a network again</p>
+                <span className="text-[var(--ui-core-red-red-6)] mt-0.5">⚠️</span>
+                <p className="text-sm text-[var(--ui-support-text-support-error)] font-medium">{uniqueDevices.length} device(s) will be remotely bricked via the Partner API — they will never connect to a network again</p>
               </div>
             )}
             <div className="flex items-start gap-3">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <p className="text-sm text-gray-700">All actions logged to each device's audit trail</p>
+              <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>
+              <p className="text-sm text-[var(--ui-text-text-secondary)]">All actions logged to each device's audit trail</p>
             </div>
           </div>
         </div>
 
         {/* Brick confirmation — for lost OR end-of-program with brick enabled */}
         {willBrick && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-8">
-            <label className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-                className="rounded border-red-300 mt-0.5"
-              />
-              <span className="text-sm text-red-700">
-                {reason === 'lost'
+          <div className="bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-xl p-5 mb-8">
+            <Checkbox
+              checked={confirmed}
+              onChange={(e: { target: { checked: boolean } }) => setConfirmed(e.target.checked)}
+              label={
+                reason === 'lost'
                   ? `I confirm these ${uniqueDevices.length} device(s) are lost or unrecoverable and should be permanently bricked. This action cannot be undone.`
                   : `I confirm these ${uniqueDevices.length} device(s) should be permanently bricked as part of the end-of-program process. They will never connect to a network again. This action cannot be undone.`
-                }
-              </span>
-            </label>
+              }
+            />
           </div>
         )}
 
         {/* Actions */}
         <div className="flex items-center justify-between pb-12">
-          <button
+          <Button
+            type="default"
+            label="Cancel"
             onClick={onClose}
-            className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
+          />
+          <Button
+            type="primary"
+            danger={willBrick}
+            label="Preview Changes →"
             onClick={() => setShowPreview(true)}
             disabled={processing || (willBrick && !confirmed)}
-            className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-              willBrick ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            Preview Changes →
-          </button>
+          />
         </div>
 
         {/* Preview Modal */}
         {showPreview && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreview(false)} />
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[70vh] overflow-y-auto p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Preview: Bulk Return</h2>
-              <p className="text-xs text-gray-400 mb-4">Generated: {new Date().toLocaleString()} · Nothing has been changed yet.</p>
+          <Modal
+            isOpen
+            title="Preview: Bulk Return"
+            onCancel={() => setShowPreview(false)}
+            hideFooter
+          >
+            <p className="text-xs text-[var(--ui-text-text-placeholder)] mb-4">Generated: {new Date().toLocaleString()} · Nothing has been changed yet.</p>
 
-              {/* What will happen */}
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <span className="text-lg">📦</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{uniqueDevices.length} device(s) will be marked as {willBrick ? 'BRICKED & DEACTIVATED' : 'Pending Return'}</p>
-                    <p className="text-xs text-gray-500">{willBrick ? 'Permanently deactivated via Partner API — cannot be undone' : 'Return emails will be sent. Devices stay active until confirmed received.'}</p>
-                  </div>
-                </div>
-
-                {willBrick && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-xs font-semibold text-red-800 mb-2">🚨 Devices being bricked:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {uniqueDevices.map((d) => (
-                        <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {requiresReturn && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-xs font-medium text-blue-800">{assigneeCount} return email(s) will be sent (grouped by region, from beta-team@eero.com)</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Affected testers */}
-              <div className="mb-6">
-                <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Affected testers</p>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {Object.entries(groupedByAssignee).filter(([k]) => k !== 'unassigned').map(([email, devs]) => (
-                    <div key={email} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
-                      <span className="text-gray-700">{devs[0].assignedTo || email}</span>
-                      <span className="text-gray-400">{email} · {devs.length} device(s) · {devs[0].country || '?'}</span>
-                    </div>
-                  ))}
+            {/* What will happen */}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-3 p-3 bg-[var(--ui-background-layer-layer-page-hover)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg">
+                <span className="text-lg">📦</span>
+                <div>
+                  <p className="text-sm font-medium text-[var(--ui-text-text-secondary)]">{uniqueDevices.length} device(s) will be marked as {willBrick ? 'BRICKED & DEACTIVATED' : 'Pending Return'}</p>
+                  <p className="text-xs text-[var(--ui-text-text-tertiary)]">{willBrick ? 'Permanently deactivated via Partner API — cannot be undone' : 'Return emails will be sent. Devices stay active until confirmed received.'}</p>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setShowPreview(false)}
-                  className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  ← Go Back & Edit
-                </button>
-                <button
-                  onClick={() => { setShowPreview(false); handleSubmit(); }}
-                  className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg ${willBrick ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-                >
-                  {willBrick ? `Confirm & Brick ${uniqueDevices.length} Device(s)` : `Confirm & Process ${uniqueDevices.length} Device(s)`}
-                </button>
+              {willBrick && (
+                <div className="p-3 bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-lg">
+                  <p className="text-xs font-semibold text-[var(--ui-support-text-support-error)] mb-2">🚨 Devices being bricked:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {uniqueDevices.map((d) => (
+                      <span key={d.id} className="text-xs font-mono bg-[var(--ui-support-fill-support-error)] text-[var(--ui-support-text-support-error)] px-1.5 py-0.5 rounded">{d.serialNumber}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {requiresReturn && (
+                <div className="p-3 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-lg">
+                  <p className="text-xs font-medium text-[var(--ui-support-text-icon-support-info)]">{assigneeCount} return email(s) will be sent (grouped by region, from beta-team@eero.com)</p>
+                </div>
+              )}
+            </div>
+
+            {/* Affected testers */}
+            <div className="mb-6">
+              <p className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase mb-2">Affected testers</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {Object.entries(groupedByAssignee).filter(([k]) => k !== 'unassigned').map(([email, devs]) => (
+                  <div key={email} className="flex items-center justify-between text-xs p-2 bg-[var(--ui-background-layer-layer-page-hover)] rounded">
+                    <span className="text-[var(--ui-text-text-secondary)]">{devs[0].assignedTo || email}</span>
+                    <span className="text-[var(--ui-text-text-placeholder)]">{email} · {devs.length} device(s) · {devs[0].country || '?'}</span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between">
+              <Button
+                type="default"
+                label="← Go Back & Edit"
+                onClick={() => setShowPreview(false)}
+              />
+              <Button
+                type="primary"
+                danger={willBrick}
+                label={willBrick ? `Confirm & Brick ${uniqueDevices.length} Device(s)` : `Confirm & Process ${uniqueDevices.length} Device(s)`}
+                onClick={() => { setShowPreview(false); handleSubmit(); }}
+              />
+            </div>
+          </Modal>
         )}
       </div>
     </div>

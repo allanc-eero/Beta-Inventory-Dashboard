@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { SalesforceCase } from '@/types';
+import { Card, Tag } from '@amzn/eero-web-design-components';
+
+type TagColor = 'grey' | 'navy' | 'periwinkle' | 'green' | 'orange' | 'red' | 'turquoise' | 'ocean' | 'purple' | 'terracotta' | 'yellow';
 
 interface SalesforcePanelProps {
   deviceId: string;
@@ -15,44 +18,45 @@ export default function SalesforcePanel({ deviceId, deviceSerial }: SalesforcePa
   // For now: simulated empty state (no cases until API is connected)
   const [cases] = useState<SalesforceCase[]>([]);
 
-  const statusColors: Record<string, string> = {
-    'New': 'bg-blue-100 text-blue-700',
-    'Open': 'bg-yellow-100 text-yellow-700',
-    'In Progress': 'bg-orange-100 text-orange-700',
-    'Escalated': 'bg-red-100 text-red-700',
-    'Closed': 'bg-gray-100 text-gray-600',
+  const statusColors: Record<string, TagColor> = {
+    'New': 'periwinkle',
+    'Open': 'orange',
+    'In Progress': 'orange',
+    'Escalated': 'red',
+    'Closed': 'grey',
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-900">Salesforce Cases</h4>
-        <span className="text-xs text-gray-400">{cases.length} case(s)</span>
-      </div>
-
+    <Card
+      size={2}
+      title={
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-[var(--ui-text-text-primary)]">Salesforce Cases</span>
+          <span className="text-xs text-[var(--ui-text-text-placeholder)]">{cases.length} case(s)</span>
+        </div>
+      }
+    >
       {cases.length === 0 ? (
-        <p className="text-xs text-gray-400">No Salesforce cases linked to this device</p>
+        <p className="text-xs text-[var(--ui-text-text-placeholder)]">No Salesforce cases linked to this device</p>
       ) : (
         <div className="space-y-2">
           {cases.map((c) => (
-            <div key={c.id} className="p-2 border border-gray-100 rounded-lg">
+            <div key={c.id} className="p-2 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-mono font-medium text-gray-900">#{c.caseNumber}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded ${statusColors[c.status] || 'bg-gray-100 text-gray-600'}`}>
-                  {c.status}
-                </span>
+                <span className="text-xs font-mono font-medium text-[var(--ui-text-text-primary)]">#{c.caseNumber}</span>
+                <Tag color={statusColors[c.status] || 'grey'} size="regular">{c.status}</Tag>
               </div>
-              <p className="text-xs text-gray-600 truncate">{c.subject}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{new Date(c.createdAt).toLocaleDateString()}</p>
+              <p className="text-xs text-[var(--ui-text-text-tertiary)] truncate">{c.subject}</p>
+              <p className="text-xs text-[var(--ui-text-text-placeholder)] mt-0.5">{new Date(c.createdAt).toLocaleDateString()}</p>
               {c.jiraTicketKey && (
-                <p className="text-xs text-purple-600 mt-0.5">→ Escalated to {c.jiraTicketKey}</p>
+                <p className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] mt-0.5">→ Escalated to {c.jiraTicketKey}</p>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <p className="text-xs text-gray-300 mt-3 italic">API integration required for live data</p>
-    </div>
+      <p className="text-xs text-[var(--ui-text-text-disabled)] mt-3 italic">API integration required for live data</p>
+    </Card>
   );
 }

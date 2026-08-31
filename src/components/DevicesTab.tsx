@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { Button, Select, Tag, Checkbox } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, DeviceStatus, Program } from '@/types';
-import { Plus, Monitor } from 'lucide-react';
+import { Monitor } from 'lucide-react';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import AddDeviceModal from './AddDeviceModal';
 import BulkReturnPanel from './BulkReturnPanel';
@@ -49,59 +50,56 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-wrap items-center gap-3 bg-[var(--ui-background-layer-layer-page)] p-4 rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)]">
         <AgentChat />
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as DeviceStatus | 'all')}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All Status</option>
-          <option value="online">Online</option>
-          <option value="not_online">Not Online</option>
-          <option value="deactivated">Deactivated</option>
-        </select>
+        <div className="w-40">
+          <Select
+            id="status-filter"
+            value={statusFilter}
+            onChange={(value) => setStatusFilter(value as DeviceStatus | 'all')}
+            options={[
+              { value: 'all', label: 'All Status' },
+              { value: 'online', label: 'Online' },
+              { value: 'not_online', label: 'Not Online' },
+              { value: 'deactivated', label: 'Deactivated' },
+            ]}
+          />
+        </div>
 
-        <select
-          value={programFilter}
-          onChange={(e) => setProgramFilter(e.target.value as Program | 'all')}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All Programs</option>
-          <option value="beta">Beta</option>
-          <option value="dogfood">Dogfood</option>
-          <option value="prq">PRQ</option>
-          <option value="pvt">PVT</option>
-          <option value="evt">EVT</option>
-          <option value="dvt">DVT</option>
-          <option value="other">Other</option>
-        </select>
+        <div className="w-40">
+          <Select
+            id="program-filter"
+            value={programFilter}
+            onChange={(value) => setProgramFilter(value as Program | 'all')}
+            options={[
+              { value: 'all', label: 'All Programs' },
+              { value: 'beta', label: 'Beta' },
+              { value: 'dogfood', label: 'Dogfood' },
+              { value: 'prq', label: 'PRQ' },
+              { value: 'pvt', label: 'PVT' },
+              { value: 'evt', label: 'EVT' },
+              { value: 'dvt', label: 'DVT' },
+              { value: 'other', label: 'Other' },
+            ]}
+          />
+        </div>
 
         {canEdit() && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Add Device
-          </button>
+          <Button type="primary" label="Add Device" onClick={() => setShowAddModal(true)} />
         )}
       </div>
 
       {/* Device actions — hidden for viewers */}
       {canEdit() && selectedDevices.size === 1 && (
-        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 p-3 rounded-lg sticky top-14 z-20">
-          <span className="text-sm font-medium text-blue-800">
+        <div className="flex items-center gap-3 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] p-3 rounded-lg sticky top-14 z-20">
+          <span className="text-sm font-medium text-[var(--ui-support-text-icon-support-info)]">
             1 device selected
           </span>
-          <button
-            onClick={() => setSelectedDevices(new Set())}
-            className="px-3 py-1 text-blue-700 border border-blue-300 rounded text-xs font-medium hover:bg-blue-100"
-          >
-            Clear
-          </button>
-          <button
+          <Button type="default" label="Clear" onClick={() => setSelectedDevices(new Set())} />
+          <Button
+            type="primary"
+            label="Edit device →"
             onClick={() => {
               const deviceId = Array.from(selectedDevices)[0];
               const device = filteredDevices.find((d) => d.id === deviceId);
@@ -110,17 +108,11 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
                 setSelectedDevices(new Set());
               }
             }}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
-          >
-            Edit device →
-          </button>
-          <button
-            onClick={() => setShowBulkReturn(true)}
-            className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700"
-          >
-            Return selected →
-          </button>
-          <button
+          />
+          <Button type="primary" danger label="Return selected →" onClick={() => setShowBulkReturn(true)} />
+          <Button
+            type="default"
+            label="Archive selected"
             onClick={() => {
               const ids = Array.from(selectedDevices);
               ids.forEach((id) => {
@@ -129,30 +121,19 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
               });
               setSelectedDevices(new Set());
             }}
-            className="px-3 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700"
-          >
-            Archive selected
-          </button>
+          />
         </div>
       )}
       {canEdit() && selectedDevices.size > 1 && (
-        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 p-3 rounded-lg sticky top-14 z-20">
-          <span className="text-sm font-medium text-blue-800">
+        <div className="flex items-center gap-3 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] p-3 rounded-lg sticky top-14 z-20">
+          <span className="text-sm font-medium text-[var(--ui-support-text-icon-support-info)]">
             {selectedDevices.size} device(s) selected
           </span>
-          <button
-            onClick={() => setSelectedDevices(new Set())}
-            className="px-3 py-1 text-blue-700 border border-blue-300 rounded text-xs font-medium hover:bg-blue-100"
-          >
-            Clear
-          </button>
-          <button
-            onClick={() => setShowBulkReturn(true)}
-            className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700"
-          >
-            Return selected →
-          </button>
-          <button
+          <Button type="default" label="Clear" onClick={() => setSelectedDevices(new Set())} />
+          <Button type="primary" danger label="Return selected →" onClick={() => setShowBulkReturn(true)} />
+          <Button
+            type="default"
+            label="Archive selected"
             onClick={() => {
               const ids = Array.from(selectedDevices);
               ids.forEach((id) => {
@@ -161,10 +142,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
               });
               setSelectedDevices(new Set());
             }}
-            className="px-3 py-1 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700"
-          >
-            Archive selected
-          </button>
+          />
         </div>
       )}
 
@@ -184,49 +162,52 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
           <>
             {/* Warning for devices missing program */}
             {missingProgram.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+              <div className="bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-xl p-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-red-600">⚠️</span>
-                  <span className="text-xs font-semibold text-red-800">{missingProgram.length} device(s) have no program assigned</span>
+                  <span className="text-[var(--ui-core-red-red-6)]">⚠️</span>
+                  <span className="text-xs font-semibold text-[var(--ui-support-text-support-error)]">{missingProgram.length} device(s) have no program assigned</span>
                 </div>
-                <p className="text-xs text-red-700 mt-1">Update them in the device detail or re-import with the Program column.</p>
+                <p className="text-xs text-[var(--ui-support-text-support-error)] mt-1">Update them in the device detail or re-import with the Program column.</p>
               </div>
             )}
 
             {programs.map((prog) => (
-              <div key={prog} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4">
-                <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
-                  <span className={`px-2.5 py-0.5 rounded text-xs font-semibold ${prog === 'unassigned' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+              <div key={prog} className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden mb-4">
+                <div className="px-4 py-2.5 bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center gap-3">
+                  <Tag color={prog === 'unassigned' ? 'red' : 'periwinkle'} size="regular">
                     {prog === 'unassigned' ? '⚠️ No Program' : `${grouped[prog][0]?.product ? grouped[prog][0].product + ' ' : ''}${prog.toUpperCase()}`}
-                  </span>
-                  <span className="text-xs text-gray-400">{grouped[prog].length} device(s)</span>
+                  </Tag>
+                  <span className="text-xs text-[var(--ui-text-text-placeholder)]">{grouped[prog].length} device(s)</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100">
+                      <tr className="border-b border-[var(--ui-background-layer-border-border-layer-page)]">
                         <th className="px-4 py-2 text-left w-8">
-                          <input type="checkbox" checked={grouped[prog].every((d) => selectedDevices.has(d.id))} onChange={() => { const ids = grouped[prog].map((d) => d.id); const allSelected = ids.every((id) => selectedDevices.has(id)); const next = new Set(selectedDevices); if (allSelected) { ids.forEach((id) => next.delete(id)); } else { ids.forEach((id) => next.add(id)); } setSelectedDevices(next); }} className="rounded border-gray-300" />
+                          <Checkbox
+                            checked={grouped[prog].every((d) => selectedDevices.has(d.id))}
+                            onChange={() => { const ids = grouped[prog].map((d) => d.id); const allSelected = ids.every((id) => selectedDevices.has(id)); const next = new Set(selectedDevices); if (allSelected) { ids.forEach((id) => next.delete(id)); } else { ids.forEach((id) => next.add(id)); } setSelectedDevices(next); }}
+                          />
                         </th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Serial Number</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Internal Name</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Phase</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Firmware</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Assigned To</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-500 uppercase text-xs">Status</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Serial Number</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Internal Name</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Phase</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Firmware</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Assigned To</th>
+                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                       {grouped[prog].map((device) => (
-                        <tr key={device.id} className="hover:bg-blue-50/50 transition-colors cursor-pointer" onClick={() => setSelectedDevice(device)}>
+                        <tr key={device.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors cursor-pointer" onClick={() => setSelectedDevice(device)}>
                           <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <input type="checkbox" checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} className="rounded border-gray-300" />
+                            <Checkbox checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} />
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-xs font-medium text-blue-700">{device.serialNumber}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{device.internalName}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{device.program?.toUpperCase() || '—'}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]">{device.serialNumber}</td>
+                          <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.internalName}</td>
+                          <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.program?.toUpperCase() || '—'}</td>
                           <td className="px-4 py-2.5 font-mono text-xs">{device.firmwareVersion || '—'}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{device.assignedTo || device.checkedOutTo || '—'}</td>
+                          <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.assignedTo || device.checkedOutTo || '—'}</td>
                           <td className="px-4 py-2.5"><StatusBadge status={device.status} /></td>
                         </tr>
                       ))}
@@ -237,14 +218,14 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
             ))}
 
             {filteredDevices.length === 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center text-gray-500">
-                <Monitor size={48} className="mx-auto mb-3 text-gray-300" />
+              <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center text-[var(--ui-text-text-tertiary)]">
+                <Monitor size={48} className="mx-auto mb-3 text-[var(--ui-text-text-disabled)]" />
                 <p className="font-medium">No devices found</p>
                 <p className="text-sm mt-1">Try adjusting your filters or add devices via Import</p>
               </div>
             )}
 
-            <div className="px-4 py-3 bg-gray-50 rounded-lg text-sm text-gray-500">
+            <div className="px-4 py-3 bg-[var(--ui-background-layer-layer-page-hover)] rounded-lg text-sm text-[var(--ui-text-text-tertiary)]">
               Showing {filteredDevices.length} of {devices.length} devices
             </div>
           </>
@@ -273,9 +254,8 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
 function StatusBadge({ status }: { status: DeviceStatus }) {
   const c = getStatusBadge(status);
   return (
-    <span className={`status-badge ${c.class}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+    <Tag color={c.color} size="regular" showIcon>
       {c.label}
-    </span>
+    </Tag>
   );
 }

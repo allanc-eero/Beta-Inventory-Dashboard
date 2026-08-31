@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { Button, Select, Tag, Card, Modal } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program } from '@/types';
 import DeviceDetailPanel from './DeviceDetailPanel';
@@ -27,6 +28,13 @@ const PROGRAM_LABELS: Record<Program, string> = {
   evt: 'EVT',
   dvt: 'DVT',
   other: 'Other',
+};
+
+// Map a DeviceAction to a WDS Tag color for inline action badges
+const ACTION_TAG_COLOR: Record<DeviceAction, 'red' | 'orange' | 'grey'> = {
+  brick_and_return: 'red',
+  return: 'orange',
+  archive: 'grey',
 };
 
 export default function ProgramsTab() {
@@ -226,39 +234,43 @@ Device Management Team`
   if (processResults) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-bold text-gray-900">✓ Program Closed Successfully</h2>
-        <p className="text-sm text-gray-500">{PROGRAM_LABELS[selectedProgram!] || 'Program'} — {processResults.totalProcessed} devices processed</p>
+        <h2 className="text-xl font-bold text-[var(--ui-text-text-primary)]">✓ Program Closed Successfully</h2>
+        <p className="text-sm text-[var(--ui-text-text-tertiary)]">{PROGRAM_LABELS[selectedProgram!] || 'Program'} — {processResults.totalProcessed} devices processed</p>
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{processResults.totalProcessed}</p>
-            <p className="text-xs text-gray-500">Total Processed</p>
+          <Card size={3}>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-[var(--ui-text-text-primary)]">{processResults.totalProcessed}</p>
+              <p className="text-xs text-[var(--ui-text-text-tertiary)]">Total Processed</p>
+            </div>
+          </Card>
+          <div className="bg-[var(--ui-support-fill-support-error)] rounded-xl border border-[var(--ui-support-border-support-error)] p-4 text-center">
+            <p className="text-2xl font-bold text-[var(--ui-support-text-support-error)]">{processResults.devicesBricked.length}</p>
+            <p className="text-xs text-[var(--ui-core-red-red-6)]">Devices Bricked</p>
           </div>
-          <div className="bg-white rounded-xl border border-red-200 p-4 text-center">
-            <p className="text-2xl font-bold text-red-700">{processResults.devicesBricked.length}</p>
-            <p className="text-xs text-red-600">Devices Bricked</p>
+          <div className="bg-[var(--ui-support-fill-support-info)] rounded-xl border border-[var(--ui-support-border-support-info)] p-4 text-center">
+            <p className="text-2xl font-bold text-[var(--ui-support-text-icon-support-info)]">{processResults.emailsSent.length}</p>
+            <p className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)]">Emails Sent</p>
           </div>
-          <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
-            <p className="text-2xl font-bold text-blue-700">{processResults.emailsSent.length}</p>
-            <p className="text-xs text-blue-600">Emails Sent</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-gray-700">{processResults.devicesArchived}</p>
-            <p className="text-xs text-gray-500">Archived</p>
-          </div>
+          <Card size={3}>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-[var(--ui-text-text-secondary)]">{processResults.devicesArchived}</p>
+              <p className="text-xs text-[var(--ui-text-text-tertiary)]">Archived</p>
+            </div>
+          </Card>
         </div>
 
         {/* Bricked devices confirmation */}
         {processResults.devicesBricked.length > 0 && (
-          <div className="bg-white rounded-xl border border-red-200 p-5">
-            <h3 className="text-sm font-semibold text-red-800 mb-3">⚠️ Devices Bricked via Partner API ({processResults.devicesBricked.length})</h3>
+          <div className="bg-[var(--ui-support-fill-support-error)] rounded-xl border border-[var(--ui-support-border-support-error)] p-5">
+            <h3 className="text-sm font-semibold text-[var(--ui-support-text-support-error)] mb-3">⚠️ Devices Bricked via Partner API ({processResults.devicesBricked.length})</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {processResults.devicesBricked.map((serial) => (
                 <div key={serial} className="flex items-center gap-2 text-xs">
-                  <span className="text-red-500">●</span>
+                  <span className="text-[var(--ui-core-red-red-6)]">●</span>
                   <span className="font-mono">{serial}</span>
-                  <span className="text-red-600 font-medium">Bricked</span>
+                  <span className="text-[var(--ui-core-red-red-6)] font-medium">Bricked</span>
                 </div>
               ))}
             </div>
@@ -267,13 +279,13 @@ Device Management Team`
 
         {/* Emails sent confirmation */}
         {processResults.emailsSent.length > 0 && (
-          <div className="bg-white rounded-xl border border-blue-200 p-5">
-            <h3 className="text-sm font-semibold text-blue-800 mb-3">📧 Return Emails Sent ({processResults.emailsSent.length} testers)</h3>
+          <div className="bg-[var(--ui-support-fill-support-info)] rounded-xl border border-[var(--ui-support-border-support-info)] p-5">
+            <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-info)] mb-3">📧 Return Emails Sent ({processResults.emailsSent.length} testers)</h3>
             <div className="space-y-2">
               {processResults.emailsSent.map(({ email, deviceCount }) => (
-                <div key={email} className="flex items-center justify-between text-sm p-2 bg-blue-50 rounded-lg">
-                  <span className="text-gray-700">{email}</span>
-                  <span className="text-xs text-blue-600 font-medium">{deviceCount} device(s) · Email sent ✓</span>
+                <div key={email} className="flex items-center justify-between text-sm p-2 bg-[var(--ui-support-fill-support-info)] rounded-lg">
+                  <span className="text-[var(--ui-text-text-secondary)]">{email}</span>
+                  <span className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] font-medium">{deviceCount} device(s) · Email sent ✓</span>
                 </div>
               ))}
             </div>
@@ -281,12 +293,11 @@ Device Management Team`
         )}
 
         {/* Back button */}
-        <button
+        <Button
+          type="primary"
+          label="Back to Programs"
           onClick={() => { setProcessResults(null); setSelectedProgram(null); }}
-          className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          Back to Programs
-        </button>
+        />
       </div>
     );
   }
@@ -305,13 +316,13 @@ Device Management Team`
         <div className="flex items-center justify-between">
           <div>
             <p
-              className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium mb-1"
+              className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] cursor-pointer font-medium mb-1"
               onClick={() => { setClosingProgram(false); setSelectedProgram(null); }}
             >
               ← Back to programs
             </p>
-            <h2 className="text-xl font-bold text-gray-900">Close Program: {PROGRAM_LABELS[selectedProgram]}</h2>
-            <p className="text-sm text-gray-500 mt-1">Decide what happens to each device in this program</p>
+            <h2 className="text-xl font-bold text-[var(--ui-text-text-primary)]">Close Program: {PROGRAM_LABELS[selectedProgram]}</h2>
+            <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">Decide what happens to each device in this program</p>
           </div>
         </div>
 
@@ -321,24 +332,24 @@ Device Management Team`
           if (!programRecord || programRecord.actions.length === 0) return null;
           const processed = programRecord.actions;
           return (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="bg-[var(--ui-support-fill-support-success)] border border-[var(--ui-support-border-support-success)] rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-green-800">✓ Devices Already Processed</h3>
-                <span className="text-xs text-green-600 font-medium">{processed.length} device(s) done</span>
+                <h3 className="text-sm font-semibold text-[var(--ui-support-text-support-success)]">✓ Devices Already Processed</h3>
+                <span className="text-xs text-[var(--ui-core-green-green-6)] font-medium">{processed.length} device(s) done</span>
               </div>
-              <div className="flex items-center gap-4 text-xs text-green-700 mb-2">
+              <div className="flex items-center gap-4 text-xs text-[var(--ui-support-text-support-success)] mb-2">
                 <span>{processed.filter((d) => d.action === 'brick_and_return').length} bricked</span>
                 <span>{processed.filter((d) => d.action === 'return').length} returned</span>
                 <span>{processed.filter((d) => d.action === 'archive').length} archived</span>
               </div>
               <details className="text-xs">
-                <summary className="cursor-pointer text-green-700 font-medium hover:text-green-900">View processed devices</summary>
+                <summary className="cursor-pointer text-[var(--ui-support-text-support-success)] font-medium hover:text-[var(--ui-core-green-green-6)]">View processed devices</summary>
                 <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
                   {processed.map((d, i) => (
-                    <div key={i} className="flex items-center justify-between p-1.5 bg-white rounded">
+                    <div key={i} className="flex items-center justify-between p-1.5 bg-[var(--ui-background-layer-layer-page)] rounded">
                       <span className="font-mono">{d.serial}</span>
-                      <span className="text-gray-500">{d.assignee} · {d.region}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs ${d.action === 'brick_and_return' ? 'bg-red-100 text-red-700' : d.action === 'return' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{d.action.replace(/_/g, ' ')}</span>
+                      <span className="text-[var(--ui-text-text-tertiary)]">{d.assignee} · {d.region}</span>
+                      <Tag color={ACTION_TAG_COLOR[d.action as DeviceAction]} size="regular">{d.action.replace(/_/g, ' ')}</Tag>
                     </div>
                   ))}
                 </div>
@@ -349,49 +360,48 @@ Device Management Team`
 
         {/* Program-wide actions — admin only */}
         {canEdit() && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-1">Program-Wide Actions</h3>
-          <p className="text-xs text-gray-500 mb-4">
+        <Card size={3}>
+          <h3 className="text-sm font-semibold text-[var(--ui-text-text-primary)] mb-1">Program-Wide Actions</h3>
+          <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-4">
             Use these buttons to apply the same action to <strong>every device</strong> in this program across all regions. If you need different actions per region, skip this and use the per-region buttons below instead.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <button
+            <Button
+              type="primary"
+              danger
+              label="Brick & Return All Devices"
               onClick={() => { handleSetAllActions('brick_and_return'); setBulkReturnDevices(selectedDevices); }}
-              className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Brick & Return All Devices
-            </button>
-            <button
+            />
+            <Button
+              type="default"
+              label="Archive All Devices"
               onClick={() => { handleSetAllActions('archive'); setBulkReturnDevices(selectedDevices); }}
-              className="px-4 py-2 text-sm font-medium bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Archive All Devices
-            </button>
-            <button
+            />
+            <Button
+              type="primary"
+              label="Return All Devices"
               onClick={() => { handleSetAllActions('return'); setBulkReturnDevices(selectedDevices); }}
-              className="px-4 py-2 text-sm font-medium bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-            >
-              Return All Devices
-            </button>
+            />
           </div>
 
           {/* Status bar */}
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[var(--ui-background-layer-border-border-layer-page)]">
             <div className="flex items-center gap-3 text-xs">
-              <span className="text-red-700 font-medium">{actionCounts.return} return</span>
-              <span className="text-red-800 font-medium">{actionCounts.brick_and_return} brick & return</span>
-              <span className="text-gray-600 font-medium">{actionCounts.archive} archive</span>
-              {Object.keys(deviceActions).length === 0 && <span className="text-orange-600 font-medium">No actions selected yet</span>}
+              <span className="text-[var(--ui-support-text-support-error)] font-medium">{actionCounts.return} return</span>
+              <span className="text-[var(--ui-support-text-support-error)] font-medium">{actionCounts.brick_and_return} brick & return</span>
+              <span className="text-[var(--ui-text-text-tertiary)] font-medium">{actionCounts.archive} archive</span>
+              {Object.keys(deviceActions).length === 0 && <span className="text-[var(--ui-core-orange-orange-6)] font-medium">No actions selected yet</span>}
             </div>
-            <button
-              onClick={() => setShowPreview(true)}
-              disabled={processing || Object.keys(deviceActions).length === 0}
-              className="ml-auto px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Preview Changes →
-            </button>
+            <div className="ml-auto">
+              <Button
+                type="primary"
+                label="Preview Changes →"
+                onClick={() => setShowPreview(true)}
+                disabled={processing || Object.keys(deviceActions).length === 0}
+              />
+            </div>
           </div>
-        </div>
+        </Card>
         )}
 
         {/* Dry Run Preview Modal */}
@@ -418,117 +428,118 @@ Device Management Team`
           };
 
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center">
-              <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreview(false)} />
-              <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
-                <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-lg font-bold text-gray-900">Preview: Close Program {PROGRAM_LABELS[selectedProgram]}</h2>
-                  <button onClick={exportPreviewCSV} className="text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 px-2.5 py-1 rounded-md hover:bg-blue-50">
-                    Export Preview (CSV)
-                  </button>
+            <Modal
+              isOpen
+              title={`Preview: Close Program ${PROGRAM_LABELS[selectedProgram]}`}
+              onCancel={() => setShowPreview(false)}
+              hideFooter
+            >
+              <div className="flex items-center justify-end mb-1">
+                <Button
+                  type="link"
+                  label="Export Preview (CSV)"
+                  onClick={exportPreviewCSV}
+                />
+              </div>
+              <p className="text-sm text-[var(--ui-text-text-tertiary)] mb-1">Review exactly what will happen before executing. Nothing has been changed yet.</p>
+              <p className="text-xs text-[var(--ui-text-text-placeholder)] mb-6">Preview generated: {previewTime}</p>
+
+              {/* Brick & Return section */}
+              {brickDevices.length > 0 && (
+                <div className="mb-5 p-4 bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-lg">
+                  <h3 className="text-sm font-semibold text-[var(--ui-support-text-support-error)] mb-2">🚨 BRICK & RETURN — {brickDevices.length} device(s)</h3>
+                  <p className="text-xs text-[var(--ui-core-red-red-6)] mb-3">These devices will be permanently deactivated via the Partner API. They will never connect to a network again. Return emails will be sent.</p>
+                  {Object.entries(brickByRegion).map(([region, devices]) => (
+                    <div key={region} className="mb-2">
+                      <p className="text-xs font-medium text-[var(--ui-support-text-support-error)]">📍 {region} ({devices.length})</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-[var(--ui-support-fill-support-error)] text-[var(--ui-support-text-support-error)] px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm text-gray-500 mb-1">Review exactly what will happen before executing. Nothing has been changed yet.</p>
-                <p className="text-xs text-gray-400 mb-6">Preview generated: {previewTime}</p>
+              )}
 
-                {/* Brick & Return section */}
-                {brickDevices.length > 0 && (
-                  <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <h3 className="text-sm font-semibold text-red-800 mb-2">🚨 BRICK & RETURN — {brickDevices.length} device(s)</h3>
-                    <p className="text-xs text-red-600 mb-3">These devices will be permanently deactivated via the Partner API. They will never connect to a network again. Return emails will be sent.</p>
-                    {Object.entries(brickByRegion).map(([region, devices]) => (
-                      <div key={region} className="mb-2">
-                        <p className="text-xs font-medium text-red-700">📍 {region} ({devices.length})</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
-                        </div>
+              {/* Return section */}
+              {returnDevices.length > 0 && (
+                <div className="mb-5 p-4 bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-lg">
+                  <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-warning)] mb-2">📦 RETURN TO EERO — {returnDevices.length} device(s)</h3>
+                  <p className="text-xs text-[var(--ui-core-orange-orange-6)] mb-3">These devices will be marked as "Pending Return." Return emails will be sent. Devices stay active until you confirm receipt.</p>
+                  {Object.entries(returnByRegion).map(([region, devices]) => (
+                    <div key={region} className="mb-2">
+                      <p className="text-xs font-medium text-[var(--ui-support-text-icon-support-warning)]">📍 {region} ({devices.length})</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-[var(--ui-support-fill-support-warning)] text-[var(--ui-support-text-icon-support-warning)] px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Return section */}
-                {returnDevices.length > 0 && (
-                  <div className="mb-5 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <h3 className="text-sm font-semibold text-orange-800 mb-2">📦 RETURN TO EERO — {returnDevices.length} device(s)</h3>
-                    <p className="text-xs text-orange-600 mb-3">These devices will be marked as "Pending Return." Return emails will be sent. Devices stay active until you confirm receipt.</p>
-                    {Object.entries(returnByRegion).map(([region, devices]) => (
-                      <div key={region} className="mb-2">
-                        <p className="text-xs font-medium text-orange-700">📍 {region} ({devices.length})</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Archive section */}
-                {archiveDevices.length > 0 && (
-                  <div className="mb-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">📁 ARCHIVE — {archiveDevices.length} device(s)</h3>
-                    <p className="text-xs text-gray-500 mb-3">These devices will be marked as deactivated. Data is preserved. No emails sent.</p>
-                    {Object.entries(archiveByRegion).map(([region, devices]) => (
-                      <div key={region} className="mb-2">
-                        <p className="text-xs font-medium text-gray-600">📍 {region} ({devices.length})</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Summary */}
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6">
-                  <h3 className="text-sm font-semibold text-blue-800 mb-2">Summary</h3>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <p className="text-xl font-bold text-red-700">{brickDevices.length}</p>
-                      <p className="text-xs text-gray-600">Bricked</p>
                     </div>
-                    <div>
-                      <p className="text-xl font-bold text-orange-600">{returnDevices.length}</p>
-                      <p className="text-xs text-gray-600">Pending Return</p>
-                    </div>
-                    <div>
-                      <p className="text-xl font-bold text-gray-600">{archiveDevices.length}</p>
-                      <p className="text-xs text-gray-600">Archived</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
+              )}
 
-                {/* Batch processing option for bricking */}
-                {brickDevices.length > 10 && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6">
-                    <h3 className="text-xs font-semibold text-yellow-800 mb-1">⚡ Large batch detected — consider processing in stages</h3>
-                    <p className="text-xs text-yellow-700 mb-3">You're about to brick {brickDevices.length} devices. We recommend processing by region using the per-region buttons instead, so you can verify each batch before continuing.</p>
-                    <button
-                      onClick={() => setShowPreview(false)}
-                      className="text-xs font-medium text-yellow-800 border border-yellow-300 px-3 py-1.5 rounded-md hover:bg-yellow-100"
-                    >
-                      ← Go back and process by region instead
-                    </button>
+              {/* Archive section */}
+              {archiveDevices.length > 0 && (
+                <div className="mb-5 p-4 bg-[var(--ui-background-layer-layer-page-hover)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg">
+                  <h3 className="text-sm font-semibold text-[var(--ui-text-text-secondary)] mb-2">📁 ARCHIVE — {archiveDevices.length} device(s)</h3>
+                  <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-3">These devices will be marked as deactivated. Data is preserved. No emails sent.</p>
+                  {Object.entries(archiveByRegion).map(([region, devices]) => (
+                    <div key={region} className="mb-2">
+                      <p className="text-xs font-medium text-[var(--ui-text-text-tertiary)]">📍 {region} ({devices.length})</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {devices.map((d) => <span key={d.id} className="text-xs font-mono bg-[var(--ui-background-layer-layer-page-hover)] text-[var(--ui-text-text-tertiary)] px-1.5 py-0.5 rounded">{d.serialNumber}</span>)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="p-4 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-lg mb-6">
+                <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-info)] mb-2">Summary</h3>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-xl font-bold text-[var(--ui-support-text-support-error)]">{brickDevices.length}</p>
+                    <p className="text-xs text-[var(--ui-text-text-tertiary)]">Bricked</p>
                   </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => setShowPreview(false)}
-                    className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    ← Go Back & Edit
-                  </button>
-                  <button
-                    onClick={() => { setShowPreview(false); handleProcessClose(); }}
-                    disabled={processing}
-                    className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${brickDevices.length > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-                  >
-                    {processing ? 'Processing...' : `Confirm & Execute (${selectedDevices.length} devices)`}
-                  </button>
+                  <div>
+                    <p className="text-xl font-bold text-[var(--ui-core-orange-orange-6)]">{returnDevices.length}</p>
+                    <p className="text-xs text-[var(--ui-text-text-tertiary)]">Pending Return</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-[var(--ui-text-text-tertiary)]">{archiveDevices.length}</p>
+                    <p className="text-xs text-[var(--ui-text-text-tertiary)]">Archived</p>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* Batch processing option for bricking */}
+              {brickDevices.length > 10 && (
+                <div className="p-4 bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-lg mb-6">
+                  <h3 className="text-xs font-semibold text-[var(--ui-support-text-icon-support-warning)] mb-1">⚡ Large batch detected — consider processing in stages</h3>
+                  <p className="text-xs text-[var(--ui-support-text-icon-support-warning)] mb-3">You're about to brick {brickDevices.length} devices. We recommend processing by region using the per-region buttons instead, so you can verify each batch before continuing.</p>
+                  <Button
+                    type="default"
+                    label="← Go back and process by region instead"
+                    onClick={() => setShowPreview(false)}
+                  />
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-between">
+                <Button
+                  type="default"
+                  label="← Go Back & Edit"
+                  onClick={() => setShowPreview(false)}
+                />
+                <Button
+                  type="primary"
+                  danger={brickDevices.length > 0}
+                  label={processing ? 'Processing...' : `Confirm & Execute (${selectedDevices.length} devices)`}
+                  onClick={() => { setShowPreview(false); handleProcessClose(); }}
+                  disabled={processing}
+                />
+              </div>
+            </Modal>
           );
         })()}
 
@@ -547,15 +558,15 @@ Device Management Team`
             <div className="space-y-4">
               {/* Warning for devices missing region data */}
               {missingRegion.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-red-600">⚠️</span>
-                    <span className="text-sm font-semibold text-red-800">{missingRegion.length} device(s) missing region/country data</span>
+                    <span className="text-[var(--ui-core-red-red-6)]">⚠️</span>
+                    <span className="text-sm font-semibold text-[var(--ui-support-text-support-error)]">{missingRegion.length} device(s) missing region/country data</span>
                   </div>
-                  <p className="text-xs text-red-700 mb-2">These devices have no country assigned. Update them in the device detail or re-import with the Country column filled in.</p>
+                  <p className="text-xs text-[var(--ui-support-text-support-error)] mb-2">These devices have no country assigned. Update them in the device detail or re-import with the Country column filled in.</p>
                   <div className="flex flex-wrap gap-2">
                     {missingRegion.map((d) => (
-                      <span key={d.id} className="text-xs font-mono bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                      <span key={d.id} className="text-xs font-mono bg-[var(--ui-support-fill-support-error)] text-[var(--ui-support-text-support-error)] px-2 py-0.5 rounded">
                         {d.serialNumber} ({d.assignedTo || d.assignedEmail || 'unassigned'})
                       </span>
                     ))}
@@ -563,78 +574,81 @@ Device Management Team`
                 </div>
               )}
               {regions.map((region) => (
-                <div key={region} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <div key={region} className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
+                  <div className="px-4 py-3 bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-700">📍 {region}</span>
-                      <span className="text-xs text-gray-400">{grouped[region].length} device(s)</span>
+                      <span className="text-sm font-semibold text-[var(--ui-text-text-secondary)]">📍 {region}</span>
+                      <span className="text-xs text-[var(--ui-text-text-placeholder)]">{grouped[region].length} device(s)</span>
                     </div>
                     {canEdit() && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">Set region to:</span>
-                      <button
+                      <span className="text-xs text-[var(--ui-text-text-tertiary)]">Set region to:</span>
+                      <Button
+                        type="default"
+                        danger
+                        label="Brick & Return"
                         onClick={() => {
                           const updated = { ...deviceActions };
                           grouped[region].forEach((d) => { updated[d.id] = 'brick_and_return'; });
                           setDeviceActions(updated);
                         }}
-                        className="px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200 rounded hover:bg-red-50"
-                      >
-                        Brick & Return
-                      </button>
-                      <button
+                      />
+                      <Button
+                        type="default"
+                        label="Archive"
                         onClick={() => {
                           const updated = { ...deviceActions };
                           grouped[region].forEach((d) => { updated[d.id] = 'archive'; });
                           setDeviceActions(updated);
                         }}
-                        className="px-2 py-0.5 text-xs font-medium text-gray-600 border border-gray-200 rounded hover:bg-gray-100"
-                      >
-                        Archive
-                      </button>
+                      />
                     </div>
                     )}
                   </div>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Serial</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Assigned To</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
+                      <tr className="border-b border-[var(--ui-background-layer-border-border-layer-page)]">
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Serial</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Assigned To</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Status</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                       {grouped[region].map((device) => (
-                        <tr key={device.id} className="hover:bg-gray-50">
+                        <tr key={device.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)]">
                           <td className="px-4 py-2.5 font-mono text-xs">
                             <button
                               onClick={() => setDetailDevice(device)}
-                              className="text-blue-700 font-medium hover:underline cursor-pointer"
+                              className="text-[var(--ui-core-periwinkle-periwinkle-6)] font-medium hover:underline cursor-pointer"
                             >
                               {device.serialNumber}
                             </button>
                           </td>
-                          <td className="px-4 py-2.5 text-gray-600">{device.assignedTo || device.assignedEmail || '—'}</td>
+                          <td className="px-4 py-2.5 text-[var(--ui-text-text-tertiary)]">{device.assignedTo || device.assignedEmail || '—'}</td>
                           <td className="px-4 py-2.5">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${device.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            <Tag color={device.status === 'online' ? 'green' : 'orange'} size="regular">
                               {device.status.replace(/_/g, ' ')}
-                            </span>
+                            </Tag>
                           </td>
                           <td className="px-4 py-2.5">
                             {canEdit() ? (
-                            <select
-                              value={deviceActions[device.id] || ''}
-                              onChange={(e) => setDeviceActions({ ...deviceActions, [device.id]: e.target.value as DeviceAction })}
-                              className={`px-2 py-1 text-xs border rounded-md ${deviceActions[device.id] ? 'border-gray-200' : 'border-orange-300 bg-orange-50'}`}
-                            >
-                              <option value="" disabled>Select action...</option>
-                              <option value="return">Return to eero</option>
-                              <option value="brick_and_return">Brick & Return</option>
-                              <option value="archive">Archive</option>
-                            </select>
+                            <div className="w-40">
+                              <Select
+                                id={`device-action-${device.id}`}
+                                value={deviceActions[device.id] || undefined}
+                                placeholder="Select action..."
+                                state={deviceActions[device.id] ? 'default' : 'warning'}
+                                onChange={(val) => setDeviceActions({ ...deviceActions, [device.id]: val as DeviceAction })}
+                                options={[
+                                  { value: 'return', label: 'Return to eero' },
+                                  { value: 'brick_and_return', label: 'Brick & Return' },
+                                  { value: 'archive', label: 'Archive' },
+                                ]}
+                              />
+                            </div>
                             ) : (
-                              <span className="text-xs text-gray-400">—</span>
+                              <span className="text-xs text-[var(--ui-text-text-placeholder)]">—</span>
                             )}
                           </td>
                         </tr>
@@ -643,16 +657,15 @@ Device Management Team`
                   </table>
                   {/* Per-region process button — admin only */}
                   {canEdit() && (
-                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                      <div className="text-xs text-gray-500">
+                    <div className="px-4 py-3 bg-[var(--ui-background-layer-layer-page-hover)] border-t border-[var(--ui-background-layer-border-border-layer-page)] flex items-center justify-between">
+                      <div className="text-xs text-[var(--ui-text-text-tertiary)]">
                         {grouped[region].filter((d) => deviceActions[d.id] === 'brick_and_return').length} brick & return · {grouped[region].filter((d) => deviceActions[d.id] === 'return').length} return · {grouped[region].filter((d) => deviceActions[d.id] === 'archive').length} archive · {grouped[region].filter((d) => !deviceActions[d.id]).length} unset
                       </div>
-                      <button
+                      <Button
+                        type="primary"
+                        label={`Process ${region} (${grouped[region].length} devices) →`}
                         onClick={() => setBulkReturnDevices(grouped[region])}
-                        className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                      >
-                        Process {region} ({grouped[region].length} devices) →
-                      </button>
+                      />
                     </div>
                   )}
                 </div>
@@ -708,7 +721,7 @@ Device Management Team`
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Programs</h2>
+        <h2 className="text-lg font-bold text-[var(--ui-text-text-primary)]">Programs</h2>
       </div>
 
       {/* Active program cards — includes programs with partial processing */}
@@ -719,35 +732,35 @@ Device Management Team`
           const hasProgress = processedCount > 0;
 
           return (
-          <div key={prog.name} className="bg-white rounded-xl border border-gray-200 p-5">
+          <Card key={prog.name} size={3}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-900">{prog.label}</h3>
+              <h3 className="text-base font-semibold text-[var(--ui-text-text-primary)]">{prog.label}</h3>
               {hasProgress ? (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">In Progress</span>
+                <Tag color="orange" size="regular">In Progress</Tag>
               ) : (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>
+                <Tag color="green" size="regular">Active</Tag>
               )}
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{prog.deviceCount}</p>
-                <p className="text-xs text-gray-500">Total Devices</p>
+                <p className="text-lg font-bold text-[var(--ui-text-text-primary)]">{prog.deviceCount}</p>
+                <p className="text-xs text-[var(--ui-text-text-tertiary)]">Total Devices</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-bold text-green-600">{prog.onlineCount}</p>
-                <p className="text-xs text-gray-500">Online Devices</p>
+                <p className="text-lg font-bold text-[var(--ui-core-green-green-6)]">{prog.onlineCount}</p>
+                <p className="text-xs text-[var(--ui-text-text-tertiary)]">Online Devices</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-bold text-yellow-600">{prog.offlineCount}</p>
-                <p className="text-xs text-gray-500">Offline Devices</p>
+                <p className="text-lg font-bold text-[var(--ui-core-orange-orange-6)]">{prog.offlineCount}</p>
+                <p className="text-xs text-[var(--ui-text-text-tertiary)]">Offline Devices</p>
               </div>
             </div>
 
             {/* Progress indicator when partially processed */}
             {hasProgress && (
-              <div className="mb-3 p-2 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3 text-xs text-gray-600">
+              <div className="mb-3 p-2 bg-[var(--ui-background-layer-layer-page-hover)] rounded-lg">
+                <div className="flex items-center gap-3 text-xs text-[var(--ui-text-text-tertiary)]">
                   <span className="font-medium">{processedCount} processed</span>
                   <span>{programRecord!.actions.filter((a) => a.action === 'brick_and_return').length} bricked</span>
                   <span>{programRecord!.actions.filter((a) => a.action === 'archive').length} archived</span>
@@ -757,43 +770,45 @@ Device Management Team`
             )}
 
             {prog.deactivatedCount > 0 && !hasProgress && (
-              <p className="text-xs text-gray-400 mb-3">{prog.deactivatedCount} deactivated</p>
+              <p className="text-xs text-[var(--ui-text-text-placeholder)] mb-3">{prog.deactivatedCount} deactivated</p>
             )}
 
-            <button
+            <Button
+              type="default"
+              fullWidth
+              label={canEdit() ? (hasProgress ? 'Continue Processing →' : 'Close Program →') : 'View Program Details →'}
               onClick={() => handleStartClose(prog.name)}
-              className="w-full py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              {canEdit() ? (hasProgress ? 'Continue Processing →' : 'Close Program →') : 'View Program Details →'}
-            </button>
-          </div>
+            />
+          </Card>
           );
         })}
       </div>
 
       {programs.filter((p) => !fullyArchivedPrograms.has(p.name)).length === 0 && closedPrograms.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <p className="text-gray-400 text-sm">No active programs with devices</p>
-        </div>
+        <Card size={3}>
+          <div className="p-12 text-center">
+            <p className="text-[var(--ui-text-text-placeholder)] text-sm">No active programs with devices</p>
+          </div>
+        </Card>
       )}
 
       {/* Archived/Closed programs */}
       {/* Archived/Closed programs — only fully processed ones */}
       {closedPrograms.filter((cp) => fullyArchivedPrograms.has(cp.program)).length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Archived Programs</h3>
+          <h3 className="text-sm font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3">Archived Programs</h3>
           <div className="space-y-3">
             {closedPrograms.filter((cp) => fullyArchivedPrograms.has(cp.program)).map((cp) => (
-              <div key={cp.id} className="bg-white rounded-xl border border-gray-200 p-5">
+              <Card key={cp.id} size={3}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <h4 className="text-base font-semibold text-gray-900">{PROGRAM_LABELS[cp.program as Program] || cp.program}</h4>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Archived</span>
+                    <h4 className="text-base font-semibold text-[var(--ui-text-text-primary)]">{PROGRAM_LABELS[cp.program as Program] || cp.program}</h4>
+                    <Tag color="grey" size="regular">Archived</Tag>
                   </div>
-                  <span className="text-xs text-gray-400">Closed {new Date(cp.closedAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-[var(--ui-text-text-placeholder)]">Closed {new Date(cp.closedAt).toLocaleDateString()}</span>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                <div className="flex items-center gap-4 text-xs text-[var(--ui-text-text-tertiary)] mb-3">
                   <span>Closed by {cp.closedBy}</span>
                   <span>·</span>
                   <span>{cp.totalDevices} devices processed</span>
@@ -804,19 +819,19 @@ Device Management Team`
 
                 {/* Expandable device list */}
                 <details className="text-xs">
-                  <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+                  <summary className="cursor-pointer text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] font-medium">
                     View {cp.actions.length} devices
                   </summary>
-                  <div className="mt-2 max-h-48 overflow-y-auto border border-gray-100 rounded-lg">
+                  <div className="mt-2 max-h-48 overflow-y-auto border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg">
                     <table className="w-full">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-[var(--ui-background-layer-layer-page-hover)] sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Serial</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Assignee</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Action</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-text-tertiary)]">Serial</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-text-tertiary)]">Assignee</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-text-tertiary)]">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50">
+                      <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                         {cp.actions.map((a, i) => {
                           const device = devices.find((d) => d.serialNumber === a.serial);
                           return (
@@ -825,7 +840,7 @@ Device Management Team`
                               {device ? (
                                 <button
                                   onClick={() => setDetailDevice(device)}
-                                  className="text-blue-700 font-medium hover:underline cursor-pointer"
+                                  className="text-[var(--ui-core-periwinkle-periwinkle-6)] font-medium hover:underline cursor-pointer"
                                 >
                                   {a.serial}
                                 </button>
@@ -833,15 +848,11 @@ Device Management Team`
                                 <span>{a.serial}</span>
                               )}
                             </td>
-                            <td className="px-3 py-1.5 text-gray-600">{a.assignee}</td>
+                            <td className="px-3 py-1.5 text-[var(--ui-text-text-tertiary)]">{a.assignee}</td>
                             <td className="px-3 py-1.5">
-                              <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                                a.action === 'brick_and_return' ? 'bg-red-100 text-red-700' :
-                                a.action === 'return' ? 'bg-orange-100 text-orange-700' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
+                              <Tag color={ACTION_TAG_COLOR[a.action as DeviceAction]} size="regular">
                                 {a.action.replace(/_/g, ' ')}
-                              </span>
+                              </Tag>
                             </td>
                           </tr>
                           );
@@ -850,7 +861,7 @@ Device Management Team`
                     </table>
                   </div>
                 </details>
-              </div>
+              </Card>
             ))}
           </div>
         </div>

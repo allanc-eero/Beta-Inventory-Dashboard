@@ -9,7 +9,8 @@ import {
   ServiceOrderPriority,
 } from '@/types';
 import { Kanban, Plus, ExternalLink, User, MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
-import { REGIONS } from '@/constants';
+import { Button, Select, Tag, Card, Input, Segmented } from '@amzn/eero-web-design-components';
+import { REGIONS, TagColor } from '@/constants';
 import { timeAgo } from '@/constants';
 
 const columns: { id: ServiceOrderStatus; label: string }[] = [
@@ -21,13 +22,14 @@ const columns: { id: ServiceOrderStatus; label: string }[] = [
   { id: 'completed', label: 'COMPLETED' },
 ];
 
-const typeColors: Record<ServiceOrderType, string> = {
-  returned_to_eero: 'bg-blue-500 text-white',
-  defective: 'bg-red-600 text-white',
-  end_of_program: 'bg-orange-500 text-white',
-  lost: 'bg-gray-700 text-white',
-  outbound_shipment: 'bg-blue-500 text-white',
-  other: 'bg-gray-500 text-white',
+// Service order type → WDS Tag color.
+const typeColors: Record<ServiceOrderType, TagColor> = {
+  returned_to_eero: 'periwinkle',
+  defective: 'red',
+  end_of_program: 'orange',
+  lost: 'grey',
+  outbound_shipment: 'periwinkle',
+  other: 'grey',
 };
 
 const typeLabels: Record<ServiceOrderType, string> = {
@@ -39,14 +41,38 @@ const typeLabels: Record<ServiceOrderType, string> = {
   other: 'Other',
 };
 
-const priorityColors: Record<ServiceOrderPriority, string> = {
-  P0: 'bg-red-600 text-white',
-  P1: 'bg-red-500 text-white',
-  P2: 'bg-orange-500 text-white',
-  P3: 'bg-yellow-500 text-white',
-  P4: 'bg-blue-400 text-white',
-  P5: 'bg-gray-400 text-white',
+// Service order priority → WDS Tag color.
+const priorityColors: Record<ServiceOrderPriority, TagColor> = {
+  P0: 'red',
+  P1: 'red',
+  P2: 'orange',
+  P3: 'yellow',
+  P4: 'periwinkle',
+  P5: 'grey',
 };
+
+const typeOptions: { value: ServiceOrderType; label: string }[] = [
+  { value: 'returned_to_eero', label: 'Returned to eero' },
+  { value: 'defective', label: 'Defective / Hardware issue' },
+  { value: 'end_of_program', label: 'End of program phase' },
+  { value: 'lost', label: 'Lost / Unrecoverable' },
+  { value: 'outbound_shipment', label: 'Outbound Shipment' },
+  { value: 'other', label: 'Other' },
+];
+
+const priorityFormOptions: { value: ServiceOrderPriority; label: string }[] = [
+  { value: 'P0', label: 'P0 - Critical' },
+  { value: 'P1', label: 'P1 - High' },
+  { value: 'P2', label: 'P2 - Medium' },
+  { value: 'P3', label: 'P3 - Normal' },
+  { value: 'P4', label: 'P4 - Low' },
+  { value: 'P5', label: 'P5 - Minimal' },
+];
+
+const priorityFilterOptions = [{ value: 'all', label: 'All priorities' }, ...(['P0', 'P1', 'P2', 'P3', 'P4', 'P5'] as ServiceOrderPriority[]).map((p) => ({ value: p, label: p }))];
+const typeFilterOptions = [{ value: 'all', label: 'All types' }, ...typeOptions];
+const regionOptions = REGIONS.map((r) => ({ value: r, label: r }));
+const regionFilterOptions = [{ value: 'all', label: 'All Regions' }, ...regionOptions];
 
 function getTimeInColumn(columnEnteredAt: string): string {
   return timeAgo(columnEnteredAt, 'short');
@@ -84,6 +110,7 @@ export default function ServiceBoard() {
     filteredOrders.filter((o) => o.status === status);
 
   const uniqueAssignees = Array.from(new Set(serviceOrders.map((o) => o.assignee).filter(Boolean)));
+  const assigneeOptions = [{ value: 'all', label: 'All assignees' }, ...uniqueAssignees.map((a) => ({ value: a, label: a }))];
 
   const handleCreate = () => {
     const now = new Date().toISOString();
@@ -137,22 +164,22 @@ export default function ServiceBoard() {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <Kanban className="w-5 h-5 text-[#2c3e7a]" />
+          <h2 className="text-xl font-semibold text-[var(--ui-text-text-primary)] flex items-center gap-2">
+            <Kanban className="w-5 h-5 text-[var(--ui-core-periwinkle-periwinkle-6)]" />
             Service Orders
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">
             Track lab work from request to close. Create an SO from a JIRA ticket or scratch, assign it, log progress, and close when done.
-            <span className="text-gray-400 ml-1">Syncs with Beta epic via API.</span>
+            <span className="text-[var(--ui-text-text-placeholder)] ml-1">Syncs with Beta epic via API.</span>
           </p>
           {/* Linked JIRA Epic */}
-          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
-            <span className="text-xs text-blue-700 font-medium">JIRA Epic:</span>
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-lg">
+            <span className="text-xs text-[var(--ui-support-text-icon-support-info)] font-medium">JIRA Epic:</span>
             <a
               href="https://eeroinc.atlassian.net/browse/BPM-1886"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+              className="text-xs font-bold text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1"
             >
               BPM-1886 — Dogfood & Beta Device Shipment Tracking
               <ExternalLink className="w-3 h-3" />
@@ -161,214 +188,158 @@ export default function ServiceBoard() {
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`px-3 py-1.5 text-xs font-medium ${viewMode === 'table' ? 'bg-[#2c3e7a] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-            >
-              Table
-            </button>
-            <button
-              onClick={() => setViewMode('board')}
-              className={`px-3 py-1.5 text-xs font-medium ${viewMode === 'board' ? 'bg-[#2c3e7a] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-            >
-              Board
-            </button>
-          </div>
-          <button
+          <Segmented
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'board' | 'table')}
+            items={[
+              { value: 'table', label: 'Table' },
+              { value: 'board', label: 'Board' },
+            ]}
+          />
+          <Button
+            type="primary"
+            size="medium"
+            ariaLabel="New Service Order"
             onClick={() => setShowNewForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2c3e7a] text-white rounded-lg text-xs font-medium hover:bg-[#1e2f5e] transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Service Order
-          </button>
+            label={
+              <span className="flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5" />
+                New Service Order
+              </span>
+            }
+          />
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value as ServiceOrderType | 'all')}
-          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600"
-        >
-          <option value="all">All types</option>
-          <option value="returned_to_eero">Returned to eero</option>
-          <option value="defective">Defective / Hardware issue</option>
-          <option value="end_of_program">End of program phase</option>
-          <option value="lost">Lost / Unrecoverable</option>
-          <option value="outbound_shipment">Outbound Shipment</option>
-          <option value="other">Other</option>
-        </select>
-        <select
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value as ServiceOrderPriority | 'all')}
-          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600"
-        >
-          <option value="all">All priorities</option>
-          <option value="P0">P0</option>
-          <option value="P1">P1</option>
-          <option value="P2">P2</option>
-          <option value="P3">P3</option>
-          <option value="P4">P4</option>
-          <option value="P5">P5</option>
-        </select>
-        <select
-          value={filterAssignee}
-          onChange={(e) => setFilterAssignee(e.target.value)}
-          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600"
-        >
-          <option value="all">All assignees</option>
-          {uniqueAssignees.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
-        <select
-          value={filterRegion}
-          onChange={(e) => setFilterRegion(e.target.value)}
-          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-600"
-        >
-          <option value="all">All Regions</option>
-          <option value="USA">USA</option>
-          <option value="CA">CA</option>
-          <option value="EU">EU</option>
-          <option value="UK">UK</option>
-          <option value="AUS">AUS</option>
-          <option value="NZ">NZ</option>
-          <option value="JPN">JPN</option>
-          <option value="SG">SG</option>
-          <option value="Other">Other</option>
-        </select>
+        <div className="w-48">
+          <Select
+            id="filter-type"
+            value={filterType}
+            onChange={(val) => setFilterType(val as ServiceOrderType | 'all')}
+            options={typeFilterOptions}
+          />
+        </div>
+        <div className="w-36">
+          <Select
+            id="filter-priority"
+            value={filterPriority}
+            onChange={(val) => setFilterPriority(val as ServiceOrderPriority | 'all')}
+            options={priorityFilterOptions}
+          />
+        </div>
+        <div className="w-40">
+          <Select
+            id="filter-assignee"
+            value={filterAssignee}
+            onChange={(val) => setFilterAssignee(val as string)}
+            options={assigneeOptions}
+          />
+        </div>
+        <div className="w-40">
+          <Select
+            id="filter-region"
+            value={filterRegion}
+            onChange={(val) => setFilterRegion(val as string)}
+            options={regionFilterOptions}
+          />
+        </div>
       </div>
 
       {/* New Service Order Form */}
       {showNewForm && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Create Service Order</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="col-span-2">
-              <label className="text-xs text-gray-500 block mb-1">Title</label>
-              <input
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="e.g., Replace Xenia SFO38 OTA Rack - 02"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Type</label>
-              <select
+        <div className="mb-6">
+          <Card size={3} title="Create Service Order">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="col-span-2">
+                <Input
+                  id="new-title"
+                  label="Title"
+                  layout="vertical"
+                  value={newTitle}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTitle(e.target.value)}
+                  placeholder="e.g., Replace Xenia SFO38 OTA Rack - 02"
+                />
+              </div>
+              <Select
+                id="new-type"
+                label="Type"
+                layout="vertical"
                 value={newType}
-                onChange={(e) => setNewType(e.target.value as ServiceOrderType)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
-              >
-                <option value="returned_to_eero">Returned to eero</option>
-                <option value="defective">Defective / Hardware issue</option>
-                <option value="end_of_program">End of program phase</option>
-                <option value="lost">Lost / Unrecoverable</option>
-                <option value="outbound_shipment">Outbound Shipment</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Priority</label>
-              <select
+                onChange={(val) => setNewType(val as ServiceOrderType)}
+                options={typeOptions}
+              />
+              <Select
+                id="new-priority"
+                label="Priority"
+                layout="vertical"
                 value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as ServiceOrderPriority)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
-              >
-                <option value="P0">P0 - Critical</option>
-                <option value="P1">P1 - High</option>
-                <option value="P2">P2 - Medium</option>
-                <option value="P3">P3 - Normal</option>
-                <option value="P4">P4 - Low</option>
-                <option value="P5">P5 - Minimal</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Assignee</label>
-              <input
-                type="text"
+                onChange={(val) => setNewPriority(val as ServiceOrderPriority)}
+                options={priorityFormOptions}
+              />
+              <Input
+                id="new-assignee"
+                label="Assignee"
+                layout="vertical"
                 value={newAssignee}
-                onChange={(e) => setNewAssignee(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAssignee(e.target.value)}
                 placeholder="e.g., sidney"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
               />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Site / Region</label>
-              <select
+              <Select
+                id="new-site"
+                label="Site / Region"
+                layout="vertical"
                 value={newSite}
-                onChange={(e) => setNewSite(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
-              >
-                <option value="USA">USA</option>
-                <option value="CA">CA</option>
-                <option value="EU">EU</option>
-                <option value="UK">UK</option>
-                <option value="AUS">AUS</option>
-                <option value="NZ">NZ</option>
-                <option value="JPN">JPN</option>
-                <option value="SG">SG</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Device Serial (optional)</label>
-              <input
-                type="text"
+                onChange={(val) => setNewSite(val as string)}
+                options={regionOptions}
+              />
+              <Input
+                id="new-device-serial"
+                label="Device Serial (optional)"
+                layout="vertical"
                 value={newDeviceSerial}
-                onChange={(e) => setNewDeviceSerial(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDeviceSerial(e.target.value)}
                 placeholder="Serial #"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
               />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">JIRA Ticket (optional)</label>
-              <input
-                type="text"
+              <Input
+                id="new-jira-key"
+                label="JIRA Ticket (optional)"
+                layout="vertical"
                 value={newJiraKey}
-                onChange={(e) => setNewJiraKey(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewJiraKey(e.target.value)}
                 placeholder="e.g., QA-17918"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
               />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">ETA</label>
-              <input
+              <Input
+                id="new-so-eta"
+                label="ETA"
+                layout="vertical"
                 type="date"
                 value={newEta}
-                onChange={(e) => setNewEta(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEta(e.target.value)}
               />
+              <div className="col-span-2 md:col-span-3">
+                <Input
+                  id="new-description"
+                  label="Description"
+                  layout="vertical"
+                  value={newDescription}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDescription(e.target.value)}
+                  placeholder="What needs to be done..."
+                />
+              </div>
             </div>
-            <div className="col-span-2 md:col-span-3">
-              <label className="text-xs text-gray-500 block mb-1">Description</label>
-              <input
-                type="text"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="What needs to be done..."
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+            <div className="flex items-center gap-2 mt-4">
+              <Button
+                type="primary"
+                size="medium"
+                label="Create Service Order"
+                disabled={!newTitle}
+                onClick={handleCreate}
               />
+              <Button type="default" size="medium" label="Cancel" onClick={resetForm} />
             </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4">
-            <button
-              onClick={handleCreate}
-              disabled={!newTitle}
-              className="px-4 py-2 bg-[#2c3e7a] text-white rounded-lg text-xs font-medium hover:bg-[#1e2f5e] disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Create Service Order
-            </button>
-            <button
-              onClick={resetForm}
-              className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200"
-            >
-              Cancel
-            </button>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -381,13 +352,13 @@ export default function ServiceBoard() {
               <div key={col.id} className="flex-shrink-0 w-[260px]">
                 {/* Column header */}
                 <div className="flex items-center justify-between mb-2 px-2">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">{col.label}</h3>
-                  <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">
+                  <h3 className="text-xs font-bold text-[var(--ui-text-text-tertiary)] uppercase tracking-wide">{col.label}</h3>
+                  <span className="text-xs bg-[var(--ui-background-layer-layer-page-hover)] text-[var(--ui-text-text-tertiary)] px-1.5 py-0.5 rounded-full font-medium">
                     {orders.length}
                   </span>
                 </div>
                 {/* Column body */}
-                <div className="bg-gray-100 rounded-xl p-2 min-h-[400px] space-y-2">
+                <div className="bg-[var(--ui-background-layer-layer-page-hover)] rounded-xl p-2 min-h-[400px] space-y-2">
                   {orders.map((order) => (
                     <ServiceOrderCard
                       key={order.id}
@@ -407,52 +378,48 @@ export default function ServiceBoard() {
 
       {/* Table View */}
       {viewMode === 'table' && (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-[var(--ui-background-layer-layer-page)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-xl overflow-hidden shadow-sm">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">TYPE</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">TITLE</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">PRIORITY</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">ASSIGNEE</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">SITE</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">STATUS</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">JIRA</th>
-                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">ETA</th>
+              <tr className="bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)]">
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">TYPE</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">TITLE</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">PRIORITY</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">ASSIGNEE</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">SITE</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">STATUS</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">JIRA</th>
+                <th className="text-left text-xs font-medium text-[var(--ui-text-text-tertiary)] px-4 py-3">ETA</th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-[var(--ui-text-text-placeholder)]">
                     No service orders found.
                   </td>
                 </tr>
               )}
               {filteredOrders.map((order) => (
-                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <tr key={order.id} className="border-b border-[var(--ui-background-layer-border-border-layer-page)] hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors">
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${typeColors[order.type]}`}>
-                      {typeLabels[order.type]}
-                    </span>
+                    <Tag color={typeColors[order.type]} size="regular">{typeLabels[order.type]}</Tag>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-gray-900">{order.title}</span>
+                    <span className="text-sm text-[var(--ui-text-text-primary)]">{order.title}</span>
                     {order.deviceSerial && (
-                      <span className="text-xs text-gray-400 block font-mono">{order.deviceSerial}</span>
+                      <span className="text-xs text-[var(--ui-text-text-placeholder)] block font-mono">{order.deviceSerial}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${priorityColors[order.priority]}`}>
-                      {order.priority}
-                    </span>
+                    <Tag color={priorityColors[order.priority]} size="regular">{order.priority}</Tag>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{order.assignee || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{order.site}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-text-secondary)]">{order.assignee || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-text-secondary)]">{order.site}</td>
                   <td className="px-4 py-3">
-                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600 capitalize">
+                    <Tag color="grey" size="regular" className="capitalize">
                       {order.status.replace('_', ' ')}
-                    </span>
+                    </Tag>
                   </td>
                   <td className="px-4 py-3">
                     {order.jiraKey ? (
@@ -460,16 +427,16 @@ export default function ServiceBoard() {
                         href={order.jiraUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1"
                       >
                         {order.jiraKey}
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-[var(--ui-text-text-placeholder)]">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{order.eta || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-text-secondary)]">{order.eta || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -494,27 +461,23 @@ function ServiceOrderCard({ order, onMoveLeft, onMoveRight, isFirst, isLast }: S
   const { moveServiceOrder } = usePackagesStore();
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-[var(--ui-background-layer-layer-page)] rounded-lg border border-[var(--ui-background-layer-border-border-layer-page)] p-3 shadow-sm hover:shadow-md transition-shadow">
       {/* Type badge + Priority */}
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${typeColors[order.type]}`}>
-          {typeLabels[order.type]}
-        </span>
-        <span className={`text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full ${priorityColors[order.priority]}`}>
-          {order.priority}
-        </span>
+      <div className="flex items-center justify-between mb-2 gap-1">
+        <Tag color={typeColors[order.type]} size="regular">{typeLabels[order.type]}</Tag>
+        <Tag color={priorityColors[order.priority]} size="regular">{order.priority}</Tag>
       </div>
 
       {/* Device serial */}
       {order.deviceSerial && (
-        <p className="text-[10px] text-gray-400 font-mono mb-1 truncate">{order.deviceSerial}</p>
+        <p className="text-xs text-[var(--ui-text-text-placeholder)] font-mono mb-1 truncate">{order.deviceSerial}</p>
       )}
 
       {/* Title */}
-      <p className="text-xs font-medium text-gray-900 mb-2 line-clamp-2">{order.title}</p>
+      <p className="text-xs font-medium text-[var(--ui-text-text-primary)] mb-2 line-clamp-2">{order.title}</p>
 
-      {/* Meta row */}
-      <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-2 flex-wrap">
+      {/* Meta row — kept text-[10px]: dense kanban card, text-xs would overflow the 3 inline meta items on a 260px card */}
+      <div className="flex items-center gap-2 text-[10px] text-[var(--ui-text-text-tertiary)] mb-2 flex-wrap">
         {order.assignee && (
           <span className="flex items-center gap-0.5">
             <User className="w-3 h-3" />
@@ -531,14 +494,14 @@ function ServiceOrderCard({ order, onMoveLeft, onMoveRight, isFirst, isLast }: S
         </span>
       </div>
 
-      {/* JIRA link + ETA */}
+      {/* JIRA link + ETA — kept text-[10px] for the tight kanban footer row */}
       <div className="flex items-center justify-between mb-2">
         {order.jiraKey ? (
           <a
             href={order.jiraUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] text-blue-600 hover:underline font-medium"
+            className="text-[10px] text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline font-medium"
           >
             {order.jiraKey}
           </a>
@@ -546,33 +509,32 @@ function ServiceOrderCard({ order, onMoveLeft, onMoveRight, isFirst, isLast }: S
           <span />
         )}
         {order.eta && (
-          <span className="text-[10px] text-gray-400">ETA {order.eta}</span>
+          <span className="text-[10px] text-[var(--ui-text-text-placeholder)]">ETA {order.eta}</span>
         )}
       </div>
 
       {/* Move controls — dropdown + arrows */}
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-2 border-t border-[var(--ui-background-layer-border-border-layer-page)]">
         <button
           onClick={onMoveLeft}
           disabled={isFirst}
-          className="text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed p-1.5 rounded hover:bg-gray-100"
+          className="text-[var(--ui-text-text-placeholder)] hover:text-[var(--ui-text-text-secondary)] disabled:opacity-20 disabled:cursor-not-allowed p-1.5 rounded hover:bg-[var(--ui-background-layer-layer-page-hover)]"
           title="Move left"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <select
-          value={order.status}
-          onChange={(e) => moveServiceOrder(order.id, e.target.value as ServiceOrderStatus)}
-          className="text-[10px] border border-gray-200 rounded px-1.5 py-1 text-gray-600 bg-gray-50 hover:bg-white cursor-pointer max-w-[120px]"
-        >
-          {columns.map((col) => (
-            <option key={col.id} value={col.id}>{col.label}</option>
-          ))}
-        </select>
+        <div className="max-w-[120px]">
+          <Select
+            id={`move-status-${order.id}`}
+            value={order.status}
+            onChange={(val) => moveServiceOrder(order.id, val as ServiceOrderStatus)}
+            options={columns.map((col) => ({ value: col.id, label: col.label }))}
+          />
+        </div>
         <button
           onClick={onMoveRight}
           disabled={isLast}
-          className="text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed p-1.5 rounded hover:bg-gray-100"
+          className="text-[var(--ui-text-text-placeholder)] hover:text-[var(--ui-text-text-secondary)] disabled:opacity-20 disabled:cursor-not-allowed p-1.5 rounded hover:bg-[var(--ui-background-layer-layer-page-hover)]"
           title="Move right"
         >
           <ChevronRight className="w-5 h-5" />

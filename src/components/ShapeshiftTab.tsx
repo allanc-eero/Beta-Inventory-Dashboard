@@ -6,13 +6,16 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { ShapeshiftJob, ShapeshiftTargetEnv, ShapeshiftJobStatus } from '@/types';
 import { Zap, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Button, Select, Input, Tag, Card, Checkbox, Segmented } from '@amzn/eero-web-design-components';
 
-const STATUS_COLORS: Record<ShapeshiftJobStatus, string> = {
-  queued: 'bg-blue-100 text-blue-700',
-  in_progress: 'bg-yellow-100 text-yellow-700',
-  success: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-500',
+type TagColor = 'grey' | 'navy' | 'periwinkle' | 'green' | 'orange' | 'red' | 'turquoise' | 'ocean' | 'purple' | 'terracotta' | 'yellow';
+
+const STATUS_TAG_COLORS: Record<ShapeshiftJobStatus, TagColor> = {
+  queued: 'periwinkle',
+  in_progress: 'orange',
+  success: 'green',
+  failed: 'red',
+  cancelled: 'grey',
 };
 
 export default function ShapeshiftTab() {
@@ -189,11 +192,11 @@ export default function ShapeshiftTab() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-[#2c3e7a]" />
+        <h2 className="text-xl font-bold text-[var(--ui-text-text-primary)] flex items-center gap-2">
+          <Zap className="w-5 h-5 text-[var(--ui-core-periwinkle-periwinkle-6)]" />
           Shapeshift
         </h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">
           Automates the prod ↔ stage shapeshift workflow. Scan a serial, pick the target environment, and hit Shapeshift. Jobs run in the background — queue multiple units in a row.
         </p>
       </div>
@@ -202,8 +205,8 @@ export default function ShapeshiftTab() {
       {cliStatus && (
         <div className={`rounded-lg border px-4 py-2.5 text-sm flex items-start gap-2 ${
           cliStatus.ready
-            ? 'bg-green-50 border-green-200 text-green-700'
-            : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+            ? 'bg-[var(--ui-support-fill-support-success)] border-[var(--ui-support-border-support-success)] text-[var(--ui-support-text-support-success)]'
+            : 'bg-[var(--ui-support-fill-support-warning)] border-[var(--ui-support-border-support-warning)] text-[var(--ui-support-text-icon-support-warning)]'
         }`}>
           {cliStatus.ready ? (
             <>
@@ -230,75 +233,75 @@ export default function ShapeshiftTab() {
             {lastChecked && (
               <span className="text-xs opacity-60">checked {lastChecked.toLocaleTimeString()}</span>
             )}
-            <button
+            <Button
+              type="default"
+              size="medium"
               onClick={refreshStatus}
-              disabled={checkingStatus}
-              className="text-xs font-medium px-2 py-1 rounded border border-current/30 hover:bg-white/40 disabled:opacity-50"
-            >
-              {checkingStatus ? 'Checking…' : '↻ Re-check'}
-            </button>
+              loading={checkingStatus}
+              label={checkingStatus ? 'Checking…' : '↻ Re-check'}
+            />
           </div>
         </div>
       )}
 
       {/* Good to know */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">▸ Good to Know</h3>
-        <ul className="space-y-2 text-sm text-gray-700">
+      <Card size={3} title={<span className="text-sm font-semibold text-[var(--ui-text-text-primary)]">▸ Good to Know</span>}>
+        <ul className="space-y-2 text-sm text-[var(--ui-text-text-secondary)]">
           <li><strong>Tokens expire.</strong> The browser-cookie admin auth is session-based and will lapse. When it does, the status banner above turns yellow and tells you which command to run. Re-auth, reload, done.</li>
           <li><strong>In-memory jobs.</strong> Job status lives in server memory — if the dev server restarts mid-shapeshift, the UI loses the job, though the actual move continues on eero's side. (A database would fix this for production.)</li>
           <li><strong>Don't double-run the same unit.</strong> Let a device finish its move before testing on it again, or use a different device. Re-running a unit that's mid-shapeshift can confuse the job state.</li>
           <li><strong>It's slow on purpose.</strong> OTA + reboot + heartbeat takes several minutes. The "Running…" state is normal — don't interpret it as hung. Expand the job to watch live CLI output.</li>
         </ul>
-      </div>
+      </Card>
 
       {/* Queue a serial */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Queue a Serial</h3>
-
+      <Card size={3} title={<span className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider">Queue a Serial</span>}>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
           {/* Serial input with device picker */}
           <div className="relative">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Serial</label>
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={serial}
-                onChange={(e) => setSerial(e.target.value)}
-                placeholder="e.g. GGC3530B522401A5"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
+            <div className="flex gap-1 items-end">
+              <div className="flex-1">
+                <Input
+                  id="shapeshift-serial"
+                  label="Serial"
+                  layout="vertical"
+                  value={serial}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSerial(e.target.value)}
+                  placeholder="e.g. GGC3530B522401A5"
+                  className="font-mono"
+                />
+              </div>
+              <Button
+                type="default"
+                size="medium"
                 onClick={() => setShowSearch(!showSearch)}
-                className="px-2 py-2 border border-gray-200 rounded-lg text-xs text-gray-500 hover:bg-gray-50"
-                title="Pick from existing devices"
-              >
-                ↓
-              </button>
+                ariaLabel="Pick from existing devices"
+                label="↓"
+              />
             </div>
             {/* Device picker dropdown */}
             {showSearch && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--ui-background-layer-layer-page)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by serial, name..."
-                  className="w-full px-3 py-2 border-b border-gray-100 text-sm focus:outline-none"
+                  className="w-full px-3 py-2 border-b border-[var(--ui-background-layer-border-border-layer-page)] text-sm focus:outline-none"
                   autoFocus
                 />
                 {searchResults.map((d) => (
                   <button
                     key={d.id}
                     onClick={() => handleSelectDevice(d.serialNumber)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] last:border-0"
                   >
                     <span className="font-mono font-medium">{d.serialNumber}</span>
-                    <span className="text-gray-400 ml-2">{d.internalName || d.model} · {d.assignedTo || 'unassigned'}</span>
+                    <span className="text-[var(--ui-text-text-placeholder)] ml-2">{d.internalName || d.model} · {d.assignedTo || 'unassigned'}</span>
                   </button>
                 ))}
                 {searchQuery && searchResults.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-gray-400">No devices found. Type serial manually above.</p>
+                  <p className="px-3 py-2 text-xs text-[var(--ui-text-text-placeholder)]">No devices found. Type serial manually above.</p>
                 )}
               </div>
             )}
@@ -306,103 +309,101 @@ export default function ShapeshiftTab() {
 
           {/* Target env */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Target Env</label>
-            <select
+            <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Target Env</label>
+            <Select
+              id="shapeshift-target-env"
               value={targetEnv}
-              onChange={(e) => setTargetEnv(e.target.value as ShapeshiftTargetEnv)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            >
-              <option value="stage">stage (prod → stage)</option>
-              <option value="prod">prod (stage → prod)</option>
-            </select>
+              onChange={(val) => setTargetEnv(val as ShapeshiftTargetEnv)}
+              options={[
+                { value: 'stage', label: 'stage (prod → stage)' },
+                { value: 'prod', label: 'prod (stage → prod)' },
+              ]}
+            />
           </div>
 
           {/* Network ID */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Network (optional)</label>
-            <input
-              type="text"
+            <Input
+              id="shapeshift-network"
+              label="Network (optional)"
+              layout="vertical"
               value={networkId}
-              onChange={(e) => setNetworkId(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNetworkId(e.target.value)}
               placeholder="e.g. 5754479"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
             />
-            <p className="text-[11px] text-gray-400 mt-1">If set, shapeshifts the whole network. Otherwise just the eero serial.</p>
+            <p className="text-xs text-[var(--ui-text-text-placeholder)] mt-1">If set, shapeshifts the whole network. Otherwise just the eero serial.</p>
           </div>
 
           {/* Retries */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Retries</label>
-            <input
+            <Input
+              id="shapeshift-retries"
+              label="Retries"
+              layout="vertical"
               type="number"
               min={1}
               max={50}
               value={retries}
-              onChange={(e) => setRetries(parseInt(e.target.value) || 10)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRetries(parseInt(e.target.value) || 10)}
             />
           </div>
 
           {/* Submit button */}
-          <button
+          <Button
+            type="primary"
             onClick={handleSubmit}
             disabled={!serial.trim() || !confirmed}
-            className="px-4 py-2 bg-[#2c3e7a] text-white rounded-lg text-sm font-medium hover:bg-[#1e2f5e] disabled:opacity-40 disabled:cursor-not-allowed h-[38px]"
-          >
-            Shapeshift →
-          </button>
+            label="Shapeshift →"
+          />
         </div>
 
         {/* Options row */}
         <div className="flex items-center gap-6 mt-3 flex-wrap">
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" checked={otaToLatest} onChange={(e) => setOtaToLatest(e.target.checked)} className="rounded border-gray-300" />
-            OTA to latest stable in target env
-          </label>
-          <label className="flex items-center gap-2 text-sm text-blue-700 font-medium cursor-pointer">
-            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="rounded border-blue-400 text-blue-600" />
-            ✓ I confirm the checklist
-          </label>
+          <Checkbox
+            checked={otaToLatest}
+            onChange={(e: { target: { checked: boolean } }) => setOtaToLatest(e.target.checked)}
+            label="OTA to latest stable in target env"
+          />
+          <Checkbox
+            checked={confirmed}
+            onChange={(e: { target: { checked: boolean } }) => setConfirmed(e.target.checked)}
+            label="✓ I confirm the checklist"
+          />
         </div>
-      </div>
+      </Card>
 
       {/* Jobs list */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Jobs</h3>
-          <div className="flex items-center gap-1">
-            {(['all', 'queued', 'in_progress', 'success', 'failed', 'cancelled'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-all capitalize ${
-                  filterStatus === s ? 'bg-[#2c3e7a] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {s === 'all' ? 'All' : s.replace('_', ' ')}
-              </button>
-            ))}
-          </div>
+          <h3 className="text-sm font-semibold text-[var(--ui-text-text-primary)] uppercase tracking-wider">Jobs</h3>
+          <Segmented
+            value={filterStatus}
+            onChange={(val) => setFilterStatus(val as ShapeshiftJobStatus | 'all')}
+            items={(['all', 'queued', 'in_progress', 'success', 'failed', 'cancelled'] as const).map((s) => ({
+              value: s,
+              label: s === 'all' ? 'All' : s.replace('_', ' '),
+            }))}
+          />
         </div>
 
         {filteredJobs.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <Zap className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-            <p className="text-sm text-gray-400">No shapeshift jobs yet. Queue one above.</p>
+          <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
+            <Zap className="w-8 h-8 mx-auto mb-2 text-[var(--ui-text-text-disabled)]" />
+            <p className="text-sm text-[var(--ui-text-text-placeholder)]">No shapeshift jobs yet. Queue one above.</p>
           </div>
         ) : (
           <div className="space-y-2">
             {filteredJobs.map((job) => (
-              <div key={job.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={job.id} className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
                 <div className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold text-gray-900">{job.serial}</span>
-                        <span className="text-gray-400">→</span>
-                        <span className="text-sm font-semibold text-gray-700 uppercase">{job.targetEnv}</span>
+                        <span className="font-mono text-sm font-bold text-[var(--ui-text-text-primary)]">{job.serial}</span>
+                        <span className="text-[var(--ui-text-text-placeholder)]">→</span>
+                        <span className="text-sm font-semibold text-[var(--ui-text-text-secondary)] uppercase">{job.targetEnv}</span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-[var(--ui-text-text-tertiary)] mt-0.5">
                         {job.status === 'in_progress' && `Attempt ${job.currentAttempt}/${job.retries} · `}
                         {job.assignedTo}
                         {job.networkId && ` · Network: ${job.networkId}`}
@@ -410,37 +411,37 @@ export default function ShapeshiftTab() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full uppercase ${STATUS_COLORS[job.status]}`}>
+                    <Tag color={STATUS_TAG_COLORS[job.status]} size="regular">
                       {job.status.replace('_', ' ')}
-                    </span>
+                    </Tag>
                     {(job.status === 'queued' || job.status === 'in_progress') && (
-                      <button
+                      <Button
+                        type="text"
+                        size="medium"
+                        danger
                         onClick={() => cancelShapeshiftJob(job.id)}
-                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
-                        title="Cancel"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                        ariaLabel="Cancel"
+                        label={<X className="w-4 h-4" />}
+                      />
                     )}
                     {/* Run via real eero CLI */}
                     {(job.status === 'queued' || job.status === 'failed') && (
-                      <button
+                      <Button
+                        type="primary"
+                        size="medium"
                         onClick={() => runShapeshift(job)}
                         disabled={!cliStatus?.ready}
-                        title={!cliStatus?.available ? 'eero CLI not available' : !cliStatus?.ready ? 'eero CLI not admin-authenticated' : 'Run shapeshift via eero CLI'}
-                        className="text-xs px-2.5 py-1 bg-[#2c3e7a] text-white rounded font-medium hover:bg-[#1e2f5e] disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {job.status === 'failed' ? 'Retry' : 'Run shapeshift'}
-                      </button>
+                        label={job.status === 'failed' ? 'Retry' : 'Run shapeshift'}
+                      />
                     )}
                     {job.status === 'in_progress' && (
-                      <span className="text-xs px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded font-medium">
+                      <Tag color="orange" size="regular">
                         Running…
-                      </span>
+                      </Tag>
                     )}
                     <button
                       onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
-                      className="text-gray-400 hover:text-gray-600 p-1"
+                      className="text-[var(--ui-text-text-placeholder)] hover:text-[var(--ui-text-text-tertiary)] p-1"
                     >
                       {expandedJob === job.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
@@ -449,55 +450,55 @@ export default function ShapeshiftTab() {
 
                 {/* Expanded details */}
                 {expandedJob === job.id && (
-                  <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 text-xs space-y-2">
+                  <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-3 bg-[var(--ui-background-layer-layer-page-hover)] text-xs space-y-2">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div><span className="text-gray-500">Target:</span> <span className="font-medium">{job.targetEnv}</span></div>
-                      <div><span className="text-gray-500">Network:</span> <span className="font-medium">{job.networkId || '—'}</span></div>
-                      <div><span className="text-gray-500">Retries:</span> <span className="font-medium">{job.currentAttempt}/{job.retries}</span></div>
-                      <div><span className="text-gray-500">Queued by:</span> <span className="font-medium">{job.assignedTo}</span></div>
-                      <div><span className="text-gray-500">OTA:</span> <span className="font-medium">{job.otaToLatest ? 'Yes' : 'No'}</span></div>
-                      <div><span className="text-gray-500">Created:</span> <span className="font-medium">{new Date(job.createdAt).toLocaleString()}</span></div>
-                      {job.completedAt && <div><span className="text-gray-500">Completed:</span> <span className="font-medium">{new Date(job.completedAt).toLocaleString()}</span></div>}
+                      <div><span className="text-[var(--ui-text-text-tertiary)]">Target:</span> <span className="font-medium">{job.targetEnv}</span></div>
+                      <div><span className="text-[var(--ui-text-text-tertiary)]">Network:</span> <span className="font-medium">{job.networkId || '—'}</span></div>
+                      <div><span className="text-[var(--ui-text-text-tertiary)]">Retries:</span> <span className="font-medium">{job.currentAttempt}/{job.retries}</span></div>
+                      <div><span className="text-[var(--ui-text-text-tertiary)]">Queued by:</span> <span className="font-medium">{job.assignedTo}</span></div>
+                      <div><span className="text-[var(--ui-text-text-tertiary)]">OTA:</span> <span className="font-medium">{job.otaToLatest ? 'Yes' : 'No'}</span></div>
+                      <div><span className="text-[var(--ui-text-text-tertiary)]">Created:</span> <span className="font-medium">{new Date(job.createdAt).toLocaleString()}</span></div>
+                      {job.completedAt && <div><span className="text-[var(--ui-text-text-tertiary)]">Completed:</span> <span className="font-medium">{new Date(job.completedAt).toLocaleString()}</span></div>}
                     </div>
 
                     {/* Live CLI output / console log */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-gray-500 font-medium uppercase tracking-wide">CLI Output</span>
+                        <span className="text-[var(--ui-text-text-tertiary)] font-medium uppercase tracking-wide">CLI Output</span>
                         {job.status === 'in_progress' && (
-                          <span className="text-yellow-700 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse" /> streaming…
+                          <span className="text-[var(--ui-support-text-icon-support-warning)] flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-[var(--ui-core-orange-orange-6)] rounded-full animate-pulse" /> streaming…
                           </span>
                         )}
                       </div>
                       {job.log && job.log.length > 0 ? (
-                        <pre className="max-h-64 overflow-auto bg-gray-900 text-gray-100 rounded-lg p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono">
+                        <pre className="max-h-64 overflow-auto bg-gray-900 text-gray-100 rounded-lg p-3 text-xs leading-relaxed whitespace-pre-wrap break-words font-mono">
 {job.log.join('\n')}
                         </pre>
                       ) : (
-                        <p className="text-gray-400 italic">No output yet. Click "Run shapeshift" to start.</p>
+                        <p className="text-[var(--ui-text-text-placeholder)] italic">No output yet. Click "Run shapeshift" to start.</p>
                       )}
                     </div>
 
                     {/* What this does / how to retry */}
                     {job.status === 'failed' && (
-                      <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                      <div className="p-2.5 bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-lg text-[var(--ui-support-text-support-error)]">
                         <p className="font-medium">This shapeshift failed.</p>
-                        <p className="mt-0.5">Check the CLI output above for the reason. Common causes: admin token expired (re-run <code className="bg-white px-1 rounded">eero api admin --prod auth</code>), the eero didn't heartbeat in time (it may still be rebooting — verify in the {job.targetEnv} admin panel before retrying), or it's already in {job.targetEnv}. Click <strong>Retry</strong> to run it again.</p>
+                        <p className="mt-0.5">Check the CLI output above for the reason. Common causes: admin token expired (re-run <code className="bg-[var(--ui-background-layer-layer-page)] px-1 rounded">eero api admin --prod auth</code>), the eero didn't heartbeat in time (it may still be rebooting — verify in the {job.targetEnv} admin panel before retrying), or it's already in {job.targetEnv}. Click <strong>Retry</strong> to run it again.</p>
                       </div>
                     )}
                     {job.status === 'in_progress' && (
-                      <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                      <div className="p-2.5 bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-lg text-[var(--ui-support-text-icon-support-warning)]">
                         Shapeshift in progress — this includes an OTA to the cross-environment firmware, a reboot, and a heartbeat wait. It can take several minutes. Leave this open to watch progress.
                       </div>
                     )}
                     {job.status === 'success' && (
-                      <div className="p-2.5 bg-green-50 border border-green-200 rounded-lg text-green-700">
+                      <div className="p-2.5 bg-[var(--ui-support-fill-support-success)] border border-[var(--ui-support-border-support-success)] rounded-lg text-[var(--ui-support-text-support-success)]">
                         ✓ Device moved to <strong>{job.targetEnv}</strong>. The device record's environment was updated and the move was logged to its timeline. Confirm in the {job.targetEnv} admin panel if needed.
                       </div>
                     )}
 
-                    {job.notes && <p className="text-gray-600 mt-2">{job.notes}</p>}
+                    {job.notes && <p className="text-[var(--ui-text-text-tertiary)] mt-2">{job.notes}</p>}
                   </div>
                 )}
               </div>

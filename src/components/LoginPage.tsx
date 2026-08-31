@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { Button, Input, Segmented, ProgressBar } from '@amzn/eero-web-design-components';
 import { useAuthStore } from '@/store/authStore';
-import { Wifi, ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { Wifi } from 'lucide-react';
 
 interface RegistrationData {
   firstName: string;
@@ -117,29 +118,45 @@ export default function LoginPage() {
 
   const prevStep = () => { setError(''); setStep((s) => s - 1); };
 
+  const ErrorBox = ({ children }: { children: React.ReactNode }) => (
+    <div className="p-3 bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-lg">
+      <p className="text-xs text-[var(--ui-support-text-support-error)]">{children}</p>
+    </div>
+  );
+
   // ─── LOGIN VIEW ─────────────────────────────────────────────────────────────
   if (mode === 'login') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--ui-background-layer-background-page)] flex items-center justify-center">
         <div className="w-full max-w-sm">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+          <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-md border border-[var(--ui-background-layer-border-border-layer-page)] p-8">
             <div className="text-center mb-8">
-              <Wifi size={48} className="mx-auto text-[#2c3e7a] mb-4" strokeWidth={1.5} />
-              <h1 className="text-2xl font-bold text-gray-900">eero Fetch</h1>
-              <p className="text-sm text-gray-500 mt-2">Sign in with your @eero.com email</p>
+              <Wifi size={48} className="mx-auto text-[var(--ui-core-periwinkle-periwinkle-6)] mb-4" strokeWidth={1.5} />
+              <h1 className="text-2xl font-bold text-[var(--ui-text-text-primary)]">eero Fetch</h1>
+              <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-2">Sign in with your @eero.com email</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@eero.com" className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
-              </div>
-              {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg"><p className="text-xs text-red-700">{error}</p></div>}
-              <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">Sign In</button>
+              <Input
+                id="login-email"
+                label="Email"
+                value={email}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                placeholder="you@eero.com"
+                layout="vertical"
+                autoFocus
+              />
+              {error && <ErrorBox>{error}</ErrorBox>}
+              <Button type="primary" label="Sign In" fullWidth onClick={() => handleLogin({ preventDefault: () => {} } as React.FormEvent)} />
             </form>
-            <div className="mt-6 pt-4 border-t border-gray-100 text-center">
-              <p className="text-xs text-gray-500">Dogfooder? <button onClick={() => { setMode('register'); setError(''); setStep(1); setFormData(INITIAL_DATA); }} className="text-blue-600 hover:text-blue-800 font-medium">Register here →</button></p>
+            <div className="mt-6 pt-4 border-t border-[var(--ui-background-layer-border-border-layer-page)] text-center">
+              <p className="text-xs text-[var(--ui-text-text-tertiary)]">
+                Dogfooder?{' '}
+                <button onClick={() => { setMode('register'); setError(''); setStep(1); setFormData(INITIAL_DATA); }} className="text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] font-medium">
+                  Register here →
+                </button>
+              </p>
             </div>
-            <p className="text-xs text-gray-400 text-center mt-4">Only @eero.com accounts can access this tool.</p>
+            <p className="text-xs text-[var(--ui-text-text-placeholder)] text-center mt-4">Only @eero.com accounts can access this tool.</p>
           </div>
         </div>
       </div>
@@ -148,79 +165,68 @@ export default function LoginPage() {
 
   // ─── REGISTRATION VIEW (Multi-step) ────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
+    <div className="min-h-screen bg-[var(--ui-background-layer-background-page)] flex items-center justify-center py-12">
       <div className="w-full max-w-lg">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-md border border-[var(--ui-background-layer-border-border-layer-page)] p-8">
           {/* Header */}
           <div className="text-center mb-6">
-            <Wifi size={36} className="mx-auto text-[#2c3e7a] mb-3" strokeWidth={1.5} />
-            <h1 className="text-xl font-bold text-gray-900">eero Fetch — Dogfood Registration</h1>
-            <p className="text-sm text-gray-500 mt-1">Step {step} of 4</p>
+            <Wifi size={36} className="mx-auto text-[var(--ui-core-periwinkle-periwinkle-6)] mb-3" strokeWidth={1.5} />
+            <h1 className="text-xl font-bold text-[var(--ui-text-text-primary)]">eero Fetch — Dogfood Registration</h1>
+            <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">Step {step} of 4</p>
           </div>
 
           {/* Progress bar */}
-          <div className="flex gap-1 mb-6">
-            {[1, 2, 3, 4].map((s) => (
-              <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? 'bg-blue-600' : 'bg-gray-200'}`} />
-            ))}
+          <div className="mb-6">
+            <ProgressBar label={`Step ${step} of 4`} percent={step * 25} />
           </div>
 
-          {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"><p className="text-xs text-red-700">{error}</p></div>}
+          {error && <div className="mb-4"><ErrorBox>{error}</ErrorBox></div>}
 
           {/* Step 1: Name + Email */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-gray-800">Your Info</h2>
+              <h2 className="text-sm font-semibold text-[var(--ui-text-text-secondary)]">Your Info</h2>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">First Name</label>
-                  <input type="text" value={formData.firstName} onChange={(e) => updateField('firstName', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Josh" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
-                  <input type="text" value={formData.lastName} onChange={(e) => updateField('lastName', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Thornbrugh" />
-                </div>
+                <Input id="reg-first-name" label="First Name" value={formData.firstName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('firstName', e.target.value)} placeholder="Josh" layout="vertical" />
+                <Input id="reg-last-name" label="Last Name" value={formData.lastName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('lastName', e.target.value)} placeholder="Thornbrugh" layout="vertical" />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">eero Email</label>
-                <input type="email" value={formData.email} onChange={(e) => updateField('email', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="you@eero.com" />
-              </div>
+              <Input id="reg-email" label="eero Email" value={formData.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('email', e.target.value)} placeholder="you@eero.com" layout="vertical" />
             </div>
           )}
 
           {/* Step 2: Device & Network Preferences */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-gray-800">Device & Network</h2>
+              <h2 className="text-sm font-semibold text-[var(--ui-text-text-secondary)]">Device & Network</h2>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Phone OS</label>
-                <div className="flex gap-3">
-                  {['iOS', 'Android'].map((os) => (
-                    <button key={os} type="button" onClick={() => updateField('phoneOS', os)} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${formData.phoneOS === os ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{os}</button>
-                  ))}
-                </div>
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Phone OS</label>
+                <Segmented
+                  items={[{ label: 'iOS', value: 'iOS' }, { label: 'Android', value: 'Android' }]}
+                  value={formData.phoneOS}
+                  onChange={(val) => updateField('phoneOS', val as string)}
+                />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Do you have an eero network?</label>
-                <div className="flex gap-2">
-                  {['No', 'Yes', 'Yes, multiple'].map((opt) => (
-                    <button key={opt} type="button" onClick={() => updateField('hasEeroNetwork', opt)} className={`flex-1 py-2.5 rounded-lg text-xs font-medium border transition-colors ${formData.hasEeroNetwork === opt ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
-                </div>
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Do you have an eero network?</label>
+                <Segmented
+                  items={[{ label: 'No', value: 'No' }, { label: 'Yes', value: 'Yes' }, { label: 'Yes, multiple', value: 'Yes, multiple' }]}
+                  value={formData.hasEeroNetwork}
+                  onChange={(val) => updateField('hasEeroNetwork', val as string)}
+                />
               </div>
               {(formData.hasEeroNetwork === 'Yes' || formData.hasEeroNetwork === 'Yes, multiple') && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Network email (if applicable)</label>
-                  <input type="email" value={formData.networkEmail} onChange={(e) => updateField('networkEmail', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="personal@gmail.com" />
-                </div>
+                <Input id="reg-network-email" label="Network email (if applicable)" value={formData.networkEmail} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('networkEmail', e.target.value)} placeholder="personal@gmail.com" layout="vertical" />
               )}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Test group preference</label>
-                <div className="flex gap-2">
-                  {['Latest and greatest firmware', 'More mature firmware'].map((opt) => (
-                    <button key={opt} type="button" onClick={() => updateField('testGroup', opt)} className={`flex-1 py-2.5 px-2 rounded-lg text-xs font-medium border transition-colors ${formData.testGroup === opt ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{opt === 'Latest and greatest firmware' ? '🚀 Latest & greatest' : '🛡️ More mature'}</button>
-                  ))}
-                </div>
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Test group preference</label>
+                <Segmented
+                  items={[
+                    { label: '🚀 Latest & greatest', value: 'Latest and greatest firmware' },
+                    { label: '🛡️ More mature', value: 'More mature firmware' },
+                  ]}
+                  value={formData.testGroup}
+                  onChange={(val) => updateField('testGroup', val as string)}
+                />
               </div>
             </div>
           )}
@@ -228,58 +234,28 @@ export default function LoginPage() {
           {/* Step 3: Shipping Address */}
           {step === 3 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-gray-800">Shipping Address</h2>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Street Address</label>
-                <input type="text" value={formData.streetAddress} onChange={(e) => updateField('streetAddress', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="123 Main St" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Apt / Unit Number (optional)</label>
-                <input type="text" value={formData.aptUnit} onChange={(e) => updateField('aptUnit', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Apt 4B" />
-              </div>
+              <h2 className="text-sm font-semibold text-[var(--ui-text-text-secondary)]">Shipping Address</h2>
+              <Input id="reg-street" label="Street Address" value={formData.streetAddress} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('streetAddress', e.target.value)} placeholder="123 Main St" layout="vertical" />
+              <Input id="reg-apt" label="Apt / Unit Number (optional)" value={formData.aptUnit} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('aptUnit', e.target.value)} placeholder="Apt 4B" layout="vertical" />
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
-                  <input type="text" value={formData.city} onChange={(e) => updateField('city', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Seattle" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
-                  <input type="text" value={formData.state} onChange={(e) => updateField('state', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="WA" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Zip Code</label>
-                  <input type="text" value={formData.zipCode} onChange={(e) => updateField('zipCode', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="98101" />
-                </div>
+                <Input id="reg-city" label="City" value={formData.city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('city', e.target.value)} placeholder="Seattle" layout="vertical" />
+                <Input id="reg-state" label="State" value={formData.state} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('state', e.target.value)} placeholder="WA" layout="vertical" />
+                <Input id="reg-zip" label="Zip Code" value={formData.zipCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('zipCode', e.target.value)} placeholder="98101" layout="vertical" />
               </div>
               <div className="pt-2">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={formData.preferWorkAddress} onChange={(e) => updateField('preferWorkAddress', e.target.checked)} className="rounded border-gray-300" />
-                  <span className="text-sm text-gray-700">Prefer shipping to a work address?</span>
+                  <input type="checkbox" checked={formData.preferWorkAddress} onChange={(e) => updateField('preferWorkAddress', e.target.checked)} className="rounded border-[var(--ui-input-border-input-rest)]" />
+                  <span className="text-sm text-[var(--ui-text-text-secondary)]">Prefer shipping to a work address?</span>
                 </label>
               </div>
               {formData.preferWorkAddress && (
-                <div className="pl-4 border-l-2 border-blue-200 space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Work Street</label>
-                    <input type="text" value={formData.workStreet} onChange={(e) => updateField('workStreet', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="660 3rd St" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Floor / Suite (optional)</label>
-                    <input type="text" value={formData.workFloor} onChange={(e) => updateField('workFloor', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="4th Floor" />
-                  </div>
+                <div className="pl-4 border-l-2 border-[var(--ui-core-periwinkle-periwinkle-3)] space-y-3">
+                  <Input id="reg-work-street" label="Work Street" value={formData.workStreet} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('workStreet', e.target.value)} placeholder="660 3rd St" layout="vertical" />
+                  <Input id="reg-work-floor" label="Floor / Suite (optional)" value={formData.workFloor} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('workFloor', e.target.value)} placeholder="4th Floor" layout="vertical" />
                   <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
-                      <input type="text" value={formData.workCity} onChange={(e) => updateField('workCity', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
-                      <input type="text" value={formData.workState} onChange={(e) => updateField('workState', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Zip</label>
-                      <input type="text" value={formData.workZip} onChange={(e) => updateField('workZip', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
+                    <Input id="reg-work-city" label="City" value={formData.workCity} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('workCity', e.target.value)} layout="vertical" />
+                    <Input id="reg-work-state" label="State" value={formData.workState} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('workState', e.target.value)} layout="vertical" />
+                    <Input id="reg-work-zip" label="Zip" value={formData.workZip} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('workZip', e.target.value)} layout="vertical" />
                   </div>
                 </div>
               )}
@@ -289,22 +265,21 @@ export default function LoginPage() {
           {/* Step 4: Contact & Final Details */}
           {step === 4 && (
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-gray-800">Contact & Final Details</h2>
+              <h2 className="text-sm font-semibold text-[var(--ui-text-text-secondary)]">Contact & Final Details</h2>
+              <Input id="reg-phone" label="Phone Number (incl. country code)" value={formData.phoneNumber} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('phoneNumber', e.target.value)} placeholder="+1 555-123-4567" layout="vertical" />
+              <Input id="reg-prod-email" label="Email used for production eero account (personal email)" value={formData.productionEmail} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('productionEmail', e.target.value)} placeholder="personal@gmail.com" layout="vertical" />
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number (incl. country code)</label>
-                <input type="tel" value={formData.phoneNumber} onChange={(e) => updateField('phoneNumber', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+1 555-123-4567" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Email used for production eero account (personal email)</label>
-                <input type="email" value={formData.productionEmail} onChange={(e) => updateField('productionEmail', e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="personal@gmail.com" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Approximate sq. footage of home</label>
-                <div className="flex gap-2 flex-wrap">
-                  {['Less than 500', '501-1000', '1000-2000', 'Over 2000'].map((opt) => (
-                    <button key={opt} type="button" onClick={() => updateField('sqFeet', opt)} className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${formData.sqFeet === opt ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
-                </div>
+                <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Approximate sq. footage of home</label>
+                <Segmented
+                  items={[
+                    { label: 'Less than 500', value: 'Less than 500' },
+                    { label: '501-1000', value: '501-1000' },
+                    { label: '1000-2000', value: '1000-2000' },
+                    { label: 'Over 2000', value: 'Over 2000' },
+                  ]}
+                  value={formData.sqFeet}
+                  onChange={(val) => updateField('sqFeet', val as string)}
+                />
               </div>
             </div>
           )}
@@ -312,15 +287,15 @@ export default function LoginPage() {
           {/* Navigation */}
           <div className="flex items-center justify-between mt-8">
             {step > 1 ? (
-              <button onClick={prevStep} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"><ArrowLeft size={16} /> Back</button>
+              <Button type="text" label="← Back" onClick={prevStep} />
             ) : (
-              <button onClick={() => { setMode('login'); setError(''); }} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"><ArrowLeft size={16} /> Sign in</button>
+              <Button type="text" label="← Sign in" onClick={() => { setMode('login'); setError(''); }} />
             )}
 
             {step < 4 ? (
-              <button onClick={nextStep} className="flex items-center gap-1 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">Next <ArrowRight size={16} /></button>
+              <Button type="primary" label="Next →" onClick={nextStep} />
             ) : (
-              <button onClick={handleRegisterSubmit} disabled={registering} className="flex items-center gap-1 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"><Check size={16} /> Create Account</button>
+              <Button type="primary" label="Create Account" onClick={handleRegisterSubmit} loading={registering} disabled={registering} />
             )}
           </div>
         </div>

@@ -2,8 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
-import { Search, Plus, Monitor } from 'lucide-react';
+import { Plus, Monitor } from 'lucide-react';
 import { OptOutReason, OptOutRecord, Device } from '@/types';
+import { Segmented, Input, TextArea, Select, Button, Tag, Checkbox, Modal } from '@amzn/eero-web-design-components';
+import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import OptOutChecklistPanel from './OptOutChecklistPanel';
@@ -156,11 +158,11 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
     setSelectedPerson(null);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusTagColor = (status: string): 'green' | 'grey' | 'orange' => {
     switch (status) {
-      case 'online': return 'bg-green-100 text-green-700';
-      case 'deactivated': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-yellow-100 text-yellow-700';
+      case 'online': return 'green';
+      case 'deactivated': return 'grey';
+      default: return 'orange';
     }
   };
 
@@ -168,57 +170,48 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
     <>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">People</h2>
+          <h2 className="text-lg font-bold text-[var(--ui-text-text-primary)]">People</h2>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setActiveView('active')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md ${activeView === 'active' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
-              >
-                Active ({derivedPeople.filter((p) => !optedOutEmails.has(p.email.toLowerCase())).length})
-              </button>
-              <button
-                onClick={() => setActiveView('opted_out')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md ${activeView === 'opted_out' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
-              >
-                Opted Out ({optOuts.length})
-              </button>
-            </div>
+            <Segmented
+              value={activeView}
+              onChange={(val) => setActiveView(val as 'active' | 'opted_out')}
+              items={[
+                { label: `Active (${derivedPeople.filter((p) => !optedOutEmails.has(p.email.toLowerCase())).length})`, value: 'active' },
+                { label: `Opted Out (${optOuts.length})`, value: 'opted_out' },
+              ]}
+            />
             {canEdit() && (
-              <button
+              <Button
+                type="primary"
+                ariaLabel="Add Person"
                 onClick={() => setShowAdd(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-              >
-                <Plus size={16} />
-                Add Person
-              </button>
+                label={<span className="flex items-center gap-1.5"><Plus size={16} /> Add Person</span>}
+              />
             )}
           </div>
         </div>
 
         {/* Search */}
-        <div className="relative max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        <div className="max-w-md">
+          <Input
+            id="people-search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+            placeholder="Search by name or email..."
           />
         </div>
 
         {/* Add Person Form */}
         {showAdd && (
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <div className="bg-[var(--ui-background-layer-layer-page)] p-4 rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)]">
             <div className="grid grid-cols-3 gap-3">
-              <input type="text" placeholder="Full name" value={newPerson.name} onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <input type="email" placeholder="Email" value={newPerson.email} onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <input type="text" placeholder="Team" value={newPerson.team} onChange={(e) => setNewPerson({ ...newPerson, team: e.target.value })} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <Input id="add-person-name" layout="vertical" placeholder="Full name" value={newPerson.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPerson({ ...newPerson, name: e.target.value })} />
+              <Input id="add-person-email" layout="vertical" placeholder="Email" value={newPerson.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPerson({ ...newPerson, email: e.target.value })} />
+              <Input id="add-person-team" layout="vertical" placeholder="Team" value={newPerson.team} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPerson({ ...newPerson, team: e.target.value })} />
             </div>
             <div className="flex justify-end gap-2 mt-3">
-              <button onClick={() => setShowAdd(false)} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={handleAdd} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add</button>
+              <Button type="default" label="Cancel" onClick={() => setShowAdd(false)} />
+              <Button type="primary" label="Add" onClick={handleAdd} />
             </div>
           </div>
         )}
@@ -232,26 +225,26 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                 {filteredPeople.filter((p) => !optedOutEmails.has(p.email.toLowerCase())).map((person) => (
                   <div
                     key={person.email || person.name}
-                    className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                    className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5 hover:shadow-md transition-shadow cursor-pointer"
                     onClick={() => setSelectedPerson(person.email || person.name)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-700 font-semibold text-sm">
+                      <div className="w-10 h-10 bg-[var(--ui-support-fill-support-success)] rounded-full flex items-center justify-center">
+                        <span className="text-[var(--ui-support-text-support-success)] font-semibold text-sm">
                           {person.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 truncate">{person.name}</h3>
-                        <p className="text-xs text-gray-500 truncate">{person.email}</p>
-                        {(() => { const p = getTesterProfile(person.email); return p?.testerId ? <p className="text-xs text-gray-400 font-mono">{p.testerId}</p> : null; })()}
+                        <h3 className="font-semibold text-[var(--ui-text-text-primary)] truncate">{person.name}</h3>
+                        <p className="text-xs text-[var(--ui-text-text-tertiary)] truncate">{person.email}</p>
+                        {(() => { const p = getTesterProfile(person.email); return p?.testerId ? <p className="text-xs text-[var(--ui-text-text-placeholder)] font-mono">{p.testerId}</p> : null; })()}
                       </div>
                     </div>
-                    <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+                    <div className="mt-3 flex items-center gap-2 text-sm text-[var(--ui-text-text-tertiary)]">
                       <Monitor size={14} />
                       <span>{person.devices.length} device(s)</span>
                       {person.devices.some((d) => d.status === 'deactivated') && (
-                        <span className="text-xs text-gray-400">· {person.devices.filter((d) => d.status === 'deactivated').length} archived</span>
+                        <span className="text-xs text-[var(--ui-text-text-placeholder)]">· {person.devices.filter((d) => d.status === 'deactivated').length} archived</span>
                       )}
                     </div>
                   </div>
@@ -263,34 +256,34 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
             {activeView === 'opted_out' && (
               <div className="space-y-3">
                 {optOuts.length > 0 ? optOuts.map((record) => (
-                  <div key={record.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                  <div key={record.id} className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                          <span className="text-gray-500 font-semibold text-sm">
+                        <div className="w-10 h-10 bg-[var(--ui-background-layer-layer-page-hover)] rounded-full flex items-center justify-center">
+                          <span className="text-[var(--ui-text-text-tertiary)] font-semibold text-sm">
                             {record.personName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{record.personName}</h3>
-                          <p className="text-xs text-gray-500">{record.personEmail}</p>
+                          <h3 className="font-semibold text-[var(--ui-text-text-primary)]">{record.personName}</h3>
+                          <p className="text-xs text-[var(--ui-text-text-tertiary)]">{record.personEmail}</p>
                         </div>
                       </div>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Opted Out</span>
+                      <Tag color="grey" size="regular">Opted Out</Tag>
                     </div>
                     {record.selfInitiated && (
-                      <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded-md">
+                      <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--ui-support-text-icon-support-warning)] bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] px-2 py-1 rounded-md">
                         🙋 Self-requested from portal — needs offboarding
                       </div>
                     )}
-                    <div className="mt-3 space-y-1 text-xs text-gray-600">
-                      <p><span className="font-medium text-gray-700">Reason:</span> {OPT_OUT_REASONS.find((r) => r.value === record.reason)?.label || record.reason}</p>
-                      {record.notes && <p><span className="font-medium text-gray-700">Notes:</span> {record.notes}</p>}
-                      <p><span className="font-medium text-gray-700">Date:</span> {new Date(record.optOutDate).toLocaleDateString()}</p>
-                      <p><span className="font-medium text-gray-700">Recorded by:</span> {record.recordedBy}</p>
-                      <p><span className="font-medium text-gray-700">Program:</span> {record.program}</p>
+                    <div className="mt-3 space-y-1 text-xs text-[var(--ui-text-text-tertiary)]">
+                      <p><span className="font-medium text-[var(--ui-text-text-secondary)]">Reason:</span> {OPT_OUT_REASONS.find((r) => r.value === record.reason)?.label || record.reason}</p>
+                      {record.notes && <p><span className="font-medium text-[var(--ui-text-text-secondary)]">Notes:</span> {record.notes}</p>}
+                      <p><span className="font-medium text-[var(--ui-text-text-secondary)]">Date:</span> {new Date(record.optOutDate).toLocaleDateString()}</p>
+                      <p><span className="font-medium text-[var(--ui-text-text-secondary)]">Recorded by:</span> {record.recordedBy}</p>
+                      <p><span className="font-medium text-[var(--ui-text-text-secondary)]">Program:</span> {record.program}</p>
                       {record.devicesAtOptOut.length > 0 && (
-                        <p><span className="font-medium text-gray-700">Devices at opt-out:</span> {record.devicesAtOptOut.join(', ')}</p>
+                        <p><span className="font-medium text-[var(--ui-text-text-secondary)]">Devices at opt-out:</span> {record.devicesAtOptOut.join(', ')}</p>
                       )}
                     </div>
 
@@ -298,17 +291,14 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                     {canEdit() && <OptOutChecklistPanel record={record} />}
 
                     {canEdit() && (
-                      <button
-                        onClick={() => setOptBackInRecord(record)}
-                        className="mt-3 px-4 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-md hover:bg-green-50"
-                      >
-                        ✓ Opt Back In
-                      </button>
+                      <div className="mt-3">
+                        <Button type="default" label="✓ Opt Back In" onClick={() => setOptBackInRecord(record)} />
+                      </div>
                     )}
                   </div>
                 )) : (
-                  <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                    <p className="text-gray-400 text-sm">No testers have opted out</p>
+                  <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
+                    <p className="text-[var(--ui-text-text-placeholder)] text-sm">No testers have opted out</p>
                   </div>
                 )}
               </div>
@@ -319,7 +309,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
           <div className="space-y-4">
             <button
               onClick={() => setSelectedPerson(null)}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              className="text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] text-sm font-medium"
             >
               ← All people
             </button>
@@ -332,33 +322,28 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
               return (
                 <>
                   {/* Profile Header */}
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                  <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
-                          <span className="text-green-700 font-bold text-lg">
+                        <div className="w-14 h-14 bg-[var(--ui-support-fill-support-success)] rounded-full flex items-center justify-center">
+                          <span className="text-[var(--ui-support-text-support-success)] font-bold text-lg">
                             {(personName || '').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                           </span>
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold text-gray-900">{personName}</h2>
+                            <h2 className="text-xl font-bold text-[var(--ui-text-text-primary)]">{personName}</h2>
                             {profile?.testerId && (
-                              <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{profile.testerId}</span>
+                              <span className="font-mono"><Tag color="grey" size="regular">{profile.testerId}</Tag></span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500 mt-1">
+                          <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">
                             {selectedPersonDevices.length} device(s) · {selectedPersonDevices.filter((d) => d.status === 'online').length} online · {selectedPersonDevices.filter((d) => d.status === 'deactivated').length} archived
                           </p>
                         </div>
                       </div>
                       {canEdit() && (
-                        <button
-                          onClick={() => setShowOptOut(true)}
-                          className="px-4 py-2 text-sm font-medium text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-50"
-                        >
-                          Record Opt-Out
-                        </button>
+                        <Button type="default" label="Record Opt-Out" onClick={() => setShowOptOut(true)} />
                       )}
                     </div>
                   </div>
@@ -366,18 +351,18 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                   {/* Profile Details — Two Column */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Contact & Identity */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">Contact & Identity</h4>
+                    <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5">
+                      <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] pb-2">Contact & Identity</h4>
                       <div className="space-y-2.5">
                         <ProfileField label="PRIMARY EMAIL" value={profile?.email || selectedPerson || ''} />
                         <ProfileField label="CONTACT EMAIL" value={profile?.contactEmail || ''} />
                         <ProfileField label="ALTERNATE EMAIL" value={profile?.alternateEmail || ''} />
                         {(profile?.additionalEmails || []).length > 0 && (
                           <div className="flex items-baseline gap-3">
-                            <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">OTHER EMAILS</span>
+                            <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">OTHER EMAILS</span>
                             <div className="flex flex-wrap gap-1">
                               {profile!.additionalEmails.map((e) => (
-                                <span key={e} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{e}</span>
+                                <Tag key={e} color="grey" size="regular">{e}</Tag>
                               ))}
                             </div>
                           </div>
@@ -388,37 +373,37 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                     </div>
 
                     {/* Programs & Network */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">Programs & Network</h4>
+                    <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5">
+                      <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] pb-2">Programs & Network</h4>
                       <div className="space-y-2.5">
                         <div className="flex items-baseline gap-3">
-                          <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ACTIVE PROGRAMS</span>
+                          <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ACTIVE PROGRAMS</span>
                           <div className="flex flex-wrap gap-1">
                             {activePrograms.length > 0 ? activePrograms.map((p) => (
-                              <span key={p} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">{p}</span>
-                            )) : <span className="text-sm text-gray-400">None</span>}
+                              <Tag key={p} color="periwinkle" size="regular">{p}</Tag>
+                            )) : <span className="text-sm text-[var(--ui-text-text-placeholder)]">None</span>}
                           </div>
                         </div>
                         <div className="flex items-baseline gap-3">
-                          <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ALL PROGRAMS</span>
+                          <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ALL PROGRAMS</span>
                           <div className="flex flex-wrap gap-1">
                             {(profile?.programs || []).map((p) => (
-                              <span key={p} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p}</span>
+                              <Tag key={p} color="grey" size="regular">{p}</Tag>
                             ))}
                           </div>
                         </div>
                         {profile?.networkId ? (
                           <div className="flex items-baseline gap-3">
-                            <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
-                            <a href={`https://insight.eero.com/eeros/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{profile.networkId} ↗</a>
+                            <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
+                            <a href={`https://insight.eero.com/eeros/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
                           </div>
                         ) : (
                           <ProfileField label="INSIGHT NETWORK" value="" />
                         )}
                         {profile?.adminId ? (
                           <div className="flex items-baseline gap-3">
-                            <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
-                            <a href={`https://admin.e2ro.com/users/${profile.adminId.replace(/^UID0*/, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">{profile.adminId} ↗</a>
+                            <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
+                            <a href={`https://admin.e2ro.com/users/${profile.adminId.replace(/^UID0*/, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.adminId} ↗</a>
                           </div>
                         ) : (
                           <ProfileField label="ADMIN ID" value="" />
@@ -434,57 +419,67 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
 
             {/* Opt-Out Form */}
             {showOptOut && (
-              <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-5">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Record Tester Opt-Out</h4>
-                <p className="text-xs text-gray-500 mb-4">Complete all offboarding steps below, then confirm. This person will be moved to the "Opted Out" list.</p>
+              <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-support-border-support-warning)] p-5">
+                <h4 className="text-sm font-semibold text-[var(--ui-text-text-primary)] mb-3">Record Tester Opt-Out</h4>
+                <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-4">Complete all offboarding steps below, then confirm. This person will be moved to the "Opted Out" list.</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Reason</label>
-                    <select value={optOutReason} onChange={(e) => setOptOutReason(e.target.value as OptOutReason)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
-                      {OPT_OUT_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
+                    <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Reason</label>
+                    <Select
+                      id="opt-reason"
+                      value={optOutReason}
+                      onChange={(val) => setOptOutReason(val as OptOutReason)}
+                      options={OPT_OUT_REASONS.map((r) => ({ value: r.value, label: r.label }))}
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                    <textarea value={optOutNotes} onChange={(e) => setOptOutNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none h-20" placeholder="Additional context..." />
+                    <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Notes</label>
+                    <TextArea id="opt-notes" value={optOutNotes} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setOptOutNotes(e.target.value)} placeholder="Additional context..." rows={3} />
                   </div>
 
                   {/* Offboarding checklist — manual steps only */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Offboarding Steps (required)</h5>
+                  <div className="border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg p-4 bg-[var(--ui-background-layer-layer-page-hover)]">
+                    <h5 className="text-xs font-semibold text-[var(--ui-text-text-secondary)] uppercase tracking-wider mb-3">Offboarding Steps (required)</h5>
                     <div className="space-y-2.5">
-                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
-                        <input type="checkbox" checked={optOutAdminDone} onChange={(e) => setOptOutAdminDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
+                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--ui-background-layer-layer-page)] cursor-pointer">
+                        <Checkbox checked={optOutAdminDone} onChange={(e: CheckboxChangeEvent) => setOptOutAdminDone(e.target.checked)} className="mt-0.5" />
                         <div className="flex-1">
-                          <span className="text-sm text-gray-900 font-medium">Removed from eero Admin</span>
-                          <p className="text-xs text-gray-500">Reverted to default user role in admin panel</p>
+                          <span className="text-sm text-[var(--ui-text-text-primary)] font-medium">Removed from eero Admin</span>
+                          <p className="text-xs text-[var(--ui-text-text-tertiary)]">Reverted to default user role in admin panel</p>
                         </div>
-                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/eeros/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
+                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/eeros/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
-                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-white cursor-pointer">
-                        <input type="checkbox" checked={optOutDevicesDone} onChange={(e) => setOptOutDevicesDone(e.target.checked)} className="rounded border-gray-300 mt-0.5" />
+                      <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--ui-background-layer-layer-page)] cursor-pointer">
+                        <Checkbox checked={optOutDevicesDone} onChange={(e: CheckboxChangeEvent) => setOptOutDevicesDone(e.target.checked)} className="mt-0.5" />
                         <div className="flex-1">
-                          <span className="text-sm text-gray-900 font-medium">Devices offboarded</span>
-                          <p className="text-xs text-gray-500">All devices returned, deactivated, or reassigned</p>
+                          <span className="text-sm text-[var(--ui-text-text-primary)] font-medium">Devices offboarded</span>
+                          <p className="text-xs text-[var(--ui-text-text-tertiary)]">All devices returned, deactivated, or reassigned</p>
                         </div>
                       </label>
                       {/* Qualtrics — automated, shown as status */}
-                      <div className="flex items-start gap-3 p-2 rounded-lg bg-blue-50 border border-blue-100">
-                        <div className="flex-shrink-0 mt-0.5 text-blue-500">
+                      <div className="flex items-start gap-3 p-2 rounded-lg bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)]">
+                        <div className="flex-shrink-0 mt-0.5 text-[var(--ui-support-text-icon-support-info)]">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                         </div>
                         <div className="flex-1">
-                          <span className="text-sm text-blue-800 font-medium">Qualtrics opt-out</span>
-                          <p className="text-xs text-blue-600">Handled automatically when you confirm — no action needed</p>
-                          {optOutQualtricsStatus && <p className={`text-xs mt-1 font-medium ${optOutQualtricsStatus.startsWith('✓') ? 'text-green-600' : 'text-orange-600'}`}>{optOutQualtricsStatus}</p>}
+                          <span className="text-sm text-[var(--ui-support-text-icon-support-info)] font-medium">Qualtrics opt-out</span>
+                          <p className="text-xs text-[var(--ui-support-text-icon-support-info)]">Handled automatically when you confirm — no action needed</p>
+                          {optOutQualtricsStatus && <p className={`text-xs mt-1 font-medium ${optOutQualtricsStatus.startsWith('✓') ? 'text-[var(--ui-core-green-green-6)]' : 'text-[var(--ui-core-orange-orange-6)]'}`}>{optOutQualtricsStatus}</p>}
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => { setShowOptOut(false); setOptOutAdminDone(false); setOptOutQualtricsDone(false); setOptOutQualtricsStatus(''); setOptOutDevicesDone(false); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                    <button
+                    <Button
+                      type="default"
+                      label="Cancel"
+                      onClick={() => { setShowOptOut(false); setOptOutAdminDone(false); setOptOutQualtricsDone(false); setOptOutQualtricsStatus(''); setOptOutDevicesDone(false); }}
+                    />
+                    <Button
+                      type="primary"
+                      disabled={!optOutAdminDone || !optOutDevicesDone}
+                      label={optOutAdminDone && optOutDevicesDone ? 'Confirm Opt-Out' : `Complete ${2 - [optOutAdminDone, optOutDevicesDone].filter(Boolean).length} step(s) first`}
                       onClick={async () => {
                         // Auto-trigger Qualtrics opt-out
                         try {
@@ -502,45 +497,39 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         // Proceed with opt-out regardless
                         handleOptOut();
                       }}
-                      disabled={!optOutAdminDone || !optOutDevicesDone}
-                      className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {optOutAdminDone && optOutDevicesDone ? 'Confirm Opt-Out' : `Complete ${2 - [optOutAdminDone, optOutDevicesDone].filter(Boolean).length} step(s) first`}
-                    </button>
+                    />
                   </div>
                 </div>
               </div>
             )}
 
             {/* Person's Devices Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <h4 className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+            <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
+              <h4 className="px-4 py-3 text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider border-b border-[var(--ui-background-layer-border-border-layer-page)] bg-[var(--ui-background-layer-layer-page-hover)]">
                 Devices ({selectedPersonDevices.length})
               </h4>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Serial</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Model</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Program</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Country</th>
+                  <tr className="bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Serial</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Model</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Program</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Country</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
                   {selectedPersonDevices.map((d) => (
-                    <tr key={d.id} className="hover:bg-blue-50/50 cursor-pointer" onClick={() => setViewDevice(d)}>
-                      <td className="px-4 py-2 font-mono text-xs text-blue-700">{d.serialNumber}</td>
-                      <td className="px-4 py-2">{d.model}</td>
+                    <tr key={d.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)] cursor-pointer" onClick={() => setViewDevice(d)}>
+                      <td className="px-4 py-2 font-mono text-xs text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</td>
+                      <td className="px-4 py-2 text-[var(--ui-text-text-secondary)]">{d.model}</td>
                       <td className="px-4 py-2">
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">{d.program}</span>
+                        <Tag color="periwinkle" size="regular">{d.program}</Tag>
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusBadge(d.status)}`}>
-                          {d.status.replace(/_/g, ' ')}
-                        </span>
+                        <Tag color={getStatusTagColor(d.status)} size="regular">{d.status.replace(/_/g, ' ')}</Tag>
                       </td>
-                      <td className="px-4 py-2 text-gray-600">{d.country || '—'}</td>
+                      <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.country || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -552,35 +541,31 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
 
       {/* Duplicate Detection Modal */}
       {duplicateMatches.length > 0 && pendingNewPerson && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { setDuplicateMatches([]); setPendingNewPerson(null); }} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">⚠️ Possible Duplicate Detected</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              We found existing profiles that might be the same person as "<strong>{pendingNewPerson.name}</strong>" ({pendingNewPerson.email}). Would you like to merge into an existing profile or create a new one?
-            </p>
-            <div className="space-y-3 mb-6 max-h-48 overflow-y-auto">
-              {duplicateMatches.map((match) => (
-                <div key={match.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{match.name}</p>
-                    <p className="text-xs text-gray-500">{match.email} {match.testerId && `· ${match.testerId}`}</p>
-                  </div>
-                  <button
-                    onClick={() => handleMergeIntoExisting(match.id)}
-                    className="px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50"
-                  >
-                    Merge Into This Profile
-                  </button>
+        <Modal
+          isOpen
+          title="⚠️ Possible Duplicate Detected"
+          onCancel={() => { setDuplicateMatches([]); setPendingNewPerson(null); }}
+          hideFooter
+        >
+          <p className="text-sm text-[var(--ui-text-text-tertiary)] mb-4">
+            We found existing profiles that might be the same person as "<strong>{pendingNewPerson.name}</strong>" ({pendingNewPerson.email}). Would you like to merge into an existing profile or create a new one?
+          </p>
+          <div className="space-y-3 mb-6 max-h-48 overflow-y-auto">
+            {duplicateMatches.map((match) => (
+              <div key={match.id} className="flex items-center justify-between p-3 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">{match.name}</p>
+                  <p className="text-xs text-[var(--ui-text-text-tertiary)]">{match.email} {match.testerId && `· ${match.testerId}`}</p>
                 </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => { setDuplicateMatches([]); setPendingNewPerson(null); }} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={handleCreateAnyway} className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900">Create New Profile Anyway</button>
-            </div>
+                <Button type="default" label="Merge Into This Profile" onClick={() => handleMergeIntoExisting(match.id)} />
+              </div>
+            ))}
           </div>
-        </div>
+          <div className="flex justify-end gap-3">
+            <Button type="default" label="Cancel" onClick={() => { setDuplicateMatches([]); setPendingNewPerson(null); }} />
+            <Button type="primary" label="Create New Profile Anyway" onClick={handleCreateAnyway} />
+          </div>
+        </Modal>
       )}
 
       {/* Device Detail Panel */}
@@ -601,8 +586,8 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="text-xs text-gray-500 uppercase w-36 shrink-0 font-medium">{label}</span>
-      <span className="text-sm text-gray-900">{value || '—'}</span>
+      <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">{label}</span>
+      <span className="text-sm text-[var(--ui-text-text-primary)]">{value || '—'}</span>
     </div>
   );
 }

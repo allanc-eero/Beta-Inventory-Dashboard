@@ -1,21 +1,24 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Card } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
 import { daysSince, OVERDUE_DAYS } from '@/constants';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
-
+// KPI tile — follows the Insight stat-row pattern (WDS Card + flex-col metric).
 function StatCard({ icon, value, label, iconBg }: { icon: string; value: number; label: string; iconBg: string }) {
   return (
-    <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px' }}>
-      <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
-        <span style={{ fontSize: '18px' }}>{icon}</span>
+    <Card size={2}>
+      <div className="flex flex-col gap-2">
+        <div className="flex size-9 items-center justify-center rounded-lg" style={{ backgroundColor: iconBg }}>
+          <span className="text-lg">{icon}</span>
+        </div>
+        <p className="text-2xl font-medium text-[var(--ui-text-text-primary)]">{value}</p>
+        <p className="text-xs text-[var(--ui-text-text-tertiary)]">{label}</p>
       </div>
-      <p style={{ fontSize: '28px', fontWeight: 700, color: '#111827', margin: '0 0 4px 0' }}>{value}</p>
-      <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>{label}</p>
-    </div>
+    </Card>
   );
 }
 
@@ -33,72 +36,82 @@ function DonutChart({ title, items, total, size, strokeWidth, centerLabel, cente
   });
 
   return (
-    <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
-      <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#374151', margin: '0 0 16px 0' }}>{title}</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, flexShrink: 0 }}>
+    <Card size={3}>
+      <p className="mb-4 text-xs font-bold uppercase text-[var(--ui-text-text-secondary)]">{title}</p>
+      <div className="flex items-center gap-4">
+        <div className="relative shrink-0" style={{ width: `${size}px`, height: `${size}px` }}>
           <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={strokeWidth} />
+            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--ui-core-gray-gray-2)" strokeWidth={strokeWidth} />
             {arcData.map((arc, i) => (
-              <circle key={i} cx={size/2} cy={size/2} r={radius} fill="none" stroke={arc.color} strokeWidth={strokeWidth}
+              <circle key={i} cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={arc.color} strokeWidth={strokeWidth}
                 strokeDasharray={`${arc.dash} ${circ - arc.dash}`} strokeDashoffset={-arc.offset} />
             ))}
           </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 8px', textAlign: 'center' }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
             {(() => {
               const display = centerValue !== undefined ? centerValue : (total > 0 ? total.toLocaleString() : items.length);
               const isText = typeof display === 'string' && isNaN(Number(display));
               const fontSize = isText ? (display.length > 8 ? '11px' : '13px') : (size > 130 ? '20px' : '18px');
-              return <span style={{ fontSize, fontWeight: 700, lineHeight: 1.1 }}>{display}</span>;
+              return <span className="font-bold text-[var(--ui-text-text-primary)]" style={{ fontSize, lineHeight: 1.1 }}>{display}</span>;
             })()}
-            <span style={{ fontSize: size > 130 ? '9px' : '8px', color: '#6b7280', textTransform: 'uppercase', marginTop: '2px' }}>{centerLabel}</span>
+            <span className="mt-0.5 uppercase text-[var(--ui-text-text-tertiary)]" style={{ fontSize: size > 130 ? '9px' : '8px' }}>{centerLabel}</span>
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: size > 130 ? '6px' : '4px', fontSize: size > 130 ? '12px' : '11px' }}>
+        <div className="flex flex-col" style={{ gap: size > 130 ? '6px' : '4px', fontSize: size > 130 ? '12px' : '11px' }}>
           {items.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: size > 130 ? '8px' : '6px' }}>
-              <span style={{ width: size > 130 ? '10px' : '8px', height: size > 130 ? '10px' : '8px', backgroundColor: item.color, borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
-              <span style={{ color: '#374151' }}>{item.name}</span>
-              <b>{item.count}</b>
-              <span style={{ color: '#9ca3af' }}>{total > 0 ? Math.round((item.count / total) * 100) : 0}%</span>
+            <div key={i} className="flex items-center" style={{ gap: size > 130 ? '8px' : '6px' }}>
+              <span className="inline-block shrink-0 rounded-[2px]" style={{ width: size > 130 ? '10px' : '8px', height: size > 130 ? '10px' : '8px', backgroundColor: item.color }} />
+              <span className="text-[var(--ui-text-text-secondary)]">{item.name}</span>
+              <b className="text-[var(--ui-text-text-primary)]">{item.count}</b>
+              <span className="text-[var(--ui-core-gray-gray-5)]">{total > 0 ? Math.round((item.count / total) * 100) : 0}%</span>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
 function BarRow({ letter, label, width, color, count }: { letter: string; label: string; width: string; color: string; count?: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-      <span style={{ fontSize: '13px', fontWeight: 700, width: '14px' }}>{letter}</span>
-      <span style={{ fontSize: '13px', color: '#4b5563', width: '160px', flexShrink: 0 }}>· {label}</span>
-      <div style={{ flex: 1, height: '14px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: count === 0 ? '0%' : width, backgroundColor: color, borderRadius: '2px' }} />
+    <div className="mb-2 flex items-center gap-2">
+      <span className="w-3.5 text-sm font-bold text-[var(--ui-text-text-primary)]">{letter}</span>
+      <span className="w-40 shrink-0 text-sm text-[var(--ui-text-text-secondary)]">· {label}</span>
+      <div className="h-3.5 flex-1 overflow-hidden rounded-[2px] bg-[var(--ui-core-gray-gray-2)]">
+        <div className="h-full rounded-[2px]" style={{ width: count === 0 ? '0%' : width, backgroundColor: color }} />
       </div>
-      <span style={{ fontSize: '12px', color: '#6b7280', width: '20px', textAlign: 'right' }}>{count ?? ''}</span>
+      <span className="w-5 text-right text-xs text-[var(--ui-text-text-tertiary)]">{count ?? ''}</span>
     </div>
   );
 }
 
 function PriorityRow({ count, label, width, color, right }: { count: number; label: string; width: string; color: string; right: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-      <span style={{ fontSize: '13px', fontWeight: 500, width: '20px', textAlign: 'right' }}>{count}</span>
-      <span style={{ fontSize: '12px', color: '#4b5563', width: '160px', flexShrink: 0 }}>{label}</span>
-      <div style={{ flex: 1, height: '12px', backgroundColor: '#f3f4f6', borderRadius: '2px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width, backgroundColor: color, borderRadius: '2px' }} />
+    <div className="mb-1.5 flex items-center gap-2">
+      <span className="w-5 text-right text-sm font-medium text-[var(--ui-text-text-primary)]">{count}</span>
+      <span className="w-40 shrink-0 text-xs text-[var(--ui-text-text-secondary)]">{label}</span>
+      <div className="h-3 flex-1 overflow-hidden rounded-[2px] bg-[var(--ui-core-gray-gray-2)]">
+        <div className="h-full rounded-[2px]" style={{ width, backgroundColor: color }} />
       </div>
-      <span style={{ fontSize: '13px', fontWeight: 500, width: '20px', textAlign: 'right' }}>{right}</span>
+      <span className="w-5 text-right text-sm font-medium text-[var(--ui-text-text-primary)]">{right}</span>
     </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-
-const REGION_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#ec4899', '#0891b2', '#65a30d', '#e11d48', '#f97316'];
-const MODEL_COLORS = ['#1e3a5f', '#d97706', '#059669', '#dc2626', '#7c3aed', '#0891b2', '#65a30d', '#ec4899', '#e11d48', '#f97316'];
+// Chart series colors mapped to EDS core color tokens (no hardcoded hex).
+const REGION_COLORS = [
+  'var(--ui-core-periwinkle-periwinkle-6)', 'var(--ui-core-green-green-6)', 'var(--ui-core-orange-orange-5)',
+  'var(--ui-core-red-red-6)', 'var(--ui-core-purple-purple-6)', 'var(--ui-core-turquoise-turquoise-6)',
+  'var(--ui-core-ocean-blue-ocean-6)', 'var(--ui-core-yellow-yellow-5)', 'var(--ui-core-terracotta-terracotta-6)',
+  'var(--ui-core-midnight-midnight-6)',
+];
+const MODEL_COLORS = [
+  'var(--ui-core-midnight-midnight-8)', 'var(--ui-core-orange-orange-5)', 'var(--ui-core-green-green-6)',
+  'var(--ui-core-red-red-6)', 'var(--ui-core-purple-purple-6)', 'var(--ui-core-turquoise-turquoise-6)',
+  'var(--ui-core-ocean-blue-ocean-6)', 'var(--ui-core-yellow-yellow-5)', 'var(--ui-core-terracotta-terracotta-6)',
+  'var(--ui-core-periwinkle-periwinkle-6)',
+];
 
 function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[]) {
   const map: Record<string, number> = {};
@@ -122,8 +135,8 @@ export default function OverviewDashboard() {
   const modelItems = useMemo(() => groupAndSort(devices, (d) => d.product || d.internalName || d.model || 'Unknown', MODEL_COLORS), [devices]);
 
   const statusItems = useMemo(() => [
-    { name: 'Online', count: online, color: '#3b82f6' },
-    { name: 'Not Online', count: notOnline, color: '#6b7280' },
+    { name: 'Online', count: online, color: 'var(--ui-core-periwinkle-periwinkle-6)' },
+    { name: 'Not Online', count: notOnline, color: 'var(--ui-core-gray-gray-6)' },
   ].filter((d) => d.count > 0), [online, notOnline]);
 
   // Service Orders — live from store
@@ -135,7 +148,6 @@ export default function OverviewDashboard() {
   const soClosed30d = serviceOrders.filter((o) => o.status === 'completed' && o.completedAt && o.completedAt >= thirtyDaysAgo).length;
   const soCancelled = serviceOrders.filter((o) => o.status === 'cancelled').length;
   const soTotal = serviceOrders.length;
-  const soBarTotal = Math.max(soOpen + soInProgress + soComplete + soOnHold + soClosed30d + soCancelled, 1);
 
   // By Job Type — live counts from service orders
   const returnedCount = serviceOrders.filter((o) => o.type === 'returned_to_eero').length;
@@ -163,77 +175,80 @@ export default function OverviewDashboard() {
   }, [serviceOrders]);
 
   return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px', backgroundColor: '#f9fafb' }}>
+    <div className="space-y-4">
       {/* ROW 1: Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '12px', marginBottom: '16px' }}>
-        <StatCard icon="💻" value={total} label="Total Devices" iconBg="#dbeafe" />
-        <StatCard icon="✓" value={online} label="Online" iconBg="#d1fae5" />
-        <StatCard icon="👥" value={notOnline} label="Not Online" iconBg="#fef3c7" />
-        <StatCard icon="🌍" value={countries} label="Countries" iconBg="#fee2e2" />
-        <StatCard icon="🔬" value={programs} label="Programs" iconBg="#ede9fe" />
-        <StatCard icon="👤" value={people} label="People" iconBg="#dbeafe" />
-        <StatCard icon="⚠️" value={overdue} label="Overdue" iconBg="#fef3c7" />
-        <StatCard icon="⚡" value={shapeshiftJobs.filter((j) => j.status === 'success').length} label="Shapeshifted" iconBg="#f3e8ff" />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-8">
+        <StatCard icon="💻" value={total} label="Total Devices" iconBg="var(--ui-core-periwinkle-periwinkle-2)" />
+        <StatCard icon="✓" value={online} label="Online" iconBg="var(--ui-core-green-green-2)" />
+        <StatCard icon="👥" value={notOnline} label="Not Online" iconBg="var(--ui-core-yellow-yellow-2)" />
+        <StatCard icon="🌍" value={countries} label="Countries" iconBg="var(--ui-core-red-red-2)" />
+        <StatCard icon="🔬" value={programs} label="Programs" iconBg="var(--ui-core-purple-purple-2)" />
+        <StatCard icon="👤" value={people} label="People" iconBg="var(--ui-core-periwinkle-periwinkle-2)" />
+        <StatCard icon="⚠️" value={overdue} label="Overdue" iconBg="var(--ui-core-yellow-yellow-2)" />
+        <StatCard icon="⚡" value={shapeshiftJobs.filter((j) => j.status === 'success').length} label="Shapeshifted" iconBg="var(--ui-core-purple-purple-2)" />
       </div>
 
       {/* ROW 2: Three Donut Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Devices" />
         <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" centerValue={regionItems.length} />
         <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Top Model" centerValue={modelItems[0]?.name || '—'} />
       </div>
 
       {/* ROW 3: Service Orders */}
-      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 700 }}>Service Orders</span>
-          <span style={{ fontSize: '14px', color: '#6b7280' }}>{soTotal} total</span>
-        </div>
-
+      <Card
+        size={5}
+        title={
+          <div className="flex items-baseline gap-2">
+            <span className="text-base font-medium text-[var(--ui-text-text-primary)]">Service Orders</span>
+            <span className="text-sm text-[var(--ui-text-text-tertiary)]">{soTotal} total</span>
+          </div>
+        }
+      >
         {/* Segmented bar — always show all 6 segments with equal width, separated by gaps */}
-        <div style={{ display: 'flex', gap: '8px', height: '28px', marginBottom: '4px' }}>
-          <div style={{ flex: 1, backgroundColor: soOpen > 0 ? '#3b82f6' : '#e5e7eb', borderRadius: '4px' }} />
-          <div style={{ flex: 1, backgroundColor: soInProgress > 0 ? '#b45309' : '#e5e7eb', borderRadius: '4px' }} />
-          <div style={{ flex: 1, backgroundColor: soComplete > 0 ? '#16a34a' : '#e5e7eb', borderRadius: '4px' }} />
-          <div style={{ flex: 1, backgroundColor: soOnHold > 0 ? '#6b7280' : '#e5e7eb', borderRadius: '4px' }} />
-          <div style={{ flex: 1, backgroundColor: soClosed30d > 0 ? '#bbf7d0' : '#e5e7eb', borderRadius: '4px' }} />
-          <div style={{ flex: 1, backgroundColor: soCancelled > 0 ? '#7f1d1d' : '#e5e7eb', borderRadius: '4px' }} />
+        <div className="mb-1 flex h-7 gap-2">
+          <div className="flex-1 rounded" style={{ backgroundColor: soOpen > 0 ? 'var(--ui-core-periwinkle-periwinkle-6)' : 'var(--ui-core-gray-gray-3)' }} />
+          <div className="flex-1 rounded" style={{ backgroundColor: soInProgress > 0 ? 'var(--ui-core-orange-orange-6)' : 'var(--ui-core-gray-gray-3)' }} />
+          <div className="flex-1 rounded" style={{ backgroundColor: soComplete > 0 ? 'var(--ui-core-green-green-6)' : 'var(--ui-core-gray-gray-3)' }} />
+          <div className="flex-1 rounded" style={{ backgroundColor: soOnHold > 0 ? 'var(--ui-core-gray-gray-6)' : 'var(--ui-core-gray-gray-3)' }} />
+          <div className="flex-1 rounded" style={{ backgroundColor: soClosed30d > 0 ? 'var(--ui-core-green-green-3)' : 'var(--ui-core-gray-gray-3)' }} />
+          <div className="flex-1 rounded" style={{ backgroundColor: soCancelled > 0 ? 'var(--ui-core-red-red-8)' : 'var(--ui-core-gray-gray-3)' }} />
         </div>
 
         {/* Numbers */}
-        <div style={{ display: 'flex', marginBottom: '24px' }}>
-          <div style={{ flex: 1 }}><span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>{soOpen}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Open</span></div>
-          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700 }}>{soInProgress}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>In progress</span></div>
-          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>{soComplete}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Complete</span></div>
-          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700 }}>{soOnHold}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>On hold</span></div>
-          <div style={{ flex: 1 }}><span style={{ fontSize: '12px' }}>{soClosed30d}</span><br /><span style={{ fontSize: '10px', color: '#6b7280' }}>Closed 30d</span></div>
-          <div style={{ flex: 1 }}><span style={{ fontSize: '14px', fontWeight: 700, color: '#7f1d1d' }}>{soCancelled}</span><br /><span style={{ fontSize: '11px', color: '#6b7280' }}>Cancelled</span></div>
+        <div className="mb-6 flex">
+          <div className="flex-1"><span className="text-lg font-bold text-[var(--ui-core-periwinkle-periwinkle-6)]">{soOpen}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Open</span></div>
+          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-text-text-primary)]">{soInProgress}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">In progress</span></div>
+          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-core-green-green-6)]">{soComplete}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Complete</span></div>
+          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-text-text-primary)]">{soOnHold}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">On hold</span></div>
+          <div className="flex-1"><span className="text-xs text-[var(--ui-text-text-primary)]">{soClosed30d}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Closed 30d</span></div>
+          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-core-red-red-8)]">{soCancelled}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Cancelled</span></div>
         </div>
 
         {/* Two columns */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
+        <div className="grid grid-cols-2 gap-12">
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Job Type</p>
-            <BarRow letter="R" label="Returned to eero" width={`${(returnedCount / jobTypeMax) * 100}%`} color="#3b82f6" count={returnedCount} />
-            <BarRow letter="D" label="Defective / Hardware" width={`${(defectiveCount / jobTypeMax) * 100}%`} color="#dc2626" count={defectiveCount} />
-            <BarRow letter="E" label="End of program phase" width={`${(endProgramCount / jobTypeMax) * 100}%`} color="#f97316" count={endProgramCount} />
-            <BarRow letter="L" label="Lost / Unrecoverable" width={`${(lostCount / jobTypeMax) * 100}%`} color="#374151" count={lostCount} />
-            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="#1d4ed8" count={outboundShipments} />
-            <BarRow letter="O" label="Other" width={`${(otherCount / jobTypeMax) * 100}%`} color="#6b7280" count={otherCount} />
-            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginTop: '24px', marginBottom: '8px' }}>Top Assignees (Open)</p>
-            {topAssignees.length === 0 && <p style={{ fontSize: '13px', color: '#9ca3af' }}>No open assignments</p>}
-            {topAssignees.map(([name], i) => <p key={i} style={{ fontSize: '13px', color: '#4b5563', margin: '2px 0' }}>{name}</p>)}
+            <p className="mb-3 text-xs font-bold uppercase text-[var(--ui-text-text-primary)]">By Job Type</p>
+            <BarRow letter="R" label="Returned to eero" width={`${(returnedCount / jobTypeMax) * 100}%`} color="var(--ui-core-periwinkle-periwinkle-6)" count={returnedCount} />
+            <BarRow letter="D" label="Defective / Hardware" width={`${(defectiveCount / jobTypeMax) * 100}%`} color="var(--ui-core-red-red-6)" count={defectiveCount} />
+            <BarRow letter="E" label="End of program phase" width={`${(endProgramCount / jobTypeMax) * 100}%`} color="var(--ui-core-orange-orange-5)" count={endProgramCount} />
+            <BarRow letter="L" label="Lost / Unrecoverable" width={`${(lostCount / jobTypeMax) * 100}%`} color="var(--ui-core-midnight-midnight-7)" count={lostCount} />
+            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="var(--ui-core-periwinkle-periwinkle-7)" count={outboundShipments} />
+            <BarRow letter="O" label="Other" width={`${(otherCount / jobTypeMax) * 100}%`} color="var(--ui-core-gray-gray-6)" count={otherCount} />
+            <p className="mb-2 mt-6 text-xs font-bold uppercase text-[var(--ui-text-text-primary)]">Top Assignees (Open)</p>
+            {topAssignees.length === 0 && <p className="text-sm text-[var(--ui-core-gray-gray-5)]">No open assignments</p>}
+            {topAssignees.map(([name], i) => <p key={i} className="my-0.5 text-sm text-[var(--ui-text-text-secondary)]">{name}</p>)}
           </div>
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>By Priority (Open - JIRA)</p>
-            <PriorityRow count={triageCount} label="P0 — Triage & Investigate" width={`${(triageCount / priorityMax) * 100}%`} color="#dc2626" right={triageCount} />
-            <PriorityRow count={onHoldCount} label="P1 — On Hold" width={`${(onHoldCount / priorityMax) * 100}%`} color="#ea580c" right={onHoldCount} />
-            <PriorityRow count={intakeCount} label="P2 — Intake" width={`${(intakeCount / priorityMax) * 100}%`} color="#ca8a04" right={intakeCount} />
-            <PriorityRow count={completedCount} label="P3 — Completed" width={`${(completedCount / priorityMax) * 100}%`} color="#16a34a" right={completedCount} />
-            <PriorityRow count={backlogCount} label="P4 — Low / Backlog" width={`${(backlogCount / priorityMax) * 100}%`} color="#3b82f6" right={backlogCount} />
+            <p className="mb-3 text-xs font-bold uppercase text-[var(--ui-text-text-primary)]">By Priority (Open - JIRA)</p>
+            <PriorityRow count={triageCount} label="P0 — Triage & Investigate" width={`${(triageCount / priorityMax) * 100}%`} color="var(--ui-core-red-red-6)" right={triageCount} />
+            <PriorityRow count={onHoldCount} label="P1 — On Hold" width={`${(onHoldCount / priorityMax) * 100}%`} color="var(--ui-core-orange-orange-5)" right={onHoldCount} />
+            <PriorityRow count={intakeCount} label="P2 — Intake" width={`${(intakeCount / priorityMax) * 100}%`} color="var(--ui-core-yellow-yellow-5)" right={intakeCount} />
+            <PriorityRow count={completedCount} label="P3 — Completed" width={`${(completedCount / priorityMax) * 100}%`} color="var(--ui-core-green-green-6)" right={completedCount} />
+            <PriorityRow count={backlogCount} label="P4 — Low / Backlog" width={`${(backlogCount / priorityMax) * 100}%`} color="var(--ui-core-periwinkle-periwinkle-6)" right={backlogCount} />
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

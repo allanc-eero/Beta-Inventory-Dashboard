@@ -3,6 +3,9 @@
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { useState } from 'react';
+import { Card, Button, Input, Tag } from '@amzn/eero-web-design-components';
+
+type TagColor = 'grey' | 'navy' | 'periwinkle' | 'green' | 'orange' | 'red' | 'turquoise' | 'ocean' | 'purple' | 'terracotta' | 'yellow';
 
 export default function JiraPanel({ deviceId }: { deviceId: string }) {
   const { devices, getJiraTicketsForDevice, createJiraTicket, closeJiraTicket } = useDeviceStore();
@@ -31,11 +34,11 @@ export default function JiraPanel({ deviceId }: { deviceId: string }) {
     setShowCreate(false);
   };
 
-  const statusColors: Record<string, string> = {
-    open: 'bg-blue-100 text-blue-700',
-    in_progress: 'bg-yellow-100 text-yellow-700',
-    resolved: 'bg-green-100 text-green-700',
-    closed: 'bg-gray-100 text-gray-500',
+  const statusColors: Record<string, TagColor> = {
+    open: 'periwinkle',
+    in_progress: 'orange',
+    resolved: 'green',
+    closed: 'grey',
   };
 
   const typeLabels: Record<string, string> = {
@@ -46,70 +49,62 @@ export default function JiraPanel({ deviceId }: { deviceId: string }) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-900">JIRA Tickets</h4>
-        {canEdit() && (
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="text-xs font-medium text-blue-600 hover:text-blue-800"
-        >
-          {showCreate ? 'Cancel' : '+ Create'}
-        </button>
-        )}
-      </div>
-
+    <Card
+      size={2}
+      title={
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-[var(--ui-text-text-primary)]">JIRA Tickets</span>
+          {canEdit() && (
+            <Button
+              type="text"
+              label={showCreate ? 'Cancel' : '+ Create'}
+              onClick={() => setShowCreate(!showCreate)}
+            />
+          )}
+        </div>
+      }
+    >
       {showCreate && (
-        <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <input
-            type="text"
+        <div className="mb-3 p-3 bg-[var(--ui-background-layer-layer-page-hover)] rounded-lg border border-[var(--ui-background-layer-border-border-layer-page)]">
+          <Input
+            id="jira-summary"
             value={summary}
-            onChange={(e) => setSummary(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSummary(e.target.value)}
             placeholder="Ticket summary..."
-            className="w-full px-3 py-1.5 border border-gray-200 rounded-md text-sm mb-2"
+            layout="vertical"
           />
-          <button
-            onClick={handleCreate}
-            className="w-full px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Create Ticket
-          </button>
+          <div className="mt-2">
+            <Button type="primary" label="Create Ticket" fullWidth onClick={handleCreate} />
+          </div>
         </div>
       )}
 
       {tickets.length > 0 ? (
         <div className="space-y-2 max-h-48 overflow-y-auto">
           {tickets.map((ticket) => (
-            <div key={ticket.id} className="p-2 border border-gray-100 rounded-md">
+            <div key={ticket.id} className="p-2 border border-[var(--ui-background-layer-border-border-layer-page)] rounded-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-medium text-blue-600">{ticket.key}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${statusColors[ticket.status]}`}>
-                    {ticket.status}
-                  </span>
+                  <span className="text-xs font-mono font-medium text-[var(--ui-core-periwinkle-periwinkle-6)]">{ticket.key}</span>
+                  <Tag color={statusColors[ticket.status] || 'grey'} size="regular">{ticket.status}</Tag>
                 </div>
                 {canEdit() && (ticket.status === 'open' || ticket.status === 'in_progress') && (
-                  <button
-                    onClick={() => closeJiraTicket(ticket.id)}
-                    className="text-xs text-gray-400 hover:text-gray-600"
-                  >
-                    Close
-                  </button>
+                  <Button type="text" label="Close" onClick={() => closeJiraTicket(ticket.id)} />
                 )}
               </div>
-              <p className="text-xs text-gray-600 mt-1">{ticket.summary}</p>
+              <p className="text-xs text-[var(--ui-text-text-tertiary)] mt-1">{ticket.summary}</p>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-gray-400">{typeLabels[ticket.type] || ticket.type}</span>
+                <span className="text-xs text-[var(--ui-text-text-placeholder)]">{typeLabels[ticket.type] || ticket.type}</span>
                 {ticket.linkedFirmware && (
-                  <span className="text-xs text-gray-400">· fw {ticket.linkedFirmware}</span>
+                  <span className="text-xs text-[var(--ui-text-text-placeholder)]">· fw {ticket.linkedFirmware}</span>
                 )}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-400">No tickets linked to this device</p>
+        <p className="text-xs text-[var(--ui-text-text-placeholder)]">No tickets linked to this device</p>
       )}
-    </div>
+    </Card>
   );
 }

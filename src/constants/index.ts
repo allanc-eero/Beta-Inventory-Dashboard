@@ -1,16 +1,19 @@
 import { Carrier } from '@/types';
 
+// WDS Tag color palette (from @amzn/eero-web-design-components Tag typings).
+export type TagColor = 'grey' | 'navy' | 'periwinkle' | 'green' | 'orange' | 'red' | 'turquoise' | 'ocean' | 'purple' | 'terracotta' | 'yellow';
+
 // ─── Shared Constants ─────────────────────────────────────────────────────────
 
 export const REGIONS = ['USA', 'CA', 'EU', 'UK', 'AUS', 'NZ', 'JPN', 'SG', 'Other'] as const;
 export type Region = (typeof REGIONS)[number];
 
-export const CARRIER_COLORS: Record<Carrier, string> = {
-  DHL: 'bg-yellow-500 text-white',
-  FedEx: 'bg-purple-600 text-white',
-  UPS: 'bg-amber-700 text-white',
-  USPS: 'bg-blue-600 text-white',
-  Other: 'bg-gray-500 text-white',
+export const CARRIER_COLORS: Record<Carrier, TagColor> = {
+  DHL: 'yellow',
+  FedEx: 'purple',
+  UPS: 'terracotta',
+  USPS: 'periwinkle',
+  Other: 'grey',
 };
 
 export const CARRIERS: Carrier[] = ['UPS', 'USPS', 'FedEx', 'DHL', 'Other'];
@@ -75,19 +78,19 @@ export function getReturnEpic(program: string): string {
   return RETURN_EPIC_MAP[program] || RETURN_EPIC_MAP.other;
 }
 
-// Shared device-status badge config (class + label), used by device tables/panels.
-export const STATUS_CONFIG: Record<string, { class: string; label: string }> = {
-  online: { class: 'status-in-stock', label: 'Online' },
-  not_online: { class: 'status-checked-out', label: 'Not Online' },
-  in_repair: { class: 'status-in-repair', label: 'In Repair' },
-  in_testing: { class: 'status-in-testing', label: 'In Testing' },
-  pending_return: { class: 'bg-orange-100 text-orange-700', label: 'Pending Return' },
-  deactivated: { class: 'bg-gray-100 text-gray-600', label: 'Deactivated' },
+// Shared device-status badge config (WDS Tag color + label), used by device tables/panels.
+export const STATUS_CONFIG: Record<string, { color: TagColor; label: string }> = {
+  online: { color: 'green', label: 'Online' },
+  not_online: { color: 'orange', label: 'Not Online' },
+  in_repair: { color: 'red', label: 'In Repair' },
+  in_testing: { color: 'periwinkle', label: 'In Testing' },
+  pending_return: { color: 'orange', label: 'Pending Return' },
+  deactivated: { color: 'grey', label: 'Deactivated' },
 };
 
 // Resolve a status to its badge config, with a safe fallback.
-export function getStatusBadge(status: string): { class: string; label: string } {
-  return STATUS_CONFIG[status] || { class: 'bg-gray-100 text-gray-600', label: status };
+export function getStatusBadge(status: string): { color: TagColor; label: string } {
+  return STATUS_CONFIG[status] || { color: 'grey', label: status };
 }
 
 // ─── CSV export ───────────────────────────────────────────────────────────────
