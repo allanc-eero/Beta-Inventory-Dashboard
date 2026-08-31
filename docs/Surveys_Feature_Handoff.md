@@ -7,6 +7,16 @@ Use this doc to resume where we left off. Read it top-to-bottom; it captures the
 
 ---
 
+## Backup status (2026-08-30)
+
+All work from the last session is **backed up to GitHub** on branch `surveys-engagement-demo`:
+- **Commit `d5ca1a0`** — the Surveys & Engagement demo (`/demo-surveys`).
+- **Commit `bdf92fa`** — the in-progress **EDS refactor** across ~34 components + config (`globals.css`, `tailwind.config.ts`, `tsconfig.json`), removal of the parked `/eds-demo` page, the `react-simple-maps` type shim, and `.kiro/EDS_REFACTOR_MAP.md`.
+
+Local branch is in sync with `origin/surveys-engagement-demo`. **Not committed:** local `.claude/` tooling only (intentionally excluded — not part of the feature work). Note: this EDS-refactor commit is a work-in-progress snapshot for safekeeping; it was not gated on a full `tsc`/build pass.
+
+---
+
 ## 1. The goal
 
 Mine features from a separate production app (`eero-beta-app-prod`, now cloned read-only at `.reference/eero-beta-app-prod`) and rebuild the valuable ones into **eero Fetch** (this app) — WITHOUT copying code. Everything must be:
