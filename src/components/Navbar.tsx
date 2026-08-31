@@ -14,12 +14,10 @@ interface NavbarProps {
 }
 
 const tabs: { id: TabType; label: string; key: string }[] = [
-  { id: 'overview', label: 'Overview', key: 'overview' },
   { id: 'devices', label: 'Devices', key: 'devices' },
-  { id: 'testbeds', label: 'Programs', key: 'testbeds' },
-  { id: 'locations', label: 'Locations', key: 'locations' },
+  { id: 'surveys', label: 'Programs', key: 'surveys' },
   { id: 'people', label: 'People', key: 'people' },
-  { id: 'surveys', label: 'Surveys', key: 'surveys' },
+  { id: 'locations', label: 'Locations', key: 'locations' },
   { id: 'shipments', label: 'Ingestion & Returns', key: 'shipments' },
   // Hidden from the sidebar — Dogfooders + Program Sign-ups are being split into a
   // separate app. Code/routes kept intact; just not surfaced here. See docs/TODO.md.
@@ -74,7 +72,7 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
         className="flex w-full max-w-md items-center gap-2 rounded-lg bg-[var(--ui-core-midnight-midnight-8)] px-3 py-2 text-sm text-[var(--ui-core-midnight-midnight-6)] transition-all hover:bg-[var(--ui-core-midnight-midnight-7)]"
       >
         <Search size={16} className="shrink-0" />
-        <span className="flex-1 truncate text-left">Search devices, testers, testbeds, locations…</span>
+        <span className="flex-1 truncate text-left">Search devices, testers, programs, locations…</span>
       </button>
 
       {currentUser && (

@@ -1221,28 +1221,67 @@ function EngagementView({ onToast }: { onToast: (msg: string) => void }) {
     return (offline || t.deviceOnline === null) && unresponsive && lowReliability;
   }), []);
 
+  // Stable program order taken from the tester list, so both sections group the same way.
+  const programNames = useMemo(() => Array.from(new Set(TESTERS.map((t) => t.programName))), []);
+  const atRiskByProgram = useMemo(
+    () => programNames.map((name) => ({ name, testers: atRisk.filter((t) => t.programName === name) })).filter((g) => g.testers.length > 0),
+    [programNames, atRisk],
+  );
+  const engagementByProgram = useMemo(
+    () => programNames.map((name) => ({ name, testers: TESTERS.filter((t) => t.programName === name) })).filter((g) => g.testers.length > 0),
+    [programNames],
+  );
+
+  // Engagement columns — Program column dropped since rows are grouped under a program header.
+  const engagementColumns = [
+    { accessorKey: 'name', header: 'Tester', cell: (c: any) => <span style={{ color: TEXT_PRIMARY }}>{c.row.original.name}</span> },
+    { id: 'engagement', header: 'Engagement', cell: (c: any) => { const e = engagementLevel(c.row.original); return <Tag color={e.color} size="regular">{e.label}</Tag>; } },
+    { accessorKey: 'reliability', header: 'Reliability', cell: (c: any) => {
+      const t = c.row.original as DemoTester;
+      return (
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-20 overflow-hidden rounded" style={{ backgroundColor: TRACK }}>
+            <div className="h-full rounded" style={{ width: `${t.reliability}%`, backgroundColor: t.reliability >= 60 ? OK_GREEN : t.reliability >= 30 ? WARN_ORANGE : BAD_RED }} />
+          </div>
+          <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{t.reliability}%</span>
+        </div>
+      );
+    } },
+    { accessorKey: 'avgResponseDays', header: 'Avg response', cell: (c: any) => <span style={{ color: TEXT_SECONDARY }}>{c.row.original.avgResponseDays}d</span> },
+    { accessorKey: 'feedbackQuality', header: 'Feedback quality', cell: (c: any) => <Stars n={c.row.original.feedbackQuality} /> },
+  ] as any;
+
   return (
     <div className="flex flex-col gap-4">
-      {/* At-Risk */}
+      {/* At-Risk — grouped by program */}
       <Card size={4} title={<span className="inline-flex items-center gap-1.5 text-sm font-medium" style={{ color: TEXT_PRIMARY }}><span style={{ color: WARN_ORANGE }}><Icon icon={ICONS.FUNCTIONAL_WARNINGREGULAR} className="h-4 w-4" /></span>At-Risk / Action Needed</span>}>
         <p className="mb-3 text-xs" style={{ color: TEXT_TERTIARY }}>
           Rules: (device offline <b>or</b> feature program) · missed ≥3 surveys · reliability &lt; 30%. The intersection of device status and survey engagement — the reason to merge these two apps.
         </p>
-        <div className="flex flex-col gap-2">
-          {atRisk.map((t) => (
-            <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-core-red-red-1)' }}>
-              <div>
-                <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</span>
-                <span className="ml-2 text-xs" style={{ color: TEXT_TERTIARY }}>{t.programName}</span>
+        {atRisk.length === 0 ? (
+          <p className="text-sm" style={{ color: TEXT_TERTIARY }}>No at-risk testers right now.</p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {atRiskByProgram.map((g) => (
+              <div key={g.name} className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 border-b pb-1.5" style={{ borderColor: TRACK }}>
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_SECONDARY }}>{g.name}</span>
+                  <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {g.testers.length} at risk</span>
+                </div>
+                {g.testers.map((t) => (
+                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-core-red-red-1)' }}>
+                    <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {t.deviceOnline === false && <Tag color="red" size="regular">Device offline</Tag>}
+                      <Tag color="orange" size="regular">{t.missedSurveys} missed surveys</Tag>
+                      <Tag color="grey" size="regular">{t.reliability}% reliability</Tag>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {t.deviceOnline === false && <Tag color="red" size="regular">Device offline</Tag>}
-                <Tag color="orange" size="regular">{t.missedSurveys} missed surveys</Tag>
-                <Tag color="grey" size="regular">{t.reliability}% reliability</Tag>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-4">
           {narration === 'idle' && (
@@ -1263,37 +1302,249 @@ function EngagementView({ onToast }: { onToast: (msg: string) => void }) {
         </div>
       </Card>
 
-      {/* Engagement table (EDS TableV2) */}
+      {/* Engagement — grouped by program (EDS TableV2 per program) */}
       <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Tester Engagement</span>}>
-        <p className="mb-3 text-xs" style={{ color: TEXT_TERTIARY }}>Derived from survey activity — engagement is computed from response reliability and missed surveys.</p>
-        <TableV2
-          data={TESTERS}
-          emptyText="No testers yet"
-          columns={[
-            { accessorKey: 'name', header: 'Tester', cell: (c: any) => <span style={{ color: TEXT_PRIMARY }}>{c.row.original.name}</span> },
-            { accessorKey: 'programName', header: 'Program', cell: (c: any) => <span style={{ color: TEXT_SECONDARY }}>{c.row.original.programName}</span> },
-            { id: 'engagement', header: 'Engagement', cell: (c: any) => { const e = engagementLevel(c.row.original); return <Tag color={e.color} size="regular">{e.label}</Tag>; } },
-            { accessorKey: 'reliability', header: 'Reliability', cell: (c: any) => {
-              const t = c.row.original as DemoTester;
-              return (
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-20 overflow-hidden rounded" style={{ backgroundColor: TRACK }}>
-                    <div className="h-full rounded" style={{ width: `${t.reliability}%`, backgroundColor: t.reliability >= 60 ? OK_GREEN : t.reliability >= 30 ? WARN_ORANGE : BAD_RED }} />
-                  </div>
-                  <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{t.reliability}%</span>
-                </div>
-              );
-            } },
-            { accessorKey: 'avgResponseDays', header: 'Avg response', cell: (c: any) => <span style={{ color: TEXT_SECONDARY }}>{c.row.original.avgResponseDays}d</span> },
-            { accessorKey: 'feedbackQuality', header: 'Feedback quality', cell: (c: any) => <Stars n={c.row.original.feedbackQuality} /> },
-          ] as any}
-        />
+        <p className="mb-3 text-xs" style={{ color: TEXT_TERTIARY }}>Derived from survey activity — engagement is computed from response reliability and missed surveys. Grouped by program.</p>
+        <div className="flex flex-col gap-5">
+          {engagementByProgram.map((g) => (
+            <div key={g.name} className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 border-b pb-1.5" style={{ borderColor: TRACK }}>
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_SECONDARY }}>{g.name}</span>
+                <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {g.testers.length} testers</span>
+              </div>
+              <TableV2 data={g.testers} emptyText="No testers" columns={engagementColumns} />
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );
 }
 
 // ─── Program Health view ─────────────────────────────────────────────────────
+// ─── Device detail (self-contained mock — mirrors the real DeviceDetailPanel) ──
+// Clicking a serial in a program roster opens this. In production it's a live
+// Insight read; here it's deterministic mock behind the same demo seam. Fields
+// mirror the real DeviceDetailPanel (Device / Assignment / Logistics / Notes /
+// Testbed / Contact + Firmware + Network Health).
+interface RosterDeviceDetail {
+  serial: string;
+  model: string; manufacturer: string; revision: string; revisionNotes: string;
+  hardwareConfig: string; mac: string; internalName: string; sku: string;
+  partNumber: string; country: string; adminId: string; firmware: string;
+  environment: string; deactivated: boolean;
+  status: string; assignedTo: string; insightNetwork: string;
+  assetTag: string; poExpensify: string; tracking: string; returnTracking: string; jira: string;
+  notes: string; testbed: string;
+  email: string; contactEmail: string; alternateEmail: string; dueDate: string; program: string;
+  firmwareCurrent: string; firmwareLatest: string;
+  speedDown: number | null; speedUp: number | null;
+}
+
+const COUNTRY_POOL = [
+  { name: 'Australia', code: 'AUS' }, { name: 'United States', code: 'USA' },
+  { name: 'United Kingdom', code: 'GBR' }, { name: 'Germany', code: 'DEU' },
+  { name: 'Canada', code: 'CAN' }, { name: 'Japan', code: 'JPN' },
+];
+
+function hashSeed(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+// Region a device reports from — in production this is the eero network's
+// geo-IP/timezone from Insight (where it's installed), not the shipped-to address.
+function countryForSerial(serial: string): { name: string; code: string } {
+  return COUNTRY_POOL[hashSeed(serial) % COUNTRY_POOL.length];
+}
+
+function deviceDetailFor(entry: RosterEntry, serial: string, program: DemoProgram): RosterDeviceDetail {
+  const model = betaModelFor(program);
+  const seed = hashSeed(serial);
+  const online = entry.candidates.find((c) => c.serial === serial)?.online ?? false;
+  const country = countryForSerial(serial);
+  const handle = entry.email.split('@')[0];
+  return {
+    serial,
+    model: 'eero Max 7',
+    manufacturer: 'eero',
+    revision: '',
+    revisionNotes: '',
+    hardwareConfig: '',
+    mac: '',
+    internalName: `${model} 10.2`,
+    sku: '',
+    partNumber: '',
+    country: country.name,
+    adminId: `UID000${2900000 + (seed % 99999)}`,
+    firmware: '',
+    environment: '',
+    deactivated: false,
+    status: online ? 'Online' : 'Not online',
+    assignedTo: entry.tester,
+    insightNetwork: String(17000000 + (seed % 99999)),
+    assetTag: '',
+    poExpensify: '',
+    tracking: '',
+    returnTracking: '',
+    jira: '',
+    notes: '',
+    testbed: program.name,
+    email: entry.email,
+    contactEmail: `${handle}@amazon.com`,
+    alternateEmail: '',
+    dueDate: '',
+    program: program.type === 'feature' ? 'feature' : 'beta',
+    firmwareCurrent: 'Unknown',
+    firmwareLatest: '7.3.8',
+    speedDown: online ? 99.5 : null,
+    speedUp: online ? 17.0 : null,
+  };
+}
+
+function DetailRow({ label, value, link }: { label: string; value?: string; link?: string }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="w-36 shrink-0 text-xs font-medium uppercase" style={{ color: TEXT_TERTIARY }}>{label}</span>
+      {link && value
+        ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:underline" style={{ color: ACCENT }}>{value} ↗</a>
+        : <span className="text-sm" style={{ color: TEXT_PRIMARY }}>{value || '—'}</span>}
+    </div>
+  );
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="mb-3 border-b pb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY, borderColor: TRACK }}>{title}</h3>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function ProgramDeviceDetail({ detail, onBack, onToast }: {
+  detail: RosterDeviceDetail;
+  onBack: () => void;
+  onToast: (msg: string) => void;
+}) {
+  const [speed, setSpeed] = useState<{ down: number | null; up: number | null }>({ down: detail.speedDown, up: detail.speedUp });
+  const [testing, setTesting] = useState(false);
+  const online = detail.status.toLowerCase() === 'online';
+
+  const runSpeedTest = () => {
+    setTesting(true);
+    simulate(true, 1200).then(() => {
+      setSpeed({ down: Math.round((80 + Math.random() * 60) * 10) / 10, up: Math.round((10 + Math.random() * 15) * 10) / 10 });
+      setTesting(false);
+      onToast('Speed test complete (simulated)');
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Button type="text" label="← Back to devices" onClick={onBack} />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-mono text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>{detail.serial}</h1>
+            <div className="mt-1 flex items-center gap-3">
+              <Tag color={online ? 'green' : 'orange'} size="regular">{detail.status}</Tag>
+              <span className="text-sm" style={{ color: 'var(--ui-core-red-red-6)' }}>📍 {detail.country}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="default" leftIcon={ICONS.FUNCTIONAL_DOWNLOAD} label="Export" onClick={() => onToast('Exported device info to CSV (simulated)')} />
+            <Button type="primary" label="Edit details" onClick={() => onToast('Edit mode (simulated) — fields become editable when wired to Insight')} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <DetailSection title="Device">
+          <DetailRow label="Model" value={detail.model} />
+          <DetailRow label="Manufacturer" value={detail.manufacturer} />
+          <DetailRow label="Revision" value={detail.revision} />
+          <DetailRow label="Revision Notes" value={detail.revisionNotes} />
+          <DetailRow label="Hardware Config" value={detail.hardwareConfig} />
+          <DetailRow label="MAC" value={detail.mac} />
+          <DetailRow label="Internal Name" value={detail.internalName} />
+          <DetailRow label="SKU" value={detail.sku} />
+          <DetailRow label="Part Number" value={detail.partNumber} />
+          <DetailRow label="Country" value={detail.country} />
+          <DetailRow label="Admin ID" value={detail.adminId} link={`https://admin.e2ro.com/users/${detail.adminId.replace(/^UID0*/, '')}`} />
+          <DetailRow label="Firmware" value={detail.firmware} />
+          <DetailRow label="Environment" value={detail.environment} />
+          <DetailRow label="Deactivated" value={detail.deactivated ? 'yes' : 'no'} />
+        </DetailSection>
+
+        <div className="space-y-6">
+          <DetailSection title="Assignment">
+            <DetailRow label="Status" value={detail.status} />
+            <DetailRow label="Assigned To" value={detail.assignedTo} />
+            <DetailRow label="Country" value={detail.country} />
+            <DetailRow label="Insight Network" value={detail.insightNetwork} link={`https://insight.eero.com/networks/${detail.insightNetwork}`} />
+          </DetailSection>
+          <DetailSection title="Logistics">
+            <DetailRow label="Asset Tag" value={detail.assetTag} />
+            <DetailRow label="PO / Expensify" value={detail.poExpensify} />
+            <DetailRow label="Tracking" value={detail.tracking} />
+            <DetailRow label="Return Tracking" value={detail.returnTracking} />
+            <DetailRow label="JIRA" value={detail.jira} />
+          </DetailSection>
+        </div>
+
+        <div className="space-y-6">
+          <DetailSection title="Notes">
+            <p className="text-sm" style={{ color: TEXT_SECONDARY }}>{detail.notes || '—'}</p>
+          </DetailSection>
+          <DetailSection title="Testbed">
+            <p className="text-sm" style={{ color: TEXT_PRIMARY }}>{detail.testbed}</p>
+          </DetailSection>
+          <DetailSection title="Contact">
+            <DetailRow label="Email" value={detail.email} />
+            <DetailRow label="Contact Email" value={detail.contactEmail} />
+            <DetailRow label="Alternate Email" value={detail.alternateEmail} />
+            <DetailRow label="Due Date" value={detail.dueDate} />
+            <DetailRow label="Program" value={detail.program} />
+          </DetailSection>
+        </div>
+      </div>
+
+      <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Firmware</span>}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between text-sm">
+            <span style={{ color: TEXT_TERTIARY }}>Current Version</span>
+            <span style={{ color: TEXT_PRIMARY }}>{detail.firmwareCurrent}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span style={{ color: TEXT_TERTIARY }}>Latest Available</span>
+            <span style={{ color: TEXT_PRIMARY }}>{detail.firmwareLatest}</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card size={4} title={
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Network Health</span>
+          <Button type="primary" label={testing ? 'Testing…' : 'Run Speed Test'} onClick={runSpeedTest} />
+        </div>
+      }>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg p-4 text-center" style={{ backgroundColor: 'var(--ui-background-layer-layer-page-backplate)' }}>
+            <p className="text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>{speed.down ?? '—'}</p>
+            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Mbps Down</p>
+          </div>
+          <div className="rounded-lg p-4 text-center" style={{ backgroundColor: 'var(--ui-background-layer-layer-page-backplate)' }}>
+            <p className="text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>{speed.up ?? '—'}</p>
+            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Mbps Up</p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Program → device roster drill-in (merged from the old Programs menu) ─────
 // This is the "user + DSN per program" table you open from a program card. It's
 // the same device list the standalone Programs menu showed, now scoped to one
@@ -1309,6 +1560,7 @@ function ProgramDevicesView({ program, onBack, onToast }: {
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [openSerial, setOpenSerial] = useState<{ entry: RosterEntry; serial: string } | null>(null);
 
   const matched = roster.filter((r) => r.match === 'matched').length;
   const needsPick = roster.filter((r) => r.match === 'multiple').length;
@@ -1345,6 +1597,16 @@ function ProgramDevicesView({ program, onBack, onToast }: {
 
   const thCls = 'px-3 py-2 text-left text-xs font-bold uppercase';
   const tdCls = 'px-3 py-2.5 align-middle text-sm';
+
+  if (openSerial) {
+    return (
+      <ProgramDeviceDetail
+        detail={deviceDetailFor(openSerial.entry, openSerial.serial, program)}
+        onBack={() => setOpenSerial(null)}
+        onToast={onToast}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -1401,6 +1663,7 @@ function ProgramDevicesView({ program, onBack, onToast }: {
                     <th className={thCls}>Serial (DSN)</th>
                     <th className={thCls}>Tester</th>
                     <th className={thCls}>eero-account email</th>
+                    <th className={thCls}>Region</th>
                     <th className={thCls}>Status</th>
                     <th className={thCls}>Action</th>
                   </tr>
@@ -1413,7 +1676,7 @@ function ProgramDevicesView({ program, onBack, onToast }: {
                         <td className={tdCls}>
                           {r.match === 'matched' && sel && (
                             <span className="flex items-center gap-2">
-                              <span className="font-mono" style={{ color: ACCENT }}>{sel.serial}</span>
+                              <button className="font-mono hover:underline" style={{ color: ACCENT }} onClick={() => setOpenSerial({ entry: r, serial: sel.serial })}>{sel.serial}</button>
                               <Tag color="grey" size="regular">{sel.model}</Tag>
                             </span>
                           )}
@@ -1431,6 +1694,11 @@ function ProgramDevicesView({ program, onBack, onToast }: {
                         </td>
                         <td className={tdCls} style={{ color: TEXT_PRIMARY }}>{r.tester}</td>
                         <td className={tdCls} style={{ color: TEXT_SECONDARY }}>{r.email}</td>
+                        <td className={tdCls}>
+                          {r.match === 'matched' && sel
+                            ? <span style={{ color: TEXT_SECONDARY }}>📍 {countryForSerial(sel.serial).name}</span>
+                            : <span style={{ color: TEXT_TERTIARY }}>—</span>}
+                        </td>
                         <td className={tdCls}>
                           {r.match === 'matched' && sel && <Tag color={sel.online ? 'green' : 'orange'} size="regular">{sel.online ? 'online' : 'not online'}</Tag>}
                           {r.match === 'multiple' && <Tag color="orange" size="regular">pick device</Tag>}
@@ -1456,7 +1724,7 @@ function ProgramDevicesView({ program, onBack, onToast }: {
                     );
                   })}
                   {roster.length === 0 && (
-                    <tr><td className={tdCls} colSpan={5} style={{ color: TEXT_TERTIARY }}>No testers on this program yet.</td></tr>
+                    <tr><td className={tdCls} colSpan={6} style={{ color: TEXT_TERTIARY }}>No testers on this program yet.</td></tr>
                   )}
                 </tbody>
               </table>

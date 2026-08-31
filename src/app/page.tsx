@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
 import Navbar from '@/components/Navbar';
 import DevicesTab from '@/components/DevicesTab';
-import ProgramsTab from '@/components/ProgramsTab';
 import LocationsTab from '@/components/LocationsTab';
 import PeopleTab from '@/components/PeopleTab';
 import ShipmentsTab from '@/components/ShipmentsTab';
@@ -23,7 +22,7 @@ import { DemoSurveysInner } from '@/components/SurveysDemo';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('devices');
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -31,10 +30,10 @@ export default function Home() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Reset to Overview tab whenever user changes (login/logout)
+  // Reset to Devices tab (now the default landing, with Overview merged in) on user change
   useEffect(() => {
     if (currentUser) {
-      setActiveTab('overview');
+      setActiveTab('devices');
       setResetKey((k) => k + 1);
     }
   }, [currentUser?.email]);
@@ -80,8 +79,7 @@ export default function Home() {
     <SeedDataProvider>
       <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab}>
         <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
-        {activeTab === 'devices' && canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
-        {activeTab !== 'devices' && activeTab !== 'overview' && activeTab !== 'surveys' && (
+        {activeTab !== 'devices' && activeTab !== 'surveys' && (
           <>
             <OverdueAlertsBanner />
             {canEdit() && (
@@ -92,9 +90,13 @@ export default function Home() {
           </>
         )}
         <div className="mt-6">
-          {activeTab === 'overview' && <OverviewDashboard />}
-          {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
-          {activeTab === 'testbeds' && <ProgramsTab />}
+          {activeTab === 'devices' && (
+            <div className="flex flex-col gap-6">
+              <OverviewDashboard />
+              {canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
+              <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />
+            </div>
+          )}
           {activeTab === 'dogfood' && <DogfoodOnboarding />}
           {activeTab === 'program_signups' && <ProgramSignupsTab />}
           {activeTab === 'locations' && <LocationsTab />}

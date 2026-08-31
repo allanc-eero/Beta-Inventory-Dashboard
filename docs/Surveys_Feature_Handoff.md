@@ -134,3 +134,22 @@ The **big** next step (separate, explicit) — **merge into the real app**:
 
 - Dev server: `npm run dev` → http://localhost:3000/demo-surveys
 - Reference app (read-only): `.reference/eero-beta-app-prod/` (source only; no node_modules/db).
+
+---
+
+## Device detail — where each field comes from (2026-08-31)
+
+Clicking a serial in a program's device roster opens a device detail view (mirrors the real `DeviceDetailPanel`). In the demo it's deterministic mock; in production it's a **join of three sources**, keyed on the serial:
+
+1. **Insight (live, looked up by serial → network)** — refetched, never stored:
+   - Status (online/offline), Firmware current version, Firmware latest available, Network Health (speed Down/Up), Insight Network (id + link), Model, Manufacturer, MAC*, Admin/unit id*, Country/region*.
+2. **Qualtrics roster** — authored:
+   - Assigned To (tester name), Email (eero-account), Contact Email (corporate).
+3. **Your feature's own records** — authored/logistics:
+   - Revision, Revision Notes, Hardware Config, SKU, Part Number, Asset Tag, PO/Expensify, Tracking, Return Tracking, Notes, Due Date, Alternate Email. (Testbed = program name; Program = program type. JIRA = existing JIRA integration.)
+
+`*` = not yet verified against the live API (scope-dependent).
+
+**Decision (2026-08-31):** we do **not** currently track the logistics/inventory fields anywhere (there is no inventory source feeding them, and there is no CSV-into-Insight path). So for now those fields are **left open (blank "—")** in the detail view rather than populated with placeholder data. When needed, they'll be **entered/edited in-app** (the "Edit details" button becomes real) — there is no upstream system to import them from.
+
+**Live vs authored:** Insight fields (status/firmware/speed/network) are always fetched fresh; roster + logistics fields are authored once and stored in the feature's own records.

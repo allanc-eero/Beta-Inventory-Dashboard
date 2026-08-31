@@ -59,18 +59,9 @@ export default function TodayBriefing({ onNavigate }: TodayBriefingProps) {
       (now - new Date(o.optOutDate).getTime()) < oneDayMs * 7
     );
 
-    // Programs in progress (partially closed)
-    const programsInProgress = [...new Set(
-      devices.filter((d) => d.status === 'deactivated' || d.status === 'pending_return')
-        .map((d) => d.program)
-    )].filter((prog) => {
-      const progDevices = devices.filter((d) => d.program === prog);
-      return progDevices.some((d) => d.status !== 'deactivated' && d.status !== 'pending_return');
-    });
+    const totalActions = overdueReturns.length + needsFollowUp.length;
 
-    const totalActions = overdueReturns.length + needsFollowUp.length + (programsInProgress.length > 0 ? 1 : 0);
-
-    return { overdueReturns, needsFollowUp, pendingReturns, recentlyOnline, recentOptOuts, programsInProgress, totalActions };
+    return { overdueReturns, needsFollowUp, pendingReturns, recentlyOnline, recentOptOuts, totalActions };
   }, [devices, getOptOuts]);
 
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
@@ -80,10 +71,8 @@ export default function TodayBriefing({ onNavigate }: TodayBriefingProps) {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">{greeting}.</h1>
-        {briefing.totalActions > 0 ? (
+        {briefing.totalActions > 0 && (
           <p className="text-sm text-gray-600 mt-1">{briefing.totalActions} item{briefing.totalActions !== 1 ? 's' : ''} need your attention today.</p>
-        ) : (
-          <p className="text-sm text-green-600 mt-1 font-medium">✓ Everything looks good. No urgent actions needed.</p>
         )}
       </div>
 
@@ -111,19 +100,6 @@ export default function TodayBriefing({ onNavigate }: TodayBriefingProps) {
             </div>
             <button onClick={() => onNavigate('shipments')} className="px-4 py-2 text-xs font-medium text-yellow-800 border border-yellow-300 rounded-lg hover:bg-yellow-100">
               Send Reminders →
-            </button>
-          </div>
-        )}
-
-        {/* Programs in progress */}
-        {briefing.programsInProgress.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-blue-800">📋 {briefing.programsInProgress.length} program(s) partially closed</p>
-              <p className="text-xs text-blue-600 mt-0.5">Programs: {briefing.programsInProgress.join(', ')} — still have unprocessed devices.</p>
-            </div>
-            <button onClick={() => onNavigate('testbeds')} className="px-4 py-2 text-xs font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-100">
-              Continue →
             </button>
           </div>
         )}

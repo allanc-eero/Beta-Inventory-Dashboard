@@ -155,7 +155,7 @@ export interface HistoryEntry {
   description: string;
 }
 
-export type TabType = 'overview' | 'devices' | 'testbeds' | 'locations' | 'people' | 'surveys' | 'shipments' | 'dogfood' | 'program_signups';
+export type TabType = 'devices' | 'locations' | 'people' | 'surveys' | 'shipments' | 'dogfood' | 'program_signups';
 
 // ─── Feature: Firmware Tracking ───────────────────────────────────────────────
 export interface FirmwareInfo {
