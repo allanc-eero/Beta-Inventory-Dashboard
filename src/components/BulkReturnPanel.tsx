@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button, Select, Checkbox, Tag, Modal } from '@amzn/eero-web-design-components';
 import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
-import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
 import { isDomesticCountry, getReturnEpic, downloadCSV, todayStamp } from '@/constants';
 
@@ -15,7 +14,6 @@ interface BulkReturnPanelProps {
 
 export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelProps) {
   const { updateDevice, addHistoryEntry, createJiraTicket } = useDeviceStore();
-  const { addServiceOrder } = usePackagesStore();
   const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'>('returned_to_eero');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
@@ -193,30 +191,6 @@ Beta Team`;
         epicKey: epic,
       });
 
-      // Create ONE Service Order on the Kanban board for this return batch (maps 1:1 to the JIRA ticket)
-      const now = new Date().toISOString();
-      const soType = reason as any; // maps directly: 'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'
-      const serialSummary = uniqueDevices.length <= 3
-        ? uniqueDevices.map((d) => d.serialNumber).join(', ')
-        : `${uniqueDevices.slice(0, 3).map((d) => d.serialNumber).join(', ')} +${uniqueDevices.length - 3} more`;
-      addServiceOrder({
-        id: crypto.randomUUID(),
-        title: `[${epic}] Return: ${uniqueDevices.length} device(s) — ${reason.replace(/_/g, ' ')}`,
-        description: `Returning ${uniqueDevices.length} device(s). Reason: ${reason.replace(/_/g, ' ')}.\n\nSerials: ${uniqueDevices.map((d) => d.serialNumber).join(', ')}\n\nTesters: ${[...new Set(uniqueDevices.map((d) => d.assignedTo || d.assignedEmail).filter(Boolean))].join(', ')}\n\n${notes || ''}`,
-        type: soType,
-        priority: reason === 'defective' ? 'P1' : 'P2',
-        status: 'intake',
-        assignee: '',
-        requester: 'System (return)',
-        site: uniqueDevices[0]?.country || 'USA',
-        deviceSerial: serialSummary,
-        jiraKey: ticketKey,
-        jiraUrl: `https://eeroinc.atlassian.net/browse/${ticketKey}`,
-        epicKey: epic,
-        columnEnteredAt: now,
-        createdAt: now,
-        updatedAt: now,
-      });
     }
 
     // Log the consolidated JIRA to each device's timeline

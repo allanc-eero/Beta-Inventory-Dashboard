@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 function processQuery(query: string, data: any): string {
   if (!data) return 'No data available. Make sure devices are loaded in the dashboard.';
 
-  const { stats, devices, testers, recentShapeshifts, serviceOrders } = data;
+  const { stats, devices, testers } = data;
 
   // ─── Device count queries ───────────────────────────────────────────
   if (query.match(/how many.*(device|unit)/)) {
@@ -137,18 +137,6 @@ function processQuery(query: string, data: any): string {
     return 'No active programs found.';
   }
 
-  // ─── Shapeshift queries ─────────────────────────────────────────────
-  if (query.match(/shapeshift|shape.?shift/)) {
-    if (query.match(/how|process|steps/)) {
-      return `**Shapeshift Process:**\n1. Ensure device is in blinking blue state (factory reset)\n2. Connect via hardwire (Ethernet) to WAN\n3. Go to the Shapeshift tab\n4. Enter the serial number\n5. Select target environment (prod → stage or stage → prod)\n6. Optionally set network ID and retries\n7. Confirm the pre-flight checklist\n8. Click "Shapeshift →"\n9. Track the job status in the jobs list`;
-    }
-    if (recentShapeshifts?.length > 0) {
-      const list = recentShapeshifts.slice(0, 5).map((j: any) => `- ${j.serial} → ${j.target} (${j.status}) by ${j.assignedTo}`);
-      return `**Recent shapeshifts:**\n${list.join('\n')}`;
-    }
-    return 'No shapeshift jobs found. Go to the Shapeshift tab to queue one.';
-  }
-
   // ─── Return process ─────────────────────────────────────────────────
   if (query.match(/return|how.*return|return process/)) {
     return `**Device Return Process:**\n1. Go to Devices tab → select the device(s)\n2. Click "Return selected →"\n3. Choose reason: Returned to eero, Defective, End of program, or Lost\n4. Complete offboarding steps (Admin removal, Qualtrics, devices)\n5. Confirm — return emails are sent to testers automatically\n6. Track pending returns in Ingestion & Returns → Pending Returns\n\nFor defective/end of program returns, a JIRA ticket is auto-created.`;
@@ -184,39 +172,8 @@ function processQuery(query: string, data: any): string {
     return 'No testers have opted out.';
   }
 
-  // ─── Package queries ────────────────────────────────────────────────
-  if (query.match(/inbound|incoming.*package/)) {
-    const pkgs = data.inboundPackages;
-    if (pkgs?.length > 0) {
-      const lines = pkgs.slice(0, 10).map((p: any) => `• ${p.asn} — ${p.models}, ${p.items} items, ${p.status} (${p.carrier} ${p.tracking})`);
-      return `**Inbound Packages (${pkgs.length}):**\n${lines.join('\n')}`;
-    }
-    return 'No inbound packages.';
-  }
-
-  if (query.match(/outbound|outgoing.*package|shipment/)) {
-    const pkgs = data.outboundPackages;
-    if (pkgs?.length > 0) {
-      const lines = pkgs.slice(0, 10).map((p: any) => `• ${p.id} → ${p.recipient} — ${p.models}, ${p.status} (${p.carrier})`);
-      return `**Outbound Packages (${pkgs.length}):**\n${lines.join('\n')}`;
-    }
-    return 'No outbound packages.';
-  }
-
-  // ─── Service order queries ──────────────────────────────────────────
-  if (query.match(/service order|kanban|board/)) {
-    const orders = data.serviceOrders;
-    if (orders?.length > 0) {
-      const byStatus: Record<string, number> = {};
-      orders.forEach((o: any) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
-      const statusLines = Object.entries(byStatus).map(([s, c]) => `• ${s}: ${c}`);
-      return `**Service Orders (${orders.length}):**\n${statusLines.join('\n')}\n\nRecent:\n${orders.slice(0, 5).map((o: any) => `• ${o.title} — ${o.status}${o.jiraKey ? ` (${o.jiraKey})` : ''}`).join('\n')}`;
-    }
-    return 'No service orders.';
-  }
-
   // ─── Fallback ───────────────────────────────────────────────────────
-  return `I can help with:\n- **Device lookups**: "Who has serial GGC...?" or "How many devices are online?"\n- **Tester lookups**: "Show me Jake's devices" or "Who is this email?"\n- **Stats**: "Give me a dashboard summary"\n- **Programs**: "What programs are active?"\n- **Regions**: "How many devices in Australia?"\n- **Activity**: "What happened recently?" or "Show recent activity"\n- **Processes**: "How do I shapeshift?" or "What's the return process?"\n- **Packages**: "Show inbound packages" or "Any outbound shipments?"\n\nTry rephrasing your question.`;
+  return `I can help with:\n- **Device lookups**: "Who has serial GGC...?" or "How many devices are online?"\n- **Tester lookups**: "Show me Jake's devices" or "Who is this email?"\n- **Stats**: "Give me a dashboard summary"\n- **Programs**: "What programs are active?"\n- **Regions**: "How many devices in Australia?"\n- **Activity**: "What happened recently?" or "Show recent activity"\n- **Processes**: "What's the return process?"\n\nTry rephrasing your question.`;
 }
 
 function extractNameOrEmail(query: string): string | null {

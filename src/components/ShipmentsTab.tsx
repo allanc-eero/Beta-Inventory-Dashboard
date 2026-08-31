@@ -5,7 +5,6 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Carrier, Shipment, Device, ShipmentStatus, DeviceStatus } from '@/types';
 import * as XLSX from 'xlsx';
 import { useAuthStore } from '@/store/authStore';
-import { usePackagesStore } from '@/store/packagesStore';
 import JiraToast from './JiraToast';
 import { createJiraIssue } from '@/services/jiraService';
 import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
@@ -83,7 +82,7 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
 export default function ShipmentsTab({ showPendingReturns }: { showPendingReturns?: boolean }) {
   const { devices, addDevice, updateDevice, addShipment, markShipmentDelivered, getAllShipments, addHistoryEntry, createJiraTicket } = useDeviceStore();
   const { canEdit } = useAuthStore();
-  const { addInboundPackage, addOutboundPackage, addServiceOrder } = usePackagesStore();
+
   const [activeView, setActiveView] = useState<'upload' | 'history' | 'pending_returns'>(showPendingReturns ? 'pending_returns' : 'upload');
   const [pasteInput, setPasteInput] = useState('');
   const [carrier, setCarrier] = useState<Carrier>('DHL');
@@ -375,33 +374,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     const epicKey = EPIC_MAP[program] || 'GENERAL-SHIPMENTS';
 
     if (shipDirection === 'incoming') {
-      // ─── INCOMING: Create Inbound Package entries (one per tester/tracking) ───
-      parsedRows.forEach((row) => {
-        const asnTimestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-        const asnSeq = String(Math.floor(Math.random() * 9999)).padStart(4, '0');
-        const asnId = `ASN-${(fcLocation || 'HQ').replace(/\s/g, '')}-${asnTimestamp}-${asnSeq}`;
-
-        addInboundPackage({
-          id: crypto.randomUUID(),
-          asn: asnId,
-          carrier: carrier as any,
-          trackingNumber: String(row.tracking || 'N/A'),
-          models: productName || program.toUpperCase(),
-          itemsTotal: row.serials.length,
-          itemsReceived: 0,
-          eta: shipDate,
-          destination: row.country || 'USA',
-          status: 'open',
-          trackingStatus: 'IN_TRANSIT',
-          notes: `From: ${row.name || 'Unknown'}. Serials: ${row.serials.join(', ')}`,
-          createdAt: now,
-          updatedAt: now,
-        });
-      });
-
+      // ─── INCOMING: devices are imported above; nothing further to record ───
       setJiraToast({
         ticketKey: '',
-        summary: `${parsedRows.length} inbound package(s) created in Packages → Inbound`,
+        summary: `${parsedRows.length} inbound shipment(s) ingested`,
         epicKey: 'INBOUND',
       });
 
@@ -437,49 +413,6 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         summary: jiraSummary,
         createdAt: now,
         url: ticketUrl || undefined,
-      });
-
-      // Create outbound package entries (one per tester for tracking)
-      parsedRows.forEach((row) => {
-        const testerName = row.name || row.email || 'Unassigned';
-        const serialList = row.serials.join(', ');
-        const outSeq = String(Math.floor(Math.random() * 9999)).padStart(4, '0');
-        addOutboundPackage({
-          id: crypto.randomUUID(),
-          shippingId: `OUT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${outSeq}`,
-          carrier: carrier as any,
-          trackingNumber: String(row.tracking || ''),
-          models: productName || program.toUpperCase(),
-          itemsTotal: row.serials.length,
-          recipient: testerName,
-          recipientEmail: row.email || undefined,
-          destination: row.country || 'USA',
-          status: 'open',
-          notes: `Serials: ${serialList}. JIRA: ${ticketKey}`,
-          createdAt: now,
-          updatedAt: now,
-        });
-      });
-
-      // ONE Service Board card for the whole batch (1:1 with the bulk JIRA ticket)
-      addServiceOrder({
-        id: crypto.randomUUID(),
-        title: jiraSummary,
-        description: jiraDescription,
-        type: 'outbound_shipment',
-        priority: 'P3',
-        status: 'intake',
-        assignee: '',
-        requester: 'System (auto-upload)',
-        site: 'USA',
-        deviceSerial: allSerials.length <= 3 ? allSerials.join(', ') : `${allSerials.slice(0, 3).join(', ')} +${allSerials.length - 3} more`,
-        jiraKey: ticketKey,
-        jiraUrl: ticketUrl || `https://eeroinc.atlassian.net/browse/${ticketKey}`,
-        epicKey: 'BPM-1886',
-        eta: shipDate,
-        columnEnteredAt: now,
-        createdAt: now,
-        updatedAt: now,
       });
 
       setJiraToast({

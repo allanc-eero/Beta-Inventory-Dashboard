@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
-import { usePackagesStore } from '@/store/packagesStore';
 import { Button, Input } from '@amzn/eero-web-design-components';
 import { Sparkles, Send, X } from 'lucide-react';
 
@@ -29,7 +28,6 @@ export default function AgentChat() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { devices, testerProfiles, getClosedPrograms, getAllShipments, jiraTickets } = useDeviceStore();
-  const { shapeshiftJobs, serviceOrders, inboundPackages, outboundPackages } = usePackagesStore();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -105,10 +103,6 @@ export default function AgentChat() {
       recentActivity: recentHistory,
       optOuts,
       shipments,
-      shapeshiftJobs: shapeshiftJobs.map((j) => ({ serial: j.serial, target: j.targetEnv, status: j.status, assignedTo: j.assignedTo, retries: j.retries, created: j.createdAt })),
-      serviceOrders: serviceOrders.map((o) => ({ title: o.title, status: o.status, type: o.type, jiraKey: o.jiraKey, assignee: o.assignee, site: o.site })),
-      inboundPackages: inboundPackages.map((p) => ({ asn: p.asn, carrier: p.carrier, tracking: p.trackingNumber, models: p.models, items: p.itemsTotal, status: p.status, destination: p.destination })),
-      outboundPackages: outboundPackages.map((p) => ({ id: p.shippingId, recipient: p.recipient, carrier: p.carrier, tracking: p.trackingNumber, models: p.models, status: p.status, destination: p.destination })),
     });
   };
 

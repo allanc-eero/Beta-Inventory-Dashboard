@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { Card } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
-import { usePackagesStore } from '@/store/packagesStore';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
 // KPI tile — follows the Insight stat-row pattern (WDS Card + flex-col metric).
@@ -73,32 +72,6 @@ function DonutChart({ title, items, total, size, strokeWidth, centerLabel, cente
   );
 }
 
-function BarRow({ letter, label, width, color, count }: { letter: string; label: string; width: string; color: string; count?: number }) {
-  return (
-    <div className="mb-2 flex items-center gap-2">
-      <span className="w-3.5 text-sm font-bold text-[var(--ui-text-text-primary)]">{letter}</span>
-      <span className="w-40 shrink-0 text-sm text-[var(--ui-text-text-secondary)]">· {label}</span>
-      <div className="h-3.5 flex-1 overflow-hidden rounded-[2px] bg-[var(--ui-core-gray-gray-2)]">
-        <div className="h-full rounded-[2px]" style={{ width: count === 0 ? '0%' : width, backgroundColor: color }} />
-      </div>
-      <span className="w-5 text-right text-xs text-[var(--ui-text-text-tertiary)]">{count ?? ''}</span>
-    </div>
-  );
-}
-
-function PriorityRow({ count, label, width, color, right }: { count: number; label: string; width: string; color: string; right: number }) {
-  return (
-    <div className="mb-1.5 flex items-center gap-2">
-      <span className="w-5 text-right text-sm font-medium text-[var(--ui-text-text-primary)]">{count}</span>
-      <span className="w-40 shrink-0 text-xs text-[var(--ui-text-text-secondary)]">{label}</span>
-      <div className="h-3 flex-1 overflow-hidden rounded-[2px] bg-[var(--ui-core-gray-gray-2)]">
-        <div className="h-full rounded-[2px]" style={{ width, backgroundColor: color }} />
-      </div>
-      <span className="w-5 text-right text-sm font-medium text-[var(--ui-text-text-primary)]">{right}</span>
-    </div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 // Chart series colors mapped to EDS core color tokens (no hardcoded hex).
 const REGION_COLORS = [
@@ -121,8 +94,7 @@ function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[
 }
 
 export default function OverviewDashboard() {
-  const { devices, jiraTickets } = useDeviceStore();
-  const { serviceOrders } = usePackagesStore();
+  const { devices } = useDeviceStore();
 
   const total = devices.length;
   const online = devices.filter((d) => d.status === 'online').length;
@@ -138,41 +110,6 @@ export default function OverviewDashboard() {
     { name: 'Online', count: online, color: 'var(--ui-core-periwinkle-periwinkle-6)' },
     { name: 'Not Online', count: notOnline, color: 'var(--ui-core-gray-gray-6)' },
   ].filter((d) => d.count > 0), [online, notOnline]);
-
-  // Service Orders — live from store
-  const soOpen = serviceOrders.filter((o) => ['intake', 'triage', 'assigned'].includes(o.status)).length;
-  const soInProgress = serviceOrders.filter((o) => o.status === 'in_progress').length;
-  const soComplete = serviceOrders.filter((o) => o.status === 'completed').length;
-  const soOnHold = serviceOrders.filter((o) => o.status === 'on_hold').length;
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const soClosed30d = serviceOrders.filter((o) => o.status === 'completed' && o.completedAt && o.completedAt >= thirtyDaysAgo).length;
-  const soCancelled = serviceOrders.filter((o) => o.status === 'cancelled').length;
-  const soTotal = serviceOrders.length;
-
-  // By Job Type — live counts from service orders
-  const returnedCount = serviceOrders.filter((o) => o.type === 'returned_to_eero').length;
-  const defectiveCount = serviceOrders.filter((o) => o.type === 'defective').length;
-  const endProgramCount = serviceOrders.filter((o) => o.type === 'end_of_program').length;
-  const lostCount = serviceOrders.filter((o) => o.type === 'lost').length;
-  const outboundShipments = serviceOrders.filter((o) => o.type === 'outbound_shipment').length;
-  const otherCount = serviceOrders.filter((o) => o.type === 'other').length;
-  const jobTypeMax = Math.max(returnedCount, defectiveCount, endProgramCount, lostCount, outboundShipments, otherCount, 1);
-
-  // By Priority — live from JIRA tickets
-  const openTickets = jiraTickets.filter((t) => t.status === 'open' || t.status === 'in_progress');
-  const triageCount = openTickets.filter((t) => t.status === 'open').length;
-  const onHoldCount = serviceOrders.filter((o) => o.status === 'on_hold').length;
-  const intakeCount = serviceOrders.filter((o) => o.status === 'intake').length;
-  const completedCount = jiraTickets.filter((t) => t.status === 'closed' || t.status === 'resolved').length;
-  const backlogCount = jiraTickets.filter((t) => t.status === 'in_progress').length;
-  const priorityMax = Math.max(triageCount, onHoldCount, intakeCount, completedCount, backlogCount, 1);
-
-  // Top Assignees
-  const topAssignees = useMemo(() => {
-    const map: Record<string, number> = {};
-    serviceOrders.filter((o) => !['completed', 'cancelled'].includes(o.status)).forEach((o) => { if (o.assignee) map[o.assignee] = (map[o.assignee] || 0) + 1; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [serviceOrders]);
 
   return (
     <div className="space-y-4">
@@ -192,61 +129,6 @@ export default function OverviewDashboard() {
         <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" centerValue={regionItems.length} />
         <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Top Model" centerValue={modelItems[0]?.name || '—'} />
       </div>
-
-      {/* ROW 3: Service Orders */}
-      <Card
-        size={5}
-        title={
-          <div className="flex items-baseline gap-2">
-            <span className="text-base font-medium text-[var(--ui-text-text-primary)]">Service Orders</span>
-            <span className="text-sm text-[var(--ui-text-text-tertiary)]">{soTotal} total</span>
-          </div>
-        }
-      >
-        {/* Segmented bar — always show all 6 segments with equal width, separated by gaps */}
-        <div className="mb-1 flex h-7 gap-2">
-          <div className="flex-1 rounded" style={{ backgroundColor: soOpen > 0 ? 'var(--ui-core-periwinkle-periwinkle-6)' : 'var(--ui-core-gray-gray-3)' }} />
-          <div className="flex-1 rounded" style={{ backgroundColor: soInProgress > 0 ? 'var(--ui-core-orange-orange-6)' : 'var(--ui-core-gray-gray-3)' }} />
-          <div className="flex-1 rounded" style={{ backgroundColor: soComplete > 0 ? 'var(--ui-core-green-green-6)' : 'var(--ui-core-gray-gray-3)' }} />
-          <div className="flex-1 rounded" style={{ backgroundColor: soOnHold > 0 ? 'var(--ui-core-gray-gray-6)' : 'var(--ui-core-gray-gray-3)' }} />
-          <div className="flex-1 rounded" style={{ backgroundColor: soClosed30d > 0 ? 'var(--ui-core-green-green-3)' : 'var(--ui-core-gray-gray-3)' }} />
-          <div className="flex-1 rounded" style={{ backgroundColor: soCancelled > 0 ? 'var(--ui-core-red-red-8)' : 'var(--ui-core-gray-gray-3)' }} />
-        </div>
-
-        {/* Numbers */}
-        <div className="mb-6 flex">
-          <div className="flex-1"><span className="text-lg font-bold text-[var(--ui-core-periwinkle-periwinkle-6)]">{soOpen}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Open</span></div>
-          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-text-text-primary)]">{soInProgress}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">In progress</span></div>
-          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-core-green-green-6)]">{soComplete}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Complete</span></div>
-          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-text-text-primary)]">{soOnHold}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">On hold</span></div>
-          <div className="flex-1"><span className="text-xs text-[var(--ui-text-text-primary)]">{soClosed30d}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Closed 30d</span></div>
-          <div className="flex-1"><span className="text-sm font-bold text-[var(--ui-core-red-red-8)]">{soCancelled}</span><br /><span className="text-xs text-[var(--ui-text-text-tertiary)]">Cancelled</span></div>
-        </div>
-
-        {/* Two columns */}
-        <div className="grid grid-cols-2 gap-12">
-          <div>
-            <p className="mb-3 text-xs font-bold uppercase text-[var(--ui-text-text-primary)]">By Job Type</p>
-            <BarRow letter="R" label="Returned to eero" width={`${(returnedCount / jobTypeMax) * 100}%`} color="var(--ui-core-periwinkle-periwinkle-6)" count={returnedCount} />
-            <BarRow letter="D" label="Defective / Hardware" width={`${(defectiveCount / jobTypeMax) * 100}%`} color="var(--ui-core-red-red-6)" count={defectiveCount} />
-            <BarRow letter="E" label="End of program phase" width={`${(endProgramCount / jobTypeMax) * 100}%`} color="var(--ui-core-orange-orange-5)" count={endProgramCount} />
-            <BarRow letter="L" label="Lost / Unrecoverable" width={`${(lostCount / jobTypeMax) * 100}%`} color="var(--ui-core-midnight-midnight-7)" count={lostCount} />
-            <BarRow letter="T" label="Outbound Shipment" width={`${(outboundShipments / jobTypeMax) * 100}%`} color="var(--ui-core-periwinkle-periwinkle-7)" count={outboundShipments} />
-            <BarRow letter="O" label="Other" width={`${(otherCount / jobTypeMax) * 100}%`} color="var(--ui-core-gray-gray-6)" count={otherCount} />
-            <p className="mb-2 mt-6 text-xs font-bold uppercase text-[var(--ui-text-text-primary)]">Top Assignees (Open)</p>
-            {topAssignees.length === 0 && <p className="text-sm text-[var(--ui-core-gray-gray-5)]">No open assignments</p>}
-            {topAssignees.map(([name], i) => <p key={i} className="my-0.5 text-sm text-[var(--ui-text-text-secondary)]">{name}</p>)}
-          </div>
-          <div>
-            <p className="mb-3 text-xs font-bold uppercase text-[var(--ui-text-text-primary)]">By Priority (Open - JIRA)</p>
-            <PriorityRow count={triageCount} label="P0 — Triage & Investigate" width={`${(triageCount / priorityMax) * 100}%`} color="var(--ui-core-red-red-6)" right={triageCount} />
-            <PriorityRow count={onHoldCount} label="P1 — On Hold" width={`${(onHoldCount / priorityMax) * 100}%`} color="var(--ui-core-orange-orange-5)" right={onHoldCount} />
-            <PriorityRow count={intakeCount} label="P2 — Intake" width={`${(intakeCount / priorityMax) * 100}%`} color="var(--ui-core-yellow-yellow-5)" right={intakeCount} />
-            <PriorityRow count={completedCount} label="P3 — Completed" width={`${(completedCount / priorityMax) * 100}%`} color="var(--ui-core-green-green-6)" right={completedCount} />
-            <PriorityRow count={backlogCount} label="P4 — Low / Backlog" width={`${(backlogCount / priorityMax) * 100}%`} color="var(--ui-core-periwinkle-periwinkle-6)" right={backlogCount} />
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

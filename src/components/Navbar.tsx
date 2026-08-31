@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
 import { Layout, Sidebar } from '@amzn/eero-web-design-components';
+import { Search } from 'lucide-react';
 import SearchModal from './SearchModal';
 import { useAuthStore } from '@/store/authStore';
 
@@ -20,8 +21,10 @@ const tabs: { id: TabType; label: string; key: string }[] = [
   { id: 'people', label: 'People', key: 'people' },
   { id: 'surveys', label: 'Surveys', key: 'surveys' },
   { id: 'shipments', label: 'Ingestion & Returns', key: 'shipments' },
-  { id: 'dogfood', label: 'Dogfooders', key: 'dogfood' },
-  { id: 'program_signups', label: 'Program Sign-ups', key: 'program_signups' },
+  // Hidden from the sidebar — Dogfooders + Program Sign-ups are being split into a
+  // separate app. Code/routes kept intact; just not surfaced here. See docs/TODO.md.
+  // { id: 'dogfood', label: 'Dogfooders', key: 'dogfood' },
+  // { id: 'program_signups', label: 'Program Sign-ups', key: 'program_signups' },
 ];
 
 export default function Navbar({ activeTab, setActiveTab, children }: NavbarProps) {
@@ -68,10 +71,10 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
     <div className="flex w-full items-center gap-3 px-4 py-2">
       <button
         onClick={() => setSearchOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ui-background-layer-layer-page-backplate)] hover:bg-[var(--ui-background-layer-layer-page-hover)] rounded-lg text-[var(--ui-text-text-tertiary)] hover:text-[var(--ui-text-text-primary)] text-xs transition-all"
+        className="flex w-full max-w-md items-center gap-2 rounded-lg bg-[var(--ui-core-midnight-midnight-8)] px-3 py-2 text-sm text-[var(--ui-core-midnight-midnight-6)] transition-all hover:bg-[var(--ui-core-midnight-midnight-7)]"
       >
-        <span>Search</span>
-        <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 bg-[var(--ui-background-layer-layer-page-backplate)] rounded text-xs text-[var(--ui-text-text-placeholder)]">⌘K</kbd>
+        <Search size={16} className="shrink-0" />
+        <span className="flex-1 truncate text-left">Search devices, testers, testbeds, locations…</span>
       </button>
 
       {currentUser && (

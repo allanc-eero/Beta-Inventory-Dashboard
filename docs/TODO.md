@@ -255,3 +255,9 @@ All features currently run with simulated API calls (setTimeout delays). When la
 - [ ] **Connect dashboard to "Hardware Reclamation Tracker" hook** — Expose serial number + tester mapping so the hook can cross-reference against CEVA returns data
 - [ ] **Read-only API for hooks** — Create a read-only API endpoint that Kiro hooks can query for device status without write access
 - [ ] **Webhook for status changes** — When a device goes online/offline/deactivated, fire a webhook that could trigger Slack notifications or hook actions
+
+### REMINDER (2026-08-31): Split Dogfooders + Program Sign-ups into a separate app
+- [ ] Dogfooders (`DogfoodOnboarding`, `DogfooderPortal`) and Program Sign-ups (`ProgramSignupsTab`, `programsStore` offerings/signups) are a recruiting/onboarding funnel that overlaps with the beta/surveys flow.
+- [ ] For now they are **hidden from the sidebar** (commented out in `src/components/Navbar.tsx`) — the components, routes, and stores are all kept intact, just not surfaced.
+- [ ] Plan: move these into their own standalone app rather than living in this dashboard.
+- **Why:** keeps this app focused on Devices → People → Programs(+Surveys) → Returns; recruiting/onboarding is a distinct product surface.
