@@ -18,8 +18,7 @@ const tabs: { id: TabType; label: string; key: string }[] = [
   { id: 'testbeds', label: 'Programs', key: 'testbeds' },
   { id: 'locations', label: 'Locations', key: 'locations' },
   { id: 'people', label: 'People', key: 'people' },
-  { id: 'packages', label: 'Packages', key: 'packages' },
-  { id: 'shapeshift', label: 'Shapeshift', key: 'shapeshift' },
+  { id: 'surveys', label: 'Surveys', key: 'surveys' },
   { id: 'shipments', label: 'Ingestion & Returns', key: 'shipments' },
   { id: 'dogfood', label: 'Dogfooders', key: 'dogfood' },
   { id: 'program_signups', label: 'Program Sign-ups', key: 'program_signups' },
@@ -31,7 +30,7 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
   const { currentUser, logout, canEdit, isBetaViewer } = useAuthStore();
 
   const visibleTabs = isBetaViewer()
-    ? tabs.filter((t) => !['packages', 'shapeshift', 'shipments', 'dogfood', 'program_signups'].includes(t.id))
+    ? tabs.filter((t) => !['shipments', 'dogfood', 'program_signups'].includes(t.id))
     : tabs;
 
   useEffect(() => {
@@ -66,7 +65,7 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
   }));
 
   const headerElement = (
-    <div className="flex items-center gap-3 px-4 py-2">
+    <div className="flex w-full items-center gap-3 px-4 py-2">
       <button
         onClick={() => setSearchOpen(true)}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ui-background-layer-layer-page-backplate)] hover:bg-[var(--ui-background-layer-layer-page-hover)] rounded-lg text-[var(--ui-text-text-tertiary)] hover:text-[var(--ui-text-text-primary)] text-xs transition-all"
@@ -95,7 +94,6 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
   return (
     <>
       <Layout
-        title="eero Fetch"
         collapsed={collapsed}
         onCollapseMenu={() => setCollapsed(!collapsed)}
         sidenav={
@@ -103,13 +101,12 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
             menuItems={menuItems}
             collapsed={collapsed}
             currentURL={`#${activeTab}`}
-            onCollapseMenu={() => setCollapsed(!collapsed)}
           />
         }
         header={headerElement}
         mainContentElementId="main-content"
       >
-        <div id="main-content" className="py-6 px-6">
+        <div id="main-content" className="h-full overflow-y-auto py-6 px-6">
           {children}
         </div>
       </Layout>

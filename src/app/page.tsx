@@ -8,10 +8,7 @@ import ProgramsTab from '@/components/ProgramsTab';
 import LocationsTab from '@/components/LocationsTab';
 import PeopleTab from '@/components/PeopleTab';
 import ShipmentsTab from '@/components/ShipmentsTab';
-import PackagesTab from '@/components/PackagesTab';
-import ShapeshiftTab from '@/components/ShapeshiftTab';
 import OverviewDashboard from '@/components/OverviewDashboard';
-import DashboardStats from '@/components/DashboardStats';
 import SeedDataProvider from '@/components/SeedDataProvider';
 import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
 import NetworkSyncButton from '@/components/NetworkSyncButton';
@@ -21,6 +18,8 @@ import LoginPage from '@/components/LoginPage';
 import DogfooderPortal from '@/components/DogfooderPortal';
 import DogfoodOnboarding from '@/components/DogfoodOnboarding';
 import ProgramSignupsTab from '@/components/ProgramSignupsTab';
+import { ToastProvider } from '@amzn/eero-web-design-components';
+import { DemoSurveysInner } from '@/components/SurveysDemo';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
@@ -82,13 +81,9 @@ export default function Home() {
       <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab}>
         <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
         {activeTab === 'devices' && canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
-        {activeTab === 'devices' && !canEdit() && (
-          <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
-        )}
-        {activeTab !== 'devices' && activeTab !== 'overview' && (
+        {activeTab !== 'devices' && activeTab !== 'overview' && activeTab !== 'surveys' && (
           <>
             <OverdueAlertsBanner />
-            <DashboardStats onOverdueClick={() => handleSetActiveTab('shipments')} />
             {canEdit() && (
               <div className="mt-4">
                 <NetworkSyncButton />
@@ -100,12 +95,11 @@ export default function Home() {
           {activeTab === 'overview' && <OverviewDashboard />}
           {activeTab === 'devices' && <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />}
           {activeTab === 'testbeds' && <ProgramsTab />}
-          {activeTab === 'packages' && <PackagesTab />}
-          {activeTab === 'shapeshift' && <ShapeshiftTab />}
           {activeTab === 'dogfood' && <DogfoodOnboarding />}
           {activeTab === 'program_signups' && <ProgramSignupsTab />}
           {activeTab === 'locations' && <LocationsTab />}
           {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
+          {activeTab === 'surveys' && <ToastProvider><DemoSurveysInner embedded /></ToastProvider>}
           {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
         </div>
       </Navbar>

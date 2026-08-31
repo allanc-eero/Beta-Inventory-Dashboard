@@ -4,19 +4,20 @@ import { useMemo } from 'react';
 import { Card } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { usePackagesStore } from '@/store/packagesStore';
-import { daysSince, OVERDUE_DAYS } from '@/constants';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
 // KPI tile — follows the Insight stat-row pattern (WDS Card + flex-col metric).
 function StatCard({ icon, value, label, iconBg }: { icon: string; value: number; label: string; iconBg: string }) {
   return (
-    <Card size={2}>
-      <div className="flex flex-col gap-2">
-        <div className="flex size-9 items-center justify-center rounded-lg" style={{ backgroundColor: iconBg }}>
-          <span className="text-lg">{icon}</span>
+    <Card size={1}>
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sm" style={{ backgroundColor: iconBg }}>
+          <span>{icon}</span>
         </div>
-        <p className="text-2xl font-medium text-[var(--ui-text-text-primary)]">{value}</p>
-        <p className="text-xs text-[var(--ui-text-text-tertiary)]">{label}</p>
+        <div className="min-w-0">
+          <p className="text-lg font-semibold leading-tight text-[var(--ui-text-text-primary)]">{value}</p>
+          <p className="truncate text-xs leading-tight text-[var(--ui-text-text-tertiary)]">{label}</p>
+        </div>
       </div>
     </Card>
   );
@@ -121,7 +122,7 @@ function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[
 
 export default function OverviewDashboard() {
   const { devices, jiraTickets } = useDeviceStore();
-  const { serviceOrders, shapeshiftJobs } = usePackagesStore();
+  const { serviceOrders } = usePackagesStore();
 
   const total = devices.length;
   const online = devices.filter((d) => d.status === 'online').length;
@@ -129,7 +130,6 @@ export default function OverviewDashboard() {
   const countries = new Set(devices.map((d) => d.country).filter(Boolean)).size;
   const programs = new Set(devices.filter((d) => d.status !== 'deactivated').map((d) => d.program)).size;
   const people = new Set(devices.map((d) => d.assignedEmail).filter(Boolean)).size;
-  const overdue = devices.filter((d) => d.status === 'pending_return' && daysSince(d.returnEmailSentAt) >= OVERDUE_DAYS).length;
 
   const regionItems = useMemo(() => groupAndSort(devices, (d) => d.country || 'Unknown', REGION_COLORS), [devices]);
   const modelItems = useMemo(() => groupAndSort(devices, (d) => d.product || d.internalName || d.model || 'Unknown', MODEL_COLORS), [devices]);
@@ -177,15 +177,13 @@ export default function OverviewDashboard() {
   return (
     <div className="space-y-4">
       {/* ROW 1: Stat Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard icon="💻" value={total} label="Total Devices" iconBg="var(--ui-core-periwinkle-periwinkle-2)" />
         <StatCard icon="✓" value={online} label="Online" iconBg="var(--ui-core-green-green-2)" />
         <StatCard icon="👥" value={notOnline} label="Not Online" iconBg="var(--ui-core-yellow-yellow-2)" />
         <StatCard icon="🌍" value={countries} label="Countries" iconBg="var(--ui-core-red-red-2)" />
         <StatCard icon="🔬" value={programs} label="Programs" iconBg="var(--ui-core-purple-purple-2)" />
         <StatCard icon="👤" value={people} label="People" iconBg="var(--ui-core-periwinkle-periwinkle-2)" />
-        <StatCard icon="⚠️" value={overdue} label="Overdue" iconBg="var(--ui-core-yellow-yellow-2)" />
-        <StatCard icon="⚡" value={shapeshiftJobs.filter((j) => j.status === 'success').length} label="Shapeshifted" iconBg="var(--ui-core-purple-purple-2)" />
       </div>
 
       {/* ROW 2: Three Donut Charts */}

@@ -155,7 +155,7 @@ export interface HistoryEntry {
   description: string;
 }
 
-export type TabType = 'overview' | 'devices' | 'testbeds' | 'locations' | 'people' | 'shipments' | 'packages' | 'shapeshift' | 'dogfood' | 'program_signups';
+export type TabType = 'overview' | 'devices' | 'testbeds' | 'locations' | 'people' | 'surveys' | 'shipments' | 'packages' | 'shapeshift' | 'dogfood' | 'program_signups';
 
 // ─── Feature: Packages & Service Board ────────────────────────────────────────
 
