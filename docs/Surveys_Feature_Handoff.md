@@ -153,3 +153,52 @@ Clicking a serial in a program's device roster opens a device detail view (mirro
 **Decision (2026-08-31):** we do **not** currently track the logistics/inventory fields anywhere (there is no inventory source feeding them, and there is no CSV-into-Insight path). So for now those fields are **left open (blank "—")** in the detail view rather than populated with placeholder data. When needed, they'll be **entered/edited in-app** (the "Edit details" button becomes real) — there is no upstream system to import them from.
 
 **Live vs authored:** Insight fields (status/firmware/speed/network) are always fetched fresh; roster + logistics fields are authored once and stored in the feature's own records.
+
+---
+
+## Serial ↔ tester assignment + shared device store (2026-08-30)
+
+This session reworked the Programs device roster around the **serial-as-join-key** model and wired it into the real device store. Files touched: `src/components/SurveysDemo.tsx`, `src/components/DevicesTab.tsx`, `src/app/api/insight/route.ts` (new, prior session), plus link-path unification across `DeviceDetailPanel.tsx`, `PeopleTab.tsx`, `OptOutChecklistPanel.tsx`, `OptBackInChecklistPanel.tsx`.
+
+### What changed
+
+- **`ProgramDevicesView` rebuilt around assignment, not email-guessing.** Roster = the program's Qualtrics testers (`program.testers`). Per tester you **assign the serial(s) you shipped them** (comma/space-separate to add several at once). Each serial is enriched through **`/api/insight?serial=`** → resolves its **network + live status + model + firmware**. A tester can hold **many devices** (multi-device betas). **Pull mesh** takes one resolved serial's network and adds the other beta units on that mesh. Per-tester **Recheck** and header **Sync from Insight** re-hit the route. Device states: **online / not online / pending activation** (assigned but not yet on a network).
+- **Insight/Admin deep links per device**, anchored on the resolved `networkId`.
+- **Devices menu (`DevicesTab`)** already grouped devices into program containers with status; added the serial→Insight link + per-row Admin link.
+
+### SIMULATION NOTE for engineering (important — flag before productionizing)
+
+The Programs device roster now writes into the shared `deviceStore` (`useDeviceStore`) so assigned devices surface in **Devices / People / Locations** — this is the "one device, shown in every menu" shared model. **Two things are simulated and must change for production:**
+
+1. **Seed re-sync on open.** `ProgramDevicesView` seeds a deterministic device set per tester (`seedAssignments`) so the demo isn't blank, and a mount `useEffect` upserts that seed into `deviceStore` (idempotent by serial). **In production there is no seed** — the device row is written **once, at real assignment time** (when the operator confirms the serial they shipped), not re-synced on every view open. Remove `seedAssignments` + the mount-sync effect when wiring to real data.
+2. **`/api/insight` is on the deterministic seed fallback**, not live eero data. It flips to live automatically once `EERO_API_TOKEN` is set and the eero User API session is valid (`eero api user --prod auth --sso`, on VPN). The route's live REST paths/field names are still marked `TODO(verify)` and must be confirmed against the live API (search-by-email → networkId; network-eeros payload; by-serial shape). Until then, `enrichSerial` maps the seed shape.
+
+Also note: `programEnumFor()` maps a demo program onto the real `Program` enum (dogfood by name; hardware by `currentPhase` DVT/EVT/PVT/PRQ; else `beta`). Serials are deterministic per tester email, so cross-program serial collisions are possible in the demo (harmless — `getDeviceBySerial` upserts). Real serials are unique.
+
+### Link paths — CONFIRMED (2026-08-30)
+
+Verified against the live tools: **both Insight and Admin key the network view on `/networks/{networkId}`.**
+- Insight network: `https://insight.eero.com/networks/{networkId}`
+- Admin network: `https://admin.e2ro.com/networks/{networkId}`
+
+Unified the whole repo to `/networks/{id}` — replaced the older `insight.eero.com/eeros/{id}` pattern in `DeviceDetailPanel`, `PeopleTab`, `OptOutChecklistPanel`, `OptBackInChecklistPanel`, and `DevicesTab`. Person/unit **admin ID** links (`admin.e2ro.com/users/{adminId}`) were left as-is — those point at a user/unit record, a different resource than the network view, and were not part of the verification.
+
+Verified: `npx tsc --noEmit` clean; `/`, `/demo-surveys`, `/api/insight` all HTTP 200.
+
+---
+
+## To make it live — the 5 remaining hookups (2026-08-30)
+
+The front end is built and wired: every screen (Devices, Programs, People, Locations, Surveys, Engagement), all the count tiles, the Insight/Admin links, and the assign-serial flow already work and derive their numbers from one shared device store. They will show **real** totals with no rebuild. What's left is connecting to the real eero systems and confirming the handshake. In priority order:
+
+1. **Get the eero sign-in working (blocker).** The live Insight connection currently fails at login, so the app runs on a deterministic practice fallback. Someone on the Amazon VPN needs to complete the eero User API SSO sign-in and provide a valid session token (`EERO_API_TOKEN`). Until then, no real device status can be pulled. Everything downstream is blocked on this.
+
+2. **Confirm how Insight returns the data.** The serial lookup (`src/app/api/insight/route.ts`) uses our best-guess request paths and field names, marked `TODO(verify)`. Once signed in, confirm against the live API: serial → network resolution, the device fields (serial, model, firmware, online status), and the search-by-email fallback. Adjust the mapping if the real shape differs. (Link paths for the human-facing tools are already confirmed: both Insight and Admin use `/networks/{id}`.)
+
+3. **Build a real "load the devices" path.** Today devices enter the app either from the practice seed or one-at-a-time via the assign flow. There is no bulk import of a real program's devices. Decide the real source (Insight network lookup, a fulfillment sheet, or provisioning capture) and build that ingestion so a program's full device list populates automatically.
+
+4. **Clear out the practice data.** The seeded example devices/testers need to be removed (and the per-program seed-on-open behavior in the Programs device roster turned off — see the SIMULATION NOTE above) so real data isn't mixed with placeholders. In production the device record is written once, at real assignment time.
+
+5. **Match people to their devices.** The tester names from the survey audience (Qualtrics) and the device owners in Insight aren't reconciled yet — they can be different names/emails. Decide the join key (serial is the reliable one; email is unreliable because a survey contact email often isn't the eero-account email) and wire it so a program's testers line up with their real devices.
+
+**Summary:** screens + counting + links + assign flow = done and solid. Sign-in + data-shape confirmation + bulk ingestion + clearing practice data + people-matching = the remaining work, all gated on step 1.

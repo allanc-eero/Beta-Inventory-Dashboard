@@ -395,7 +395,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         {profile?.networkId ? (
                           <div className="flex items-baseline gap-3">
                             <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
-                            <a href={`https://insight.eero.com/eeros/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
+                            <a href={`https://insight.eero.com/networks/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
                           </div>
                         ) : (
                           <ProfileField label="INSIGHT NETWORK" value="" />
@@ -447,7 +447,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           <span className="text-sm text-[var(--ui-text-text-primary)] font-medium">Removed from eero Admin</span>
                           <p className="text-xs text-[var(--ui-text-text-tertiary)]">Reverted to default user role in admin panel</p>
                         </div>
-                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/eeros/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
+                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/networks/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
                       <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--ui-background-layer-layer-page)] cursor-pointer">
                         <Checkbox checked={optOutDevicesDone} onChange={(e: CheckboxChangeEvent) => setOptOutDevicesDone(e.target.checked)} className="mt-0.5" />

@@ -55,7 +55,7 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
       description: 'Set their user role back to tester in the admin panel',
       done: adminReAdded,
       onCheck: () => setAdminReAdded(true),
-      link: adminId ? `https://admin.e2ro.com/users/${adminId.replace(/^UID0*/, '')}` : networkId ? `https://insight.eero.com/eeros/${networkId}` : undefined,
+      link: adminId ? `https://admin.e2ro.com/users/${adminId.replace(/^UID0*/, '')}` : networkId ? `https://insight.eero.com/networks/${networkId}` : undefined,
       linkLabel: adminId ? 'Open in Admin' : networkId ? 'Open in Insight' : undefined,
     },
   ];

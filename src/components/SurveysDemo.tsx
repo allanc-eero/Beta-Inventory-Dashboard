@@ -4,9 +4,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * DEMO: Surveys + Engagement + Program Health  (flagship preview)
  * ─────────────────────────────────────────────────────────────────────────────
- * Self-contained preview route at /demo-surveys. Touches NOTHING in the real app:
- * all types, mock data, and components live in this one file. Once approved, the
- * pieces get promoted into src/types, src/store, and src/components.
+ * Preview route at /demo-surveys. Types, mock data, and view components live in
+ * this one file. EXCEPTION: the Programs device roster now writes assigned serials
+ * into the shared deviceStore (useDeviceStore) so the same devices surface in the
+ * Devices / People / Locations menus — see ProgramDevicesView's shared-store bridge
+ * and the SIMULATION NOTE in docs/Surveys_Feature_Handoff.md. Once approved, the
+ * remaining pieces get promoted into src/types, src/store, and src/components.
  *
  * What it shows (the flagship loop we scoped):
  *   1. Surveys      — list + results (charts + AI feedback summary + closed-loop
@@ -26,6 +29,11 @@ import {
   Card, Button, Tag, Segmented, Select, ProgressBar, Input, Modal,
   Icon, ICONS, TableV2, ToastProvider, useToast, ToastType,
 } from '@amzn/eero-web-design-components';
+// Shared device store — assigning serials in a Program writes real Device rows
+// here, so the same devices surface in the Devices / People / Locations menus.
+// (This is the "shared model" wiring; see the handoff doc's simulation note.)
+import { useDeviceStore } from '@/store/deviceStore';
+import { Device, Program, DeviceStatus } from '@/types';
 
 // ─── Types (inline — demo only) ──────────────────────────────────────────────
 type ProgramType = 'hardware' | 'feature';
@@ -114,6 +122,11 @@ interface DemoProgram {
   devicesOnline: number;
   surveyResponseRate: number; // 0-100
   avgFeedbackQuality: number; // 1-5
+  // The program's tester roster. For seed programs this is the sampled mock;
+  // for programs created from a live Qualtrics list it's the real contacts
+  // (names/emails from Qualtrics) with engagement metrics simulated until
+  // survey-response data is wired in. Drives the Engagement view.
+  testers: DemoTester[];
 }
 
 // Survey-kind metadata: label, default title + cadence. Drives the pickers and tags.
@@ -309,11 +322,36 @@ const TESTERS: DemoTester[] = [
 ];
 
 const INITIAL_PROGRAMS: DemoProgram[] = [
-  { id: 'pg-merci-beta', name: 'Merci Beta', type: 'hardware', status: 'active', currentPhase: 'DVT', audienceSize: 62, devicesDeployed: 62, devicesOnline: 51, surveyResponseRate: 63, avgFeedbackQuality: 3.8 },
-  { id: 'pg-outdoor-df', name: 'Outdoor Dogfood', type: 'hardware', status: 'completed', currentPhase: 'PVT', audienceSize: 30, devicesDeployed: 30, devicesOnline: 22, surveyResponseRate: 90, avgFeedbackQuality: 4.4 },
-  { id: 'pg-foghorn-fw', name: 'Foghorn Firmware Beta', type: 'feature', status: 'active', audienceSize: 48, devicesDeployed: 0, devicesOnline: 0, surveyResponseRate: 85, avgFeedbackQuality: 4.6 },
-  { id: 'pg-app-beta', name: 'App Experience Beta', type: 'feature', status: 'active', audienceSize: 24, devicesDeployed: 0, devicesOnline: 0, surveyResponseRate: 0, avgFeedbackQuality: 0 },
+  { id: 'pg-merci-beta', name: 'Merci Beta', type: 'hardware', status: 'active', currentPhase: 'DVT', audienceSize: 62, devicesDeployed: 62, devicesOnline: 51, surveyResponseRate: 63, avgFeedbackQuality: 3.8, testers: TESTERS.filter((t) => t.programName === 'Merci Beta') },
+  { id: 'pg-outdoor-df', name: 'Outdoor Dogfood', type: 'hardware', status: 'completed', currentPhase: 'PVT', audienceSize: 30, devicesDeployed: 30, devicesOnline: 22, surveyResponseRate: 90, avgFeedbackQuality: 4.4, testers: TESTERS.filter((t) => t.programName === 'Outdoor Dogfood') },
+  { id: 'pg-foghorn-fw', name: 'Foghorn Firmware Beta', type: 'feature', status: 'active', audienceSize: 48, devicesDeployed: 0, devicesOnline: 0, surveyResponseRate: 85, avgFeedbackQuality: 4.6, testers: TESTERS.filter((t) => t.programName === 'Foghorn Firmware Beta') },
+  { id: 'pg-app-beta', name: 'App Experience Beta', type: 'feature', status: 'active', audienceSize: 24, devicesDeployed: 0, devicesOnline: 0, surveyResponseRate: 0, avgFeedbackQuality: 0, testers: TESTERS.filter((t) => t.programName === 'App Experience Beta') },
 ];
+
+// Turn a real Qualtrics contact into a program tester. The identity (name/email)
+// is REAL (from the live Qualtrics list); engagement metrics are deterministically
+// simulated from the email until survey-response data is wired in — so a real
+// roster gets stable, plausible numbers instead of placeholders.
+function contactToTester(
+  contact: { email: string; firstName?: string; lastName?: string },
+  program: { id: string; name: string; type: ProgramType },
+): DemoTester {
+  const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || contact.email.split('@')[0];
+  const seed = hashSeed(contact.email);
+  const levels: TechnicalLevel[] = ['Beginner', 'Intermediate', 'Advanced'];
+  return {
+    id: `${program.id}-${contact.email}`,
+    name,
+    email: contact.email,
+    programName: program.name,
+    technicalLevel: levels[seed % 3],
+    reliability: 40 + (seed % 60),                                  // 40–99%
+    avgResponseDays: Math.round(((seed % 50) / 10 + 0.5) * 10) / 10, // 0.5–5.4d
+    feedbackQuality: 3 + (seed % 3),                                // 3–5
+    deviceOnline: program.type === 'feature' ? null : seed % 4 !== 0, // ~75% online (hardware)
+    missedSurveys: seed % 4,                                        // 0–3
+  };
+}
 
 // ─── Per-program device roster — the Insight identity-match surface ──────────
 // PRODUCTION MODEL (simulated here behind the same demo seam as everything else):
@@ -1210,26 +1248,28 @@ function Stars({ n }: { n: number }) {
   return <span style={{ color: 'var(--ui-core-yellow-yellow-6)' }}>{'★'.repeat(n)}<span style={{ color: TRACK }}>{'★'.repeat(5 - n)}</span></span>;
 }
 
-function EngagementView({ onToast }: { onToast: (msg: string) => void }) {
+function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToast: (msg: string) => void }) {
   const [narration, setNarration] = useState<'idle' | 'loading' | 'done'>('idle');
 
   // Rules engine — deterministic, explainable. AI only narrates the output.
-  const atRisk = useMemo(() => TESTERS.filter((t) => {
+  const isAtRisk = (t: DemoTester) => {
     const offline = t.deviceOnline === false;             // hardware: device offline
     const unresponsive = t.missedSurveys >= 3;            // missed 3+ surveys
     const lowReliability = t.reliability < 30;            // reliability under 30%
     return (offline || t.deviceOnline === null) && unresponsive && lowReliability;
-  }), []);
+  };
 
-  // Stable program order taken from the tester list, so both sections group the same way.
-  const programNames = useMemo(() => Array.from(new Set(TESTERS.map((t) => t.programName))), []);
+  // Roster comes from each program's testers (real Qualtrics contacts for programs
+  // created from a live list; sampled seed for the example programs). Grouped by
+  // program, in program order.
+  const atRisk = useMemo(() => programs.flatMap((p) => p.testers).filter(isAtRisk), [programs]);
   const atRiskByProgram = useMemo(
-    () => programNames.map((name) => ({ name, testers: atRisk.filter((t) => t.programName === name) })).filter((g) => g.testers.length > 0),
-    [programNames, atRisk],
+    () => programs.map((p) => ({ name: p.name, testers: p.testers.filter(isAtRisk) })).filter((g) => g.testers.length > 0),
+    [programs],
   );
   const engagementByProgram = useMemo(
-    () => programNames.map((name) => ({ name, testers: TESTERS.filter((t) => t.programName === name) })).filter((g) => g.testers.length > 0),
-    [programNames],
+    () => programs.map((p) => ({ name: p.name, testers: p.testers })).filter((g) => g.testers.length > 0),
+    [programs],
   );
 
   // Engagement columns — Program column dropped since rows are grouped under a program header.
@@ -1550,59 +1590,308 @@ function ProgramDeviceDetail({ detail, onBack, onToast }: {
 // the same device list the standalone Programs menu showed, now scoped to one
 // program and driven by the Insight identity-match model (email → network →
 // beta-model DSN), with in-app resolution for the rows that don't auto-match.
+// ── Assigned-device model (the serial↔tester pairing you author in-app) ───────
+// A tester can have MANY devices. Each assigned serial is enriched through
+// /api/insight?serial= into a network + live status. Until eero auth is live the
+// route returns a deterministic seed, so this works today and flips to real data
+// with zero UI change.
+type DeviceLiveStatus = 'online' | 'offline' | 'pending'; // pending = assigned, not yet on a network in Insight
+
+interface AssignedDevice {
+  serial: string;
+  model: string;
+  networkId: string | null;   // Insight network the unit lives on (null until it activates)
+  status: DeviceLiveStatus;
+  firmware: string;
+  source: 'live' | 'seed';
+}
+
+// Insight + Admin deep links, anchored on the resolved network — this is what
+// makes a serial clickable back to the platform it lives on. Both tools key the
+// network view on /networks/{id} (confirmed against the live tools).
+const insightNetworkUrl = (networkId: string) => `https://insight.eero.com/networks/${networkId}`;
+const adminNetworkUrl = (networkId: string) => `https://admin.e2ro.com/networks/${networkId}`;
+
+// Enrich one serial through the /api/insight route (serial-anchored lookup).
+async function enrichSerial(serial: string, fallbackModel: string): Promise<AssignedDevice> {
+  const clean = serial.trim().toUpperCase();
+  try {
+    const res = await fetch(`/api/insight?serial=${encodeURIComponent(clean)}`);
+    const d = await res.json();
+    if (d.match === 'matched' && d.device) {
+      return {
+        serial: clean,
+        model: d.device.model || fallbackModel,
+        networkId: d.networkId ?? null,
+        status: d.device.online ? 'online' : 'offline',
+        firmware: d.device.firmware || '',
+        source: d.source === 'live' ? 'live' : 'seed',
+      };
+    }
+    // Insight doesn't know this serial yet → assigned but pending activation.
+    return { serial: clean, model: fallbackModel, networkId: null, status: 'pending', firmware: '', source: d.source === 'live' ? 'live' : 'seed' };
+  } catch {
+    return { serial: clean, model: fallbackModel, networkId: null, status: 'pending', firmware: '', source: 'seed' };
+  }
+}
+
+// Seed each tester with a deterministic device set so the roster isn't blank in
+// the demo. Mirrors /api/insight's seededSerialLookup mix: most testers have one
+// matched unit, some have two (multi-device), some are pending, a few have none.
+function seedAssignments(program: DemoProgram): Record<string, AssignedDevice[]> {
+  const model = betaModelFor(program);
+  const map: Record<string, AssignedDevice[]> = {};
+  program.testers.forEach((t) => {
+    const seed = hashSeed(t.email);
+    const r = seed % 10;
+    if (r === 2 || r === 9) { map[t.id] = []; return; }               // not shipped / not assigned yet
+    const primary = mkSerial((seed % 900) + 3);
+    if (r === 4) {                                                     // assigned but pending activation
+      map[t.id] = [{ serial: primary, model, networkId: null, status: 'pending', firmware: '', source: 'seed' }];
+      return;
+    }
+    const networkId = String(17000000 + (seed % 99999));
+    const devices: AssignedDevice[] = [
+      { serial: primary, model, networkId, status: r === 6 ? 'offline' : 'online', firmware: 'v7.3-beta', source: 'seed' },
+    ];
+    if (r === 5) {                                                     // multi-device tester (2 units, same mesh)
+      devices.push({ serial: mkSerial((seed % 900) + 4), model, networkId, status: 'online', firmware: 'v7.3-beta', source: 'seed' });
+    }
+    map[t.id] = devices;
+  });
+  return map;
+}
+
+// Reuse the existing device-detail view by shaping a one-candidate RosterEntry,
+// then overriding the fields the assigned device actually knows (network/status).
+function assignedDetail(tester: DemoTester, device: AssignedDevice, program: DemoProgram): RosterDeviceDetail {
+  const entry: RosterEntry = {
+    id: tester.id,
+    tester: tester.name,
+    email: tester.email,
+    match: 'matched',
+    candidates: [{ serial: device.serial, model: device.model, online: device.status === 'online' }],
+    selectedSerial: device.serial,
+  };
+  const detail = deviceDetailFor(entry, device.serial, program);
+  return {
+    ...detail,
+    insightNetwork: device.networkId ?? detail.insightNetwork,
+    status: device.status === 'online' ? 'Online' : device.status === 'offline' ? 'Not online' : 'Pending activation',
+    firmwareCurrent: device.firmware || detail.firmwareCurrent,
+  };
+}
+
+// Map a demo program onto the real deviceStore Program enum — this is the key
+// that DevicesTab groups containers by. Seed devices are all 'beta', so a beta
+// program's assigned devices must also be 'beta' to land in the same "Merci BETA"
+// container the Devices menu shows. Phase (DVT/EVT/PVT) is separate metadata (a
+// tag), NOT the container key.
+function programEnumFor(program: DemoProgram): Program {
+  return program.name.toLowerCase().includes('dogfood') ? 'dogfood' : 'beta';
+}
+
+// Shape an assigned device into a full deviceStore Device so it appears in the
+// Devices menu (grouped by program) and flows to People (assignedEmail) and
+// Locations (country). Deterministic id keeps re-syncs idempotent.
+function toStoreDevice(tester: DemoTester, d: AssignedDevice, program: DemoProgram): Device {
+  const country = d.networkId ? countryForSerial(d.serial).name : '';
+  const now = new Date().toISOString();
+  return {
+    id: `prog-${program.id}-${d.serial}`,
+    serialNumber: d.serial,
+    model: 'eero Max 7',
+    manufacturer: 'eero',
+    revision: '', revisionNotes: '', hardwareConfig: '', mac: '',
+    internalName: `${betaModelFor(program)} beta`,
+    sku: '', partNumber: '',
+    country,
+    adminId: '',
+    unitId: `UID000${2900000 + (hashSeed(d.serial) % 99999)}`,
+    deactivated: false,
+    firmwareVersion: d.firmware,
+    environment: '',
+    status: d.status === 'online' ? 'online' : 'not_online',
+    assignedTo: tester.name,
+    assignedEmail: tester.email,
+    contactEmail: '', alternateEmail: '',
+    location: country,
+    adminLocation: '',
+    network: d.networkId || '',
+    program: programEnumFor(program),
+    product: betaModelFor(program),
+    assetTag: '', poExpensify: '', accountingId: '', cost: '', purchaseDate: '',
+    imei1: '', imei2: '', eid: '', tracking: '', jira: '',
+    checkedOutTo: tester.name, checkedOutDate: now,
+    dueDate: '', notes: '',
+    shipmentStatus: 'delivered',
+    fcLocation: '', leg1Carrier: '', leg1Tracking: '', leg1Date: '',
+    leg2Carrier: '', leg2Tracking: '', leg2Date: '',
+    testbedId: '', testbedName: program.name,
+    createdAt: now, updatedAt: now,
+  };
+}
+
+function deviceStatusTag(status: DeviceLiveStatus) {
+  if (status === 'online') return <Tag color="green" size="regular">online</Tag>;
+  if (status === 'offline') return <Tag color="orange" size="regular">not online</Tag>;
+  return <Tag color="grey" size="regular">pending activation</Tag>;
+}
+
+// ─── Program → device roster: assign serials, enrich via Insight, link back ────
 function ProgramDevicesView({ program, onBack, onToast }: {
   program: DemoProgram;
   onBack: () => void;
   onToast: (msg: string) => void;
 }) {
   const model = betaModelFor(program);
-  const [roster, setRoster] = useState<RosterEntry[]>(() => rosterForProgram(program));
+  const { addDevice, updateDevice, deleteDevice, getDeviceBySerial } = useDeviceStore();
+  const [roster, setRoster] = useState<DemoTester[]>(() => program.testers);
+  const [assignments, setAssignments] = useState<Record<string, AssignedDevice[]>>(() => seedAssignments(program));
+  const [serialInput, setSerialInput] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null); // testerId being enriched, or 'sync'
+  const [open, setOpen] = useState<{ tester: DemoTester; device: AssignedDevice } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [openSerial, setOpenSerial] = useState<{ entry: RosterEntry; serial: string } | null>(null);
 
-  const matched = roster.filter((r) => r.match === 'matched').length;
-  const needsPick = roster.filter((r) => r.match === 'multiple').length;
-  const unmatched = roster.filter((r) => r.match === 'unmatched').length;
-  const onlineCount = roster.filter((r) => r.match === 'matched' && r.candidates.find((c) => c.serial === r.selectedSerial)?.online).length;
+  // ── Shared-store bridge ──────────────────────────────────────────────────────
+  // Every assigned device is upserted into the real deviceStore (idempotent by
+  // serial), so it shows up in Devices/People/Locations. SIMULATION NOTE: in
+  // production the write happens once at assignment time; here we also re-sync the
+  // seeded roster on open so the demo isn't blank. See the handoff doc.
+  const syncToStore = (tester: DemoTester, d: AssignedDevice) => {
+    const existing = getDeviceBySerial(d.serial);
+    const region = d.networkId ? countryForSerial(d.serial).name : '';
+    if (existing) {
+      updateDevice(existing.id, {
+        status: d.status === 'online' ? 'online' : 'not_online',
+        network: d.networkId || '',
+        firmwareVersion: d.firmware,
+        assignedTo: tester.name,
+        assignedEmail: tester.email,
+        program: programEnumFor(program),
+        product: betaModelFor(program),
+        country: region || existing.country,
+        location: region || existing.location,
+      });
+    } else {
+      addDevice(toStoreDevice(tester, d, program));
+    }
+  };
+  const removeFromStore = (serial: string) => {
+    const existing = getDeviceBySerial(serial);
+    if (existing) deleteDevice(existing.id);
+  };
 
-  const pickSerial = (id: string, serial: string) => {
-    if (!serial) return;
-    setRoster((prev) => prev.map((r) => (r.id === id ? { ...r, selectedSerial: serial, match: 'matched' as MatchState } : r)));
-    onToast(`Selected ${serial} as this tester's beta unit`);
+  // Sync the seeded roster into the store once when the program opens.
+  useEffect(() => {
+    if (program.type === 'feature') return;
+    roster.forEach((t) => (assignments[t.id] || []).forEach((d) => syncToStore(t, d)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const allDevices = roster.flatMap((t) => assignments[t.id] || []);
+  const total = allDevices.length;
+  const onlineCount = allDevices.filter((d) => d.status === 'online').length;
+  const pendingCount = allDevices.filter((d) => d.status === 'pending').length;
+  const testersWithDevice = roster.filter((t) => (assignments[t.id] || []).length > 0).length;
+  const unassigned = roster.length - testersWithDevice;
+
+  const enrichAll = async (devs: AssignedDevice[]) => Promise.all(devs.map((d) => enrichSerial(d.serial, model)));
+
+  const assignSerial = async (tester: DemoTester) => {
+    const raw = (serialInput[tester.id] || '').trim();
+    if (!raw) return;
+    const serials = raw.split(/[\s,]+/).filter(Boolean);
+    const existing = new Set((assignments[tester.id] || []).map((d) => d.serial));
+    setBusy(tester.id);
+    const enriched = await enrichAll(serials.map((s) => ({ serial: s } as AssignedDevice)));
+    const toAdd = enriched.filter((d) => !existing.has(d.serial));
+    setAssignments((prev) => ({ ...prev, [tester.id]: [...(prev[tester.id] || []), ...toAdd] }));
+    toAdd.forEach((d) => syncToStore(tester, d));
+    setSerialInput((prev) => ({ ...prev, [tester.id]: '' }));
+    setBusy(null);
+    onToast(toAdd.length ? `Assigned ${toAdd.length} device${toAdd.length !== 1 ? 's' : ''} to ${tester.name} — now in the Devices menu too` : 'Those serials are already assigned');
   };
-  const removeTester = (id: string) => {
-    setRoster((prev) => prev.filter((r) => r.id !== id));
-    onToast('Removed tester from program');
+
+  const recheckTester = async (tester: DemoTester) => {
+    const devs = assignments[tester.id] || [];
+    if (!devs.length) return;
+    setBusy(tester.id);
+    const next = await enrichAll(devs);
+    setAssignments((prev) => ({ ...prev, [tester.id]: next }));
+    next.forEach((d) => syncToStore(tester, d));
+    setBusy(null);
+    onToast(`Rechecked ${tester.name}'s device${devs.length > 1 ? 's' : ''} against Insight`);
   };
-  const fixMatch = (id: string) => {
-    setRoster((prev) => prev.map((r) => {
-      if (r.id !== id) return r;
-      const serial = mkSerial(r.tester.length + 20);
-      return { ...r, match: 'matched' as MatchState, email: r.email.replace('@amazon.com', '@gmail.com'), candidates: [{ serial, model, online: true }], selectedSerial: serial };
-    }));
-    onToast('Re-matched on corrected eero-account email (simulated)');
+
+  const syncAll = async () => {
+    setBusy('sync');
+    const entries = await Promise.all(roster.map(async (t) => [t.id, await enrichAll(assignments[t.id] || [])] as const));
+    setAssignments(Object.fromEntries(entries));
+    entries.forEach(([tid, devs]) => { const t = roster.find((x) => x.id === tid); if (t) devs.forEach((d) => syncToStore(t, d)); });
+    setBusy(null);
+    onToast('Synced all assigned devices from Insight');
   };
+
+  // One serial resolves a whole network — offer to pull the tester's other beta
+  // units on that mesh (simulated client-side until the network-eeros call is live).
+  const pullMesh = (tester: DemoTester, device: AssignedDevice) => {
+    if (!device.networkId) return;
+    const existing = new Set((assignments[tester.id] || []).map((d) => d.serial));
+    const seed = hashSeed(device.serial);
+    const extra: AssignedDevice[] = [];
+    const count = 1 + (seed % 2); // 1–2 siblings on the same mesh
+    for (let k = 1; k <= count; k++) {
+      const s = mkSerial((seed % 900) + 10 + k);
+      if (existing.has(s)) continue;
+      extra.push({ serial: s, model, networkId: device.networkId, status: 'online', firmware: 'v7.3-beta', source: device.source });
+    }
+    if (!extra.length) { onToast('No additional beta units found on that network'); return; }
+    setAssignments((prev) => ({ ...prev, [tester.id]: [...(prev[tester.id] || []), ...extra] }));
+    extra.forEach((d) => syncToStore(tester, d));
+    onToast(`Pulled ${extra.length} more ${model} unit${extra.length > 1 ? 's' : ''} from network ${device.networkId}`);
+  };
+
+  const removeDevice = (tester: DemoTester, serial: string) => {
+    setAssignments((prev) => ({ ...prev, [tester.id]: (prev[tester.id] || []).filter((d) => d.serial !== serial) }));
+    removeFromStore(serial);
+    onToast(`Unassigned ${serial} from ${tester.name} — also removed from the Devices menu`);
+  };
+
+  const removeTester = (tester: DemoTester) => {
+    (assignments[tester.id] || []).forEach((d) => removeFromStore(d.serial));
+    setRoster((prev) => prev.filter((t) => t.id !== tester.id));
+    setAssignments((prev) => { const n = { ...prev }; delete n[tester.id]; return n; });
+    onToast(`Removed ${tester.name} from program`);
+  };
+
   const addTester = () => {
     if (!newName.trim() || !newEmail.trim()) return;
-    setRoster((prev) => [{ id: `${program.id}-new-${prev.length}-${Date.now()}`, tester: newName.trim(), email: newEmail.trim(), match: 'unmatched' as MatchState, candidates: [] }, ...prev]);
-    onToast(`Added ${newName.trim()} — resolve their device below`);
+    const t: DemoTester = {
+      id: `${program.id}-new-${roster.length}-${Date.now()}`,
+      name: newName.trim(),
+      email: newEmail.trim(),
+      programName: program.name,
+      technicalLevel: 'Intermediate',
+      reliability: 0,
+      avgResponseDays: 0,
+      feedbackQuality: 0,
+      deviceOnline: null,
+      missedSurveys: 0,
+    };
+    setRoster((prev) => [t, ...prev]);
+    setAssignments((prev) => ({ ...prev, [t.id]: [] }));
+    onToast(`Added ${t.name} — assign their serial(s) below`);
     setNewName(''); setNewEmail(''); setAddOpen(false);
   };
-  const rowAction = (serial: string, action: string) => {
-    if (!action) return;
-    onToast(`${action} queued for ${serial} (simulated)`);
-  };
 
-  const thCls = 'px-3 py-2 text-left text-xs font-bold uppercase';
-  const tdCls = 'px-3 py-2.5 align-middle text-sm';
-
-  if (openSerial) {
+  if (open) {
     return (
       <ProgramDeviceDetail
-        detail={deviceDetailFor(openSerial.entry, openSerial.serial, program)}
-        onBack={() => setOpenSerial(null)}
+        detail={assignedDetail(open.tester, open.device, program)}
+        onBack={() => setOpen(null)}
         onToast={onToast}
       />
     );
@@ -1618,7 +1907,7 @@ function ProgramDevicesView({ program, onBack, onToast }: {
           {program.type === 'hardware' && program.currentPhase && <Tag color="periwinkle-4" size="regular">Phase: {program.currentPhase}</Tag>}
         </div>
         {program.type === 'hardware' && (
-          <Button type="default" leftIcon={ICONS.FUNCTIONAL_REFRESH} label="Sync from Insight" onClick={() => onToast('Re-synced roster from Insight — matched by eero-account email (simulated)')} />
+          <Button type="default" leftIcon={ICONS.FUNCTIONAL_REFRESH} label={busy === 'sync' ? 'Syncing…' : 'Sync from Insight'} onClick={syncAll} />
         )}
       </div>
 
@@ -1631,14 +1920,14 @@ function ProgramDevicesView({ program, onBack, onToast }: {
       ) : (
         <>
           <div className="rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: TRACK, backgroundColor: 'var(--ui-core-periwinkle-periwinkle-1)', color: TEXT_SECONDARY }}>
-            Built from the Qualtrics roster: each tester&apos;s <b style={{ color: TEXT_PRIMARY }}>eero-account email</b> resolves to their network in Insight, auto-filtered to the <b style={{ color: TEXT_PRIMARY }}>{model}</b> beta model. Pick the unit when someone has more than one; fix the email when it doesn&apos;t resolve.
+            Roster comes from the <b style={{ color: TEXT_PRIMARY }}>Qualtrics audience</b>. Assign each tester the <b style={{ color: TEXT_PRIMARY }}>serial(s)</b> you shipped them — Insight resolves each to its <b style={{ color: TEXT_PRIMARY }}>network + live status</b> and links back to the platform. A tester can have more than one unit; use <i>Pull mesh</i> to add the rest of a network at once.
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Tag color="green" size="regular">{matched} matched</Tag>
-            {needsPick > 0 && <Tag color="orange" size="regular">{needsPick} to select</Tag>}
-            {unmatched > 0 && <Tag color="red" size="regular">{unmatched} unmatched</Tag>}
-            <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {onlineCount}/{matched} online</span>
+            <Tag color="green" size="regular">{onlineCount}/{total} online</Tag>
+            {pendingCount > 0 && <Tag color="orange" size="regular">{pendingCount} pending activation</Tag>}
+            {unassigned > 0 && <Tag color="grey" size="regular">{unassigned} unassigned</Tag>}
+            <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {total} device{total !== 1 ? 's' : ''} across {roster.length} tester{roster.length !== 1 ? 's' : ''}</span>
             <div className="ml-auto">
               <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="Add tester" onClick={() => setAddOpen((v) => !v)} />
             </div>
@@ -1655,81 +1944,73 @@ function ProgramDevicesView({ program, onBack, onToast }: {
             </Card>
           )}
 
-          <Card size={4}>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${TRACK}`, color: TEXT_TERTIARY }}>
-                    <th className={thCls}>Serial (DSN)</th>
-                    <th className={thCls}>Tester</th>
-                    <th className={thCls}>eero-account email</th>
-                    <th className={thCls}>Region</th>
-                    <th className={thCls}>Status</th>
-                    <th className={thCls}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roster.map((r) => {
-                    const sel = r.candidates.find((c) => c.serial === r.selectedSerial);
-                    return (
-                      <tr key={r.id} style={{ borderBottom: `1px solid ${TRACK}` }}>
-                        <td className={tdCls}>
-                          {r.match === 'matched' && sel && (
-                            <span className="flex items-center gap-2">
-                              <button className="font-mono hover:underline" style={{ color: ACCENT }} onClick={() => setOpenSerial({ entry: r, serial: sel.serial })}>{sel.serial}</button>
-                              <Tag color="grey" size="regular">{sel.model}</Tag>
-                            </span>
-                          )}
-                          {r.match === 'multiple' && (
-                            <div className="w-64">
-                              <Select
-                                id={`pick-${r.id}`}
-                                value=""
-                                onChange={(v) => pickSerial(r.id, String(v))}
-                                options={[{ value: '', label: `Pick ${model} unit…` }, ...r.candidates.map((c) => ({ value: c.serial, label: `${c.serial} · ${c.online ? 'online' : 'offline'}` }))]}
-                              />
-                            </div>
-                          )}
-                          {r.match === 'unmatched' && <span style={{ color: TEXT_TERTIARY }}>—</span>}
-                        </td>
-                        <td className={tdCls} style={{ color: TEXT_PRIMARY }}>{r.tester}</td>
-                        <td className={tdCls} style={{ color: TEXT_SECONDARY }}>{r.email}</td>
-                        <td className={tdCls}>
-                          {r.match === 'matched' && sel
-                            ? <span style={{ color: TEXT_SECONDARY }}>📍 {countryForSerial(sel.serial).name}</span>
-                            : <span style={{ color: TEXT_TERTIARY }}>—</span>}
-                        </td>
-                        <td className={tdCls}>
-                          {r.match === 'matched' && sel && <Tag color={sel.online ? 'green' : 'orange'} size="regular">{sel.online ? 'online' : 'not online'}</Tag>}
-                          {r.match === 'multiple' && <Tag color="orange" size="regular">pick device</Tag>}
-                          {r.match === 'unmatched' && <Tag color="red" size="regular">no network found</Tag>}
-                        </td>
-                        <td className={tdCls}>
-                          <div className="flex items-center gap-2">
-                            {r.match === 'matched' && sel && (
-                              <div className="w-40">
-                                <Select
-                                  id={`act-${r.id}`}
-                                  value=""
-                                  onChange={(v) => rowAction(sel.serial, String(v))}
-                                  options={[{ value: '', label: 'Select action…' }, { value: 'Return', label: 'Return' }, { value: 'Archive', label: 'Archive' }, { value: 'Brick & Return', label: 'Brick & Return' }]}
-                                />
-                              </div>
+          <div className="flex flex-col gap-3">
+            {roster.map((t) => {
+              const devs = assignments[t.id] || [];
+              const isBusy = busy === t.id;
+              return (
+                <Card key={t.id} size={4}>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</p>
+                        <p className="truncate text-xs" style={{ color: TEXT_TERTIARY }}>{t.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {devs.length > 0 && <Button type="text" leftIcon={ICONS.FUNCTIONAL_REFRESH} label={isBusy ? 'Rechecking…' : 'Recheck'} onClick={() => recheckTester(t)} />}
+                        <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel="Remove tester" onClick={() => removeTester(t)} />
+                      </div>
+                    </div>
+
+                    {devs.length > 0 ? (
+                      <div className="flex flex-col divide-y" style={{ borderColor: TRACK }}>
+                        {devs.map((d) => (
+                          <div key={d.serial} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                            <button className="font-mono text-sm hover:underline" style={{ color: ACCENT }} onClick={() => setOpen({ tester: t, device: d })}>{d.serial}</button>
+                            <Tag color="grey" size="regular">{d.model}</Tag>
+                            {deviceStatusTag(d.status)}
+                            {d.networkId
+                              ? <span className="text-xs" style={{ color: TEXT_SECONDARY }}>📍 {countryForSerial(d.serial).name}</span>
+                              : <span className="text-xs" style={{ color: TEXT_TERTIARY }}>awaiting first connection</span>}
+                            {d.networkId && (
+                              <span className="flex items-center gap-2 text-xs">
+                                <a href={insightNetworkUrl(d.networkId)} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Insight network ↗</a>
+                                <span style={{ color: TEXT_TERTIARY }}>·</span>
+                                <a href={adminNetworkUrl(d.networkId)} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Admin ↗</a>
+                              </span>
                             )}
-                            {r.match === 'unmatched' && <Button type="default" label="Fix email" onClick={() => fixMatch(r.id)} />}
-                            <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel="Remove tester" onClick={() => removeTester(r.id)} />
+                            <div className="ml-auto flex items-center gap-2">
+                              {d.networkId && <Button type="text" label="Pull mesh" onClick={() => pullMesh(t, d)} />}
+                              <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel={`Unassign ${d.serial}`} onClick={() => removeDevice(t, d.serial)} />
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {roster.length === 0 && (
-                    <tr><td className={tdCls} colSpan={6} style={{ color: TEXT_TERTIARY }}>No testers on this program yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No devices assigned yet.</p>
+                    )}
+
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="w-72">
+                        <Input
+                          id={`assign-${t.id}`}
+                          label="Assign serial(s)"
+                          value={serialInput[t.id] || ''}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSerialInput((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                          placeholder="GGC54MX36114… (comma-separate for several)"
+                          layout="vertical"
+                        />
+                      </div>
+                      <Button type="default" label={isBusy ? 'Resolving…' : 'Assign'} onClick={() => assignSerial(t)} />
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+            {roster.length === 0 && (
+              <Card size={4}><p className="text-sm" style={{ color: TEXT_TERTIARY }}>No testers on this program yet. Add one above or import a Qualtrics audience.</p></Card>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -1746,6 +2027,10 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
   onToggleStatus: (program: DemoProgram) => void;
   onOpenDevices: (program: DemoProgram) => void;
 }) {
+  // Device counts are derived from the SHARED deviceStore (the same source the
+  // Devices menu's containers + Overview boxes use), so every menu shows matching
+  // numbers. As devices are assigned/brought online, these update automatically.
+  const { devices } = useDeviceStore();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
@@ -1757,10 +2042,13 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {programs.map((p) => {
-          const onlinePct = p.devicesDeployed > 0 ? Math.round((p.devicesOnline / p.devicesDeployed) * 100) : null;
-          const healthy = p.surveyResponseRate >= 60 && (onlinePct === null || onlinePct >= 75);
           const surveyCount = surveys.filter((s) => s.programId === p.id).length;
           const noSurveys = p.status === 'active' && surveyCount === 0;
+          // Match the DevicesTab container exactly: all devices grouped under this
+          // program's enum key. Online = those reporting online right now.
+          const progDevices = p.type === 'feature' ? [] : devices.filter((d) => d.program === programEnumFor(p));
+          const deployed = progDevices.length;
+          const online = progDevices.filter((d) => d.status === 'online').length;
           return (
             <Card key={p.id} size={4}>
               <div className="mb-3 flex items-center justify-between gap-2">
@@ -1771,11 +2059,7 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
                 </div>
                 {p.status === 'completed'
                   ? <Tag color="periwinkle" size="regular">Completed</Tag>
-                  : surveyCount === 0
-                    ? <Tag color="grey" size="regular">No surveys yet</Tag>
-                    : p.surveyResponseRate === 0
-                      ? <Tag color="grey" size="regular">Awaiting responses</Tag>
-                      : <Tag color={healthy ? 'green' : 'orange'} size="regular">{healthy ? 'Healthy' : 'Needs attention'}</Tag>}
+                  : <Tag color="green" size="regular">In progress</Tag>}
               </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div>
@@ -1786,7 +2070,7 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
                   <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Devices online</p>
                   {p.type === 'feature'
                     ? <p className="text-lg font-medium" style={{ color: TEXT_PRIMARY }}>—</p>
-                    : <button className="text-lg font-medium underline decoration-dotted underline-offset-4" style={{ color: ACCENT }} onClick={() => onOpenDevices(p)}>{onlinePct === null ? 'n/a' : `${onlinePct}%`}</button>}
+                    : <button className="text-lg font-medium underline decoration-dotted underline-offset-4" style={{ color: ACCENT }} onClick={() => onOpenDevices(p)}>{online} <span className="text-sm no-underline" style={{ color: TEXT_TERTIARY }}>of {deployed}</span></button>}
                 </div>
                 <div className="col-span-2">
                   <p className="mb-1 text-xs" style={{ color: TEXT_TERTIARY }}>Survey response rate</p>
@@ -1956,7 +2240,7 @@ export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = 
               ? <DraftPanel survey={selected} onBack={() => setSelected(null)} onDelete={() => handleDeleteSurvey(selected)} />
               : <SurveyResults survey={selected} onBack={() => setSelected(null)} onToast={showToast} onDelete={() => handleDeleteSurvey(selected)} />)
           : <SurveyList surveys={surveys} onSelect={setSelected} onNewSurvey={() => setNewSurvey({ open: true })} onDelete={handleDeleteSurvey} />)}
-        {view === 'engagement' && <EngagementView onToast={showToast} />}
+        {view === 'engagement' && <EngagementView programs={programs} onToast={showToast} />}
         {view === 'health' && (openProgram
           ? <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} />
           : <ProgramHealthView
@@ -2097,6 +2381,9 @@ function NewProgramModal({
   const create = () => {
     const id = slugify(name, existingIds);
     const phase = type === 'hardware' ? startPhase : undefined;
+    // Keep the REAL Qualtrics contacts as this program's tester roster (identity
+    // real; engagement metrics simulated). This is what feeds the Engagement view.
+    const testers = (audience?.contacts ?? []).map((c) => contactToTester(c, { id, name: name.trim(), type }));
     const program: DemoProgram = {
       id,
       name: name.trim(),
@@ -2108,6 +2395,7 @@ function NewProgramModal({
       devicesOnline: 0,
       surveyResponseRate: 0,
       avgFeedbackQuality: 0,
+      testers,
     };
     const firstSurvey: DemoSurvey = {
       id: `${id}-${firstKind}-${phase ?? 'x'}`,

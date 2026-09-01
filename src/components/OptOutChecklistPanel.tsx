@@ -42,7 +42,7 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
       done: checklist.adminRemoved,
       doneAt: checklist.adminRemovedAt,
       doneBy: checklist.adminRemovedBy,
-      link: adminId ? `https://admin.e2ro.com/users/${adminId.replace(/^UID0*/, '')}` : networkId ? `https://insight.eero.com/eeros/${networkId}` : undefined,
+      link: adminId ? `https://admin.e2ro.com/users/${adminId.replace(/^UID0*/, '')}` : networkId ? `https://insight.eero.com/networks/${networkId}` : undefined,
       linkLabel: adminId ? 'Open in Admin' : networkId ? 'Open in Insight' : undefined,
     },
     {
@@ -72,7 +72,7 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
       done: checklist.networkReset,
       doneAt: checklist.networkResetAt,
       doneBy: checklist.networkResetBy,
-      link: networkId ? `https://insight.eero.com/eeros/${networkId}` : undefined,
+      link: networkId ? `https://insight.eero.com/networks/${networkId}` : undefined,
       linkLabel: networkId ? 'Open in Insight' : undefined,
     },
   ];

@@ -203,7 +203,18 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
                           <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                             <Checkbox checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} />
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]">{device.serialNumber}</td>
+                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                            {device.network ? (
+                              <a href={`https://insight.eero.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title="Open this device's network in Insight">{device.serialNumber} ↗</a>
+                            ) : (
+                              <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title="No network yet — device not online in Insight">{device.serialNumber}</span>
+                            )}
+                            {device.network && (
+                              <div>
+                                <a href={`https://admin.e2ro.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title="Open this network in Admin">Admin ↗</a>
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.internalName}</td>
                           <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.program?.toUpperCase() || '—'}</td>
                           <td className="px-4 py-2.5 font-mono text-xs">{device.firmwareVersion || '—'}</td>
