@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Card, Button, Tag, Segmented, Select, ProgressBar, Input, Modal,
   Icon, ICONS, TableV2, ToastProvider, useToast, ToastType,
+  Pagination,
 } from '@amzn/eero-web-design-components';
 // Shared device store — assigning serials in a Program writes real Device rows
 // here, so the same devices surface in the Devices / People / Locations menus.
@@ -601,28 +602,6 @@ function sentimentTag(s: 'positive' | 'neutral' | 'negative') {
 // The clarity centerpiece: make "surveys repeat within a phase, and pause/resume
 // around other surveys" legible AT A GLANCE instead of something you have to be told.
 
-// Tiny inline trend of a recurring survey's response rate across its waves.
-function Sparkline({ waves }: { waves: SurveyWave[] }) {
-  if (waves.length < 2) return null;
-  const pts = waves.map((w) => rate(w.responses, w.recipients));
-  const w = 72, h = 20, max = Math.max(...pts, 1), min = Math.min(...pts, 0);
-  const span = max - min || 1;
-  const coords = pts.map((p, i) => {
-    const x = (i / (pts.length - 1)) * (w - 4) + 2;
-    const y = h - 2 - ((p - min) / span) * (h - 4);
-    return `${x},${y}`;
-  });
-  return (
-    <svg width={w} height={h} aria-hidden className="shrink-0">
-      <polyline points={coords.join(' ')} fill="none" stroke="var(--ui-core-ocean-blue-ocean-6)" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-      {coords.map((c, i) => {
-        const [x, y] = c.split(',');
-        return <circle key={i} cx={x} cy={y} r={i === coords.length - 1 ? 2.5 : 1.5} fill="var(--ui-core-ocean-blue-ocean-6)" />;
-      })}
-    </svg>
-  );
-}
-
 // One survey's own wave history — dated rows, newest last, with the resumed note.
 function WaveTimeline({ waves, selectedId, onSelect }: { waves: SurveyWave[]; selectedId?: string; onSelect?: (id: string) => void }) {
   return (
@@ -652,52 +631,6 @@ function WaveTimeline({ waves, selectedId, onSelect }: { waves: SurveyWave[]; se
           </button>
         );
       })}
-    </div>
-  );
-}
-
-// A flattened event on the phase timeline: either a wave of a recurring survey
-// or the single run of a one-off. Sorting by date interleaves them so the
-// "Performance → RTM → Performance" story reads left-to-right.
-interface PhaseEvent { date: string; title: string; kind: SurveyKind; rate: number; resumed?: boolean; }
-
-function buildPhaseEvents(surveys: DemoSurvey[]): PhaseEvent[] {
-  const events: PhaseEvent[] = [];
-  for (const s of surveys) {
-    if (s.waves && s.waves.length) {
-      for (const wv of s.waves) {
-        events.push({ date: wv.date, title: `${SURVEY_KINDS[s.kind].label} · ${wv.label}`, kind: s.kind, rate: rate(wv.responses, wv.recipients), resumed: !!wv.resumedNote });
-      }
-    } else if (s.ranOn) {
-      events.push({ date: s.ranOn, title: SURVEY_KINDS[s.kind].label, kind: s.kind, rate: rate(s.responses, s.recipients) });
-    }
-  }
-  return events.sort((a, b) => a.date.localeCompare(b.date));
-}
-
-// The horizontal dated strip a newcomer reads to understand a phase at a glance.
-function PhaseTimeline({ surveys }: { surveys: DemoSurvey[] }) {
-  const events = useMemo(() => buildPhaseEvents(surveys), [surveys]);
-  if (events.length < 2) return null;
-  return (
-    <div className="rounded-lg border px-3 py-2.5" style={{ borderColor: TRACK, backgroundColor: 'var(--ui-background-bg-primary, #fff)' }}>
-      <p className="mb-2 text-xs font-medium" style={{ color: TEXT_TERTIARY }}>Phase timeline — what ran, when (paused pulses and re-runs show as gaps)</p>
-      <div className="flex items-stretch gap-1 overflow-x-auto pb-1">
-        {events.map((e, i) => (
-          <div key={i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-xs" style={{ color: TRACK }}>—</span>}
-            <div
-              className="flex min-w-[7.5rem] flex-col gap-0.5 rounded-md px-2 py-1.5"
-              style={{ backgroundColor: e.kind === 'performance' ? 'var(--ui-core-ocean-blue-ocean-1)' : 'var(--ui-core-periwinkle-periwinkle-1)' }}
-            >
-              <span className="text-xs font-medium" style={{ color: TEXT_PRIMARY }}>
-                {e.title}{e.resumed ? ' · resumed' : ''}
-              </span>
-              <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{fmtDate(e.date)} · {e.rate}%</span>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1128,35 +1061,31 @@ function SurveyCard({ s, onSelect, onDelete }: { s: DemoSurvey; onSelect: (s: De
   const recipients = wave ? wave.recipients : s.recipients;
   const waveCount = s.waves?.length ?? 0;
   return (
-    <Card size={4}>
-      <div className="flex h-full flex-col gap-3">
-        <div className="flex items-start justify-between gap-2">
+    <Card size={1}>
+      {/* One compact row — columns spread evenly across the card (Insight style) */}
+      <div className="flex items-center gap-x-4">
+        <div className="min-w-0 flex-[2] leading-tight">
+          <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onSelect(s)}>{s.title}</button>
+          <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>
+            {SURVEY_KINDS[s.kind].label} · {s.cadence === 'recurring' ? 'Recurring' : 'One-off'}{s.phase ? ` · ${s.phase}` : ''}
+          </p>
+        </div>
+        <div className="flex-1 leading-tight">
+          <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Questions</p>
+          <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{s.questions.length}</p>
+        </div>
+        <div className="flex-1 leading-tight">
+          <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Latest wave</p>
+          <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{waveCount > 0 && wave ? `${wave.label} · ${fmtDate(wave.date)}` : '—'}</p>
+        </div>
+        <div className="flex-1 leading-tight">
+          <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Responses</p>
+          <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>
+            {s.status === 'draft' ? '—' : <>{responses}/{recipients} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>({r}%)</span></>}
+          </p>
+        </div>
+        <div className="flex flex-1 items-center justify-end gap-2">
           {statusTag(s.status)}
-          <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{s.questions.length} questions</span>
-        </div>
-        <div>
-          <p className="text-base font-medium leading-snug" style={{ color: TEXT_PRIMARY }}>{s.title}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">{kindTag(s.kind, s.cadence)}{phaseTag(s.phase)}</div>
-        </div>
-
-        {/* Recurring pulse: which wave you're looking at + trend across waves */}
-        {waveCount > 0 && wave && (
-          <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: 'var(--ui-core-ocean-blue-ocean-1)' }}>
-            <div className="flex flex-col">
-              <span className="text-xs font-medium" style={{ color: TEXT_PRIMARY }}>{wave.label} · {fmtDate(wave.date)}</span>
-              <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{waveCount} waves{wave.resumedNote ? ' · resumed after RTM' : ''}</span>
-            </div>
-            <Sparkline waves={s.waves!} />
-          </div>
-        )}
-
-        <div className="mt-auto">
-          {s.status === 'draft'
-            ? <p className="text-sm" style={{ color: TEXT_TERTIARY }}>No responses yet</p>
-            : <ProgressBar className="w-full" label={`${responses}/${recipients} responses${wave ? ` · ${wave.label}` : ''}`} percent={r} />}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="default" label={s.status === 'draft' ? 'View' : 'View results'} onClick={() => onSelect(s)} />
           <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel="Delete survey" onClick={() => onDelete(s)} />
         </div>
       </div>
@@ -1179,7 +1108,7 @@ function SurveyList({ surveys, onSelect, onNewSurvey, onDelete }: { surveys: Dem
   }, [filtered]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="w-56">
           <Select
@@ -1210,29 +1139,17 @@ function SurveyList({ surveys, onSelect, onNewSurvey, onDelete }: { surveys: Dem
         ];
         return (
           <div key={programName} className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2 border-b pb-2" style={{ borderColor: TRACK }}>
-              {programTag(programType, programName)}
-              {phases.map((p) => phaseTag(p))}
+            <div className="flex flex-wrap items-center gap-2 border-b pb-1.5" style={{ borderColor: TRACK }}>
+              <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{programName}</span>
               <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{group.length} survey{group.length === 1 ? '' : 's'}</span>
             </div>
 
             {orderedPhases.map((ph) => {
               const inPhase = group.filter((s) => (ph === 'none' ? !s.phase : s.phase === ph));
               if (inPhase.length === 0) return null;
-              const kinds = Array.from(new Set(inPhase.map((s) => SURVEY_KINDS[s.kind].label)));
               return (
-                <div key={ph} className="flex flex-col gap-3">
-                  {ph !== 'none' && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {phaseTag(ph)}
-                      <span className="text-xs" style={{ color: TEXT_TERTIARY }}>Running: {kinds.join(' · ')}</span>
-                    </div>
-                  )}
-                  {/* The at-a-glance story of the phase: dated events, gaps and resumes visible */}
-                  <PhaseTimeline surveys={inPhase} />
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {inPhase.map((s) => <SurveyCard key={s.id} s={s} onSelect={onSelect} onDelete={onDelete} />)}
-                  </div>
+                <div key={ph} className="flex flex-col gap-2">
+                  {inPhase.map((s) => <SurveyCard key={s.id} s={s} onSelect={onSelect} onDelete={onDelete} />)}
                 </div>
               );
             })}
@@ -1294,7 +1211,7 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
   return (
     <div className="flex flex-col gap-4">
       {/* At-Risk — grouped by program */}
-      <Card size={4} title={<span className="inline-flex items-center gap-1.5 text-sm font-medium" style={{ color: TEXT_PRIMARY }}><span style={{ color: WARN_ORANGE }}><Icon icon={ICONS.FUNCTIONAL_WARNINGREGULAR} className="h-4 w-4" /></span>At-Risk / Action Needed</span>}>
+      <Card size={2} title={<span className="inline-flex items-center gap-1.5 text-sm font-medium" style={{ color: TEXT_PRIMARY }}><span style={{ color: WARN_ORANGE }}><Icon icon={ICONS.FUNCTIONAL_WARNINGREGULAR} className="h-4 w-4" /></span>At-Risk / Action Needed</span>}>
         <p className="mb-3 text-xs" style={{ color: TEXT_TERTIARY }}>
           Rules: (device offline <b>or</b> feature program) · missed ≥3 surveys · reliability &lt; 30%. The intersection of device status and survey engagement — the reason to merge these two apps.
         </p>
@@ -1309,7 +1226,7 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
                   <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {g.testers.length} at risk</span>
                 </div>
                 {g.testers.map((t) => (
-                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-core-red-red-1)' }}>
+                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-core-red-red-1)' }}>
                     <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</span>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {t.deviceOnline === false && <Tag color="red" size="regular">Device offline</Tag>}
@@ -1343,7 +1260,7 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
       </Card>
 
       {/* Engagement — grouped by program (EDS TableV2 per program) */}
-      <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Tester Engagement</span>}>
+      <Card size={2} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Tester Engagement</span>}>
         <p className="mb-3 text-xs" style={{ color: TEXT_TERTIARY }}>Derived from survey activity — engagement is computed from response reliability and missed surveys. Grouped by program.</p>
         <div className="flex flex-col gap-5">
           {engagementByProgram.map((g) => (
@@ -1949,8 +1866,8 @@ function ProgramDevicesView({ program, onBack, onToast }: {
               const devs = assignments[t.id] || [];
               const isBusy = busy === t.id;
               return (
-                <Card key={t.id} size={4}>
-                  <div className="flex flex-col gap-3">
+                <Card key={t.id} size={2}>
+                  <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</p>
@@ -2017,6 +1934,18 @@ function ProgramDevicesView({ program, onBack, onToast }: {
   );
 }
 
+// Compact metric cell — small muted label over a small value, Insight row style.
+function HealthMetric({ label, children, onClick }: { label: string; children: React.ReactNode; onClick?: () => void }) {
+  return (
+    <div className="leading-tight">
+      <p className="text-xs" style={{ color: TEXT_TERTIARY }}>{label}</p>
+      {onClick
+        ? <button className="text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={onClick}>{children}</button>
+        : <div className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{children}</div>}
+    </div>
+  );
+}
+
 function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurvey, onDeleteProgram, onToggleStatus, onOpenDevices }: {
   programs: DemoProgram[];
   surveys: DemoSurvey[];
@@ -2031,17 +1960,26 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
   // Devices menu's containers + Overview boxes use), so every menu shows matching
   // numbers. As devices are assigned/brought online, these update automatically.
   const { devices } = useDeviceStore();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  const totalPages = Math.max(1, Math.ceil(programs.length / pageSize));
+  const current = Math.min(page, totalPages);
+  const start = (current - 1) * pageSize;
+  const pageItems = programs.slice(start, start + pageSize);
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm" style={{ color: TEXT_TERTIARY }}>Create and track beta programs here. Each program is the container you launch surveys into.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{programs.length} program{programs.length === 1 ? '' : 's'}</p>
         <div className="flex items-center gap-2">
           <Button type="primary" leftIcon={ICONS.FUNCTIONAL_ADD} label="New Program" onClick={onNewProgram} />
           <Button type="text" leftIcon={ICONS.FUNCTIONAL_DOWNLOAD} label="Export report" onClick={() => onToast('Exported program-health report to CSV (simulated)')} />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {programs.map((p) => {
+
+      <div className="flex flex-col gap-3">
+        {pageItems.map((p) => {
           const surveyCount = surveys.filter((s) => s.programId === p.id).length;
           const noSurveys = p.status === 'active' && surveyCount === 0;
           // Match the DevicesTab container exactly: all devices grouped under this
@@ -2050,54 +1988,71 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
           const deployed = progDevices.length;
           const online = progDevices.filter((d) => d.status === 'online').length;
           return (
-            <Card key={p.id} size={4}>
-              <div className="mb-3 flex items-center justify-between gap-2">
+            <Card key={p.id} size={1}>
+              <div className="flex flex-col gap-2">
+                {/* Identity line */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-base font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>
+                  {p.type === 'hardware'
+                    ? <button className="truncate text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpenDevices(p)}>{p.name}</button>
+                    : <span className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>}
                   {programTag(p.type, p.type === 'feature' ? 'Feature' : 'Hardware')}
-                  {p.type === 'hardware' && p.currentPhase && <Tag color="periwinkle-4" size="regular">Phase: {p.currentPhase}</Tag>}
+                  {p.type === 'hardware' && p.currentPhase && <Tag color="periwinkle-4" size="regular">{p.currentPhase}</Tag>}
                 </div>
-                {p.status === 'completed'
-                  ? <Tag color="periwinkle" size="regular">Completed</Tag>
-                  : <Tag color="green" size="regular">In progress</Tag>}
-              </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <div>
-                  <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Audience</p>
-                  <p className="text-lg font-medium" style={{ color: TEXT_PRIMARY }}>{p.audienceSize} <span className="text-sm" style={{ color: TEXT_TERTIARY }}>testers</span></p>
+
+                {/* Single metric row — columns spread evenly across the full card width (Insight style) */}
+                <div className="flex items-center gap-x-4">
+                  <div className="flex-1"><HealthMetric label="Audience">{p.audienceSize} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>testers</span></HealthMetric></div>
+                  <div className="flex-1"><HealthMetric label="Response rate">{p.surveyResponseRate}%</HealthMetric></div>
+                  <div className="flex-1">
+                    <HealthMetric label="Devices online" onClick={p.type === 'hardware' ? () => onOpenDevices(p) : undefined}>
+                      {p.type === 'feature' ? '—' : <>{online} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>of {deployed}</span></>}
+                    </HealthMetric>
+                  </div>
+                  <div className="flex-1"><HealthMetric label="Feedback">{p.avgFeedbackQuality > 0 ? `${p.avgFeedbackQuality.toFixed(1)} / 5` : '—'}</HealthMetric></div>
+                  <div className="flex flex-1 justify-end">
+                    {p.status === 'completed'
+                      ? <Tag color="periwinkle" size="regular">Completed</Tag>
+                      : <Tag color="green" size="regular">In progress</Tag>}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Devices online</p>
-                  {p.type === 'feature'
-                    ? <p className="text-lg font-medium" style={{ color: TEXT_PRIMARY }}>—</p>
-                    : <button className="text-lg font-medium underline decoration-dotted underline-offset-4" style={{ color: ACCENT }} onClick={() => onOpenDevices(p)}>{online} <span className="text-sm no-underline" style={{ color: TEXT_TERTIARY }}>of {deployed}</span></button>}
+
+                {noSurveys && (
+                  <div className="rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--ui-core-ocean-blue-ocean-1)', color: TEXT_SECONDARY }}>
+                    No surveys yet — add your first with <b style={{ color: TEXT_PRIMARY }}>New survey</b>.
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-1 border-t pt-2" style={{ borderColor: TRACK }}>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {p.type === 'hardware' && <Button type="text" label="View devices" onClick={() => onOpenDevices(p)} />}
+                    {p.status === 'active' && <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey(p.id)} />}
+                    <Button type="text" leftIcon={p.status === 'active' ? ICONS.FUNCTIONAL_CHECK : ICONS.FUNCTIONAL_REFRESH} label={p.status === 'active' ? 'Close' : 'Reopen'} onClick={() => onToggleStatus(p)} />
+                  </div>
+                  <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} label="Delete" onClick={() => onDeleteProgram(p)} />
                 </div>
-                <div className="col-span-2">
-                  <p className="mb-1 text-xs" style={{ color: TEXT_TERTIARY }}>Survey response rate</p>
-                  <ProgressBar className="w-full" label={`${p.surveyResponseRate}%`} percent={p.surveyResponseRate} />
-                </div>
-                <div>
-                  <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Avg feedback quality</p>
-                  <p className="text-lg font-medium" style={{ color: TEXT_PRIMARY }}>{p.avgFeedbackQuality > 0 ? <>{p.avgFeedbackQuality.toFixed(1)} <span className="text-sm" style={{ color: TEXT_TERTIARY }}>/ 5</span></> : '—'}</p>
-                </div>
-              </div>
-              {noSurveys && (
-                <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: 'var(--ui-core-ocean-blue-ocean-1)', color: TEXT_SECONDARY }}>
-                  Audience ready ({p.audienceSize} testers). This program has no surveys yet — add your first with <b style={{ color: TEXT_PRIMARY }}>“+ New survey”</b> to start collecting feedback.
-                </div>
-              )}
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: TRACK }}>
-                <div className="flex items-center gap-2">
-                  {p.type === 'hardware' && <Button type="default" label="View devices" onClick={() => onOpenDevices(p)} />}
-                  {p.status === 'active' && <Button type={noSurveys ? 'primary' : 'default'} leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey(p.id)} />}
-                  <Button type="text" leftIcon={p.status === 'active' ? ICONS.FUNCTIONAL_CHECK : ICONS.FUNCTIONAL_REFRESH} label={p.status === 'active' ? 'Close program' : 'Reopen'} onClick={() => onToggleStatus(p)} />
-                </div>
-                <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} label="Delete program" onClick={() => onDeleteProgram(p)} />
               </div>
             </Card>
           );
         })}
+
+        {programs.length === 0 && (
+          <Card size={4}><p className="text-sm" style={{ color: TEXT_TERTIARY }}>No programs yet. Create one with <b style={{ color: TEXT_PRIMARY }}>New Program</b>.</p></Card>
+        )}
       </div>
+
+      {programs.length > 0 && (
+        <Pagination
+          pagination={{ totalItems: programs.length, totalPages, hasPreviousPage: current > 1, hasNextPage: current < totalPages }}
+          currentPage={current}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onNextPage={() => setPage((n) => Math.min(totalPages, n + 1))}
+          onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          pageSizeOptions={[{ value: 5, label: '5' }, { value: 10, label: '10' }, { value: 25, label: '25' }]}
+          ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
+        />
+      )}
     </div>
   );
 }
@@ -2110,28 +2065,6 @@ const TABS = [
   { value: 'surveys', label: 'Surveys', description: 'Every survey that has run, grouped by program and phase. Recurring pulses show their waves; the phase timeline shows what ran when.' },
   { value: 'engagement', label: 'Engagement', description: 'Per-tester reliability and feedback quality, plus the At-Risk rules that flag testers to re-engage or reclaim.' },
 ] as const;
-
-function LifecycleLegend() {
-  const steps = [
-    { label: 'Program', hint: 'the container' },
-    { label: 'Phase', hint: 'EVT → DVT → PVT (hardware)' },
-    { label: 'Survey', hint: 'OOBE · Performance · RTM…' },
-    { label: 'Waves', hint: 'each weekly send; history kept' },
-  ];
-  return (
-    <div className="mb-4 flex flex-wrap items-center gap-x-1 gap-y-2 rounded-lg border px-3 py-2" style={{ borderColor: TRACK, backgroundColor: 'var(--ui-background-bg-primary, #fff)' }}>
-      <span className="mr-1 text-xs font-medium uppercase" style={{ color: TEXT_TERTIARY }}>How it fits together:</span>
-      {steps.map((s, i) => (
-        <span key={s.label} className="flex items-center gap-1">
-          <span className="rounded-md px-2 py-1 text-xs" style={{ backgroundColor: 'var(--ui-core-periwinkle-periwinkle-1)', color: TEXT_SECONDARY }}>
-            <b style={{ color: TEXT_PRIMARY }}>{s.label}</b> <span style={{ color: TEXT_TERTIARY }}>· {s.hint}</span>
-          </span>
-          {i < steps.length - 1 && <span style={{ color: TEXT_TERTIARY }}>›</span>}
-        </span>
-      ))}
-    </div>
-  );
-}
 
 // ─── Page shell ──────────────────────────────────────────────────────────────
 // ToastProvider must wrap the tree that calls useToast — so the page is a thin
@@ -2215,25 +2148,21 @@ export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = 
         </div>
       )}
 
-      <div className="mx-auto max-w-6xl p-6">
-        <header className="mb-4">
-          <h1 className="text-2xl font-medium" style={{ color: TEXT_PRIMARY }}>Surveys &amp; Engagement</h1>
-          <p className="mt-1 text-sm" style={{ color: TEXT_TERTIARY }}>
+      <div className={`w-full ${embedded ? 'p-0' : 'p-6'}`}>
+        <header className="mb-3">
+          <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>Surveys &amp; Engagement</h1>
+          <p className="mt-0.5 text-xs" style={{ color: TEXT_TERTIARY }}>
             Feedback loop for beta &amp; dogfood programs — surveys via Qualtrics, joined to your testers, programs, and devices.
           </p>
         </header>
 
-        {/* How it fits together — states the mental model instead of leaving newcomers to infer it */}
-        <LifecycleLegend />
-
-        <div className="mb-3">
+        <div className="mb-4">
           <Segmented
             value={view}
             onChange={(v) => { setView(v); setSelected(null); setOpenProgram(null); }}
             items={TABS.map((t) => ({ label: t.label, value: t.value }))}
           />
         </div>
-        <p className="mb-5 text-sm" style={{ color: TEXT_TERTIARY }}>{TABS.find((t) => t.value === view)?.description}</p>
 
         {view === 'surveys' && (selected
           ? (selected.status === 'draft'

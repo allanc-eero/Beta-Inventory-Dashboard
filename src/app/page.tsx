@@ -89,7 +89,7 @@ export default function Home() {
             )}
           </>
         )}
-        <div className="mt-6">
+        <div className={activeTab === 'surveys' ? '' : 'mt-6'}>
           {activeTab === 'devices' && (
             <div className="flex flex-col gap-6">
               <OverviewDashboard />

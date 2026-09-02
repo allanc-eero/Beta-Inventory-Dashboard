@@ -202,3 +202,19 @@ The front end is built and wired: every screen (Devices, Programs, People, Locat
 5. **Match people to their devices.** The tester names from the survey audience (Qualtrics) and the device owners in Insight aren't reconciled yet — they can be different names/emails. Decide the join key (serial is the reliable one; email is unreliable because a survey contact email often isn't the eero-account email) and wire it so a program's testers line up with their real devices.
 
 **Summary:** screens + counting + links + assign flow = done and solid. Sign-in + data-shape confirmation + bulk ingestion + clearing practice data + people-matching = the remaining work, all gated on step 1.
+
+---
+
+## Insight-style UI pass on the Programs menu (2026-08-30, session 2)
+
+Redesigned the Programs feature's three tabs to match the real Insight summary page (dense full-width rows, uniform small text, minimal chrome). All in `src/components/SurveysDemo.tsx` (+ one line in `src/app/page.tsx`).
+
+- **Layout:** removed the centered `max-w-6xl` container — content now stretches the full content-area width, edge to edge (standalone `/demo-surveys` keeps its own padding; embedded relies on the app shell's). Removed the app shell's extra `mt-6` for this tab so the title sits tight under the top bar.
+- **Programs tab:** program cards are compact full-width rows — name + type/phase tags on line 1; one metric line with equal-width columns spread across the card (Audience · Response rate · Devices online · Feedback · status tag right-aligned); thin-bordered action strip (text buttons). Status is now just **In progress / Completed** (healthy/needs-attention logic removed). Device counts derive live from the shared deviceStore. EDS `Pagination` at the bottom (5/10/25 per page).
+- **Surveys tab:** removed the **Phase timeline** strip and its dead code (`PhaseTimeline`, `buildPhaseEvents`, `Sparkline`); removed the redundant "DVT · Running: …" sub-headers; group headers are plain text (program name + count, like Insight's "2 devices"); survey cards are one-line rows (title + muted kind·cadence·phase text · Questions · Latest wave · Responses · status + delete). Tag noise cut to just the status tag.
+- **Engagement tab + device roster:** tightened card padding/gaps to match.
+- Also removed: the lifecycle legend ("How it fits together"), per-tab description lines, page title shrunk to `text-base`.
+
+Verified after each step: `tsc --noEmit` clean; `/` and `/demo-surveys` HTTP 200.
+
+**Next session:** apply the same treatment (compact even-column rows, full width, small text, pagination) to the app-level **Devices / People / Locations** menus. Then the standing reminder: **the eero SSO login is still the blocker for live data** (see "To make it live", step 1).
