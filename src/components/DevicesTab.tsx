@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Button, Select, Tag, Checkbox } from '@amzn/eero-web-design-components';
+import { Button, Select, Tag, Checkbox, Pagination } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, DeviceStatus, Program } from '@/types';
 import { Monitor } from 'lucide-react';
@@ -172,60 +172,15 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
             )}
 
             {programs.map((prog) => (
-              <div key={prog} className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden mb-4">
-                <div className="px-4 py-2.5 bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center gap-3">
-                  <Tag color={prog === 'unassigned' ? 'red' : 'periwinkle'} size="regular">
-                    {prog === 'unassigned' ? '⚠️ No Program' : `${grouped[prog][0]?.product ? grouped[prog][0].product + ' ' : ''}${prog.toUpperCase()}`}
-                  </Tag>
-                  <span className="text-xs text-[var(--ui-text-text-placeholder)]">{grouped[prog].length} device(s)</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--ui-background-layer-border-border-layer-page)]">
-                        <th className="px-4 py-2 text-left w-8">
-                          <Checkbox
-                            checked={grouped[prog].every((d) => selectedDevices.has(d.id))}
-                            onChange={() => { const ids = grouped[prog].map((d) => d.id); const allSelected = ids.every((id) => selectedDevices.has(id)); const next = new Set(selectedDevices); if (allSelected) { ids.forEach((id) => next.delete(id)); } else { ids.forEach((id) => next.add(id)); } setSelectedDevices(next); }}
-                          />
-                        </th>
-                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Serial Number</th>
-                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Internal Name</th>
-                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Phase</th>
-                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Firmware</th>
-                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Assigned To</th>
-                        <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
-                      {grouped[prog].map((device) => (
-                        <tr key={device.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors cursor-pointer" onClick={() => setSelectedDevice(device)}>
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} />
-                          </td>
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            {device.network ? (
-                              <a href={`https://insight.eero.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title="Open this device's network in Insight">{device.serialNumber} ↗</a>
-                            ) : (
-                              <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title="No network yet — device not online in Insight">{device.serialNumber}</span>
-                            )}
-                            {device.network && (
-                              <div>
-                                <a href={`https://admin.e2ro.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title="Open this network in Admin">Admin ↗</a>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.internalName}</td>
-                          <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.program?.toUpperCase() || '—'}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs">{device.firmwareVersion || '—'}</td>
-                          <td className="px-4 py-2.5 text-[var(--ui-text-text-secondary)]">{device.assignedTo || device.checkedOutTo || '—'}</td>
-                          <td className="px-4 py-2.5"><StatusBadge status={device.status} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <ProgramDeviceGroup
+                key={prog}
+                prog={prog}
+                rows={grouped[prog]}
+                selectedDevices={selectedDevices}
+                setSelectedDevices={setSelectedDevices}
+                toggleSelect={toggleSelect}
+                onSelectDevice={setSelectedDevice}
+              />
             ))}
 
             {filteredDevices.length === 0 && (
@@ -257,6 +212,94 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
           devices={devices.filter((d) => selectedDevices.has(d.id))}
           onClose={() => { setShowBulkReturn(false); setSelectedDevices(new Set()); }}
         />
+      )}
+    </div>
+  );
+}
+
+// One program container — full-width table with its own pagination (long
+// containers like the Merci beta fleet can run 70+ rows).
+function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, toggleSelect, onSelectDevice }: {
+  prog: string;
+  rows: Device[];
+  selectedDevices: Set<string>;
+  setSelectedDevices: (s: Set<string>) => void;
+  toggleSelect: (id: string) => void;
+  onSelectDevice: (d: Device) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(page, totalPages);
+  const paged = rows.slice((current - 1) * pageSize, (current - 1) * pageSize + pageSize);
+  const label = prog === 'unassigned' ? '⚠️ No Program' : `${rows[0]?.product ? rows[0].product + ' ' : ''}${prog.toUpperCase()}`;
+
+  return (
+    <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden mb-4">
+      <div className="px-4 py-4 bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center gap-3">
+        <Tag color={prog === 'unassigned' ? 'red' : 'periwinkle'} size="regular">{label}</Tag>
+        <span className="text-xs text-[var(--ui-text-text-placeholder)]">{rows.length} device(s)</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--ui-background-layer-border-border-layer-page)]">
+              <th className="px-4 py-2 text-left w-8">
+                <Checkbox
+                  checked={rows.every((d) => selectedDevices.has(d.id))}
+                  onChange={() => { const ids = rows.map((d) => d.id); const allSelected = ids.every((id) => selectedDevices.has(id)); const next = new Set(selectedDevices); if (allSelected) { ids.forEach((id) => next.delete(id)); } else { ids.forEach((id) => next.add(id)); } setSelectedDevices(next); }}
+                />
+              </th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Serial Number</th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Internal Name</th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Phase</th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Firmware</th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Assigned To</th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
+            {paged.map((device) => (
+              <tr key={device.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors cursor-pointer" onClick={() => onSelectDevice(device)}>
+                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} />
+                </td>
+                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                  {device.network ? (
+                    <a href={`https://insight.eero.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title="Open this device's network in Insight">{device.serialNumber} ↗</a>
+                  ) : (
+                    <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title="No network yet — device not online in Insight">{device.serialNumber}</span>
+                  )}
+                  {device.network && (
+                    <div>
+                      <a href={`https://admin.e2ro.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title="Open this network in Admin">Admin ↗</a>
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.internalName}</td>
+                <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.program?.toUpperCase() || '—'}</td>
+                <td className="px-4 py-4 font-mono text-xs">{device.firmwareVersion || '—'}</td>
+                <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.assignedTo || device.checkedOutTo || '—'}</td>
+                <td className="px-4 py-4"><StatusBadge status={device.status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > pageSize && (
+        <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-2">
+          <Pagination
+            pagination={{ totalItems: rows.length, totalPages, hasPreviousPage: current > 1, hasNextPage: current < totalPages }}
+            currentPage={current}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onNextPage={() => setPage((n) => Math.min(totalPages, n + 1))}
+            onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
+            onPageSizeChange={() => { /* fixed page size for device containers */ }}
+            pageSizeOptions={[{ value: 15, label: '15' }]}
+            ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
+          />
+        </div>
       )}
     </div>
   );

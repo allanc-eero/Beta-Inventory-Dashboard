@@ -900,14 +900,19 @@ function QuestionBlock({ q, onCreateTicket }: { q: DemoQuestion; onCreateTicket:
         <div className="flex flex-col gap-3">
           {q.textResponses.map((r, i) => (
             <div key={i} className="rounded-lg border p-3" style={{ borderColor: TRACK }}>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-xs font-medium" style={{ color: TEXT_TERTIARY }}>{r.tester}</span>
-                {sentimentTag(r.sentiment)}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-medium" style={{ color: TEXT_TERTIARY }}>{r.tester}</span>
+                  <p className="mt-1 text-sm leading-snug" style={{ color: TEXT_SECONDARY }}>{r.text}</p>
+                </div>
+                {/* Sentiment tag + any call-to-action stacked together on the right */}
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  {sentimentTag(r.sentiment)}
+                  {r.sentiment === 'negative' && (
+                    <Button type="text" leftIcon={ICONS.FUNCTIONAL_TAG} label="Create JIRA ticket" onClick={() => onCreateTicket(r.text)} />
+                  )}
+                </div>
               </div>
-              <p className="mb-2 text-sm leading-snug" style={{ color: TEXT_SECONDARY }}>{r.text}</p>
-              {r.sentiment === 'negative' && (
-                <Button type="text" leftIcon={ICONS.FUNCTIONAL_TAG} label="Create JIRA ticket" onClick={() => onCreateTicket(r.text)} />
-              )}
             </div>
           ))}
         </div>
@@ -1031,7 +1036,7 @@ function SurveyResults({ survey, onBack, onToast, onDelete }: { survey: DemoSurv
       )}
 
       {/* Stat row — reflects the selected wave */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatTile value={recipients} label="Recipients" />
         <StatTile value={responses} label={selectedWave ? `Responses · ${selectedWave.label}` : 'Responses'} accent="var(--ui-core-periwinkle-periwinkle-6)" />
         <StatTile value={`${responseRate}%`} label="Response rate" accent={responseRate >= 70 ? 'var(--ui-core-green-green-6)' : 'var(--ui-core-orange-orange-6)'} />
@@ -1061,29 +1066,18 @@ function SurveyCard({ s, onSelect, onDelete }: { s: DemoSurvey; onSelect: (s: De
   const recipients = wave ? wave.recipients : s.recipients;
   const waveCount = s.waves?.length ?? 0;
   return (
-    <Card size={1}>
-      {/* One compact row — columns spread evenly across the card (Insight style) */}
-      <div className="flex items-center gap-x-4">
-        <div className="min-w-0 flex-[2] leading-tight">
+    <Card size={4}>
+      {/* Same spacing + column style as the program cards */}
+      <div className="flex items-start gap-x-4 py-3">
+        <div className="min-w-0 flex-[2] leading-snug">
           <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onSelect(s)}>{s.title}</button>
           <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>
             {SURVEY_KINDS[s.kind].label} · {s.cadence === 'recurring' ? 'Recurring' : 'One-off'}{s.phase ? ` · ${s.phase}` : ''}
           </p>
         </div>
-        <div className="flex-1 leading-tight">
-          <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Questions</p>
-          <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{s.questions.length}</p>
-        </div>
-        <div className="flex-1 leading-tight">
-          <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Latest wave</p>
-          <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{waveCount > 0 && wave ? `${wave.label} · ${fmtDate(wave.date)}` : '—'}</p>
-        </div>
-        <div className="flex-1 leading-tight">
-          <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Responses</p>
-          <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>
-            {s.status === 'draft' ? '—' : <>{responses}/{recipients} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>({r}%)</span></>}
-          </p>
-        </div>
+        <div className="flex-1"><HealthMetric label="Questions">{s.questions.length}</HealthMetric></div>
+        <div className="flex-1"><HealthMetric label="Latest wave">{waveCount > 0 && wave ? `${wave.label} · ${fmtDate(wave.date)}` : '—'}</HealthMetric></div>
+        <div className="flex-1"><HealthMetric label="Responses">{s.status === 'draft' ? '—' : `${responses}/${recipients} (${r}%)`}</HealthMetric></div>
         <div className="flex flex-1 items-center justify-end gap-2">
           {statusTag(s.status)}
           <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel="Delete survey" onClick={() => onDelete(s)} />
@@ -1148,7 +1142,7 @@ function SurveyList({ surveys, onSelect, onNewSurvey, onDelete }: { surveys: Dem
               const inPhase = group.filter((s) => (ph === 'none' ? !s.phase : s.phase === ph));
               if (inPhase.length === 0) return null;
               return (
-                <div key={ph} className="flex flex-col gap-2">
+                <div key={ph} className="flex flex-col gap-3">
                   {inPhase.map((s) => <SurveyCard key={s.id} s={s} onSelect={onSelect} onDelete={onDelete} />)}
                 </div>
               );
@@ -1937,11 +1931,11 @@ function ProgramDevicesView({ program, onBack, onToast }: {
 // Compact metric cell — small muted label over a small value, Insight row style.
 function HealthMetric({ label, children, onClick }: { label: string; children: React.ReactNode; onClick?: () => void }) {
   return (
-    <div className="leading-tight">
-      <p className="text-xs" style={{ color: TEXT_TERTIARY }}>{label}</p>
+    <div className="min-w-0 leading-snug">
+      <p className="truncate text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{label}</p>
       {onClick
-        ? <button className="text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={onClick}>{children}</button>
-        : <div className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{children}</div>}
+        ? <button className="mt-1 block max-w-full truncate text-left text-sm hover:underline" style={{ color: ACCENT }} onClick={onClick}>{children}</button>
+        : <div className="mt-1 truncate text-sm" style={{ color: TEXT_SECONDARY }}>{children}</div>}
     </div>
   );
 }
@@ -1988,24 +1982,22 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
           const deployed = progDevices.length;
           const online = progDevices.filter((d) => d.status === 'online').length;
           return (
-            <Card key={p.id} size={1}>
-              <div className="flex flex-col gap-2">
-                {/* Identity line */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {p.type === 'hardware'
-                    ? <button className="truncate text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpenDevices(p)}>{p.name}</button>
-                    : <span className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>}
-                  {programTag(p.type, p.type === 'feature' ? 'Feature' : 'Hardware')}
-                  {p.type === 'hardware' && p.currentPhase && <Tag color="periwinkle-4" size="regular">{p.currentPhase}</Tag>}
-                </div>
-
-                {/* Single metric row — columns spread evenly across the full card width (Insight style) */}
-                <div className="flex items-center gap-x-4">
-                  <div className="flex-1"><HealthMetric label="Audience">{p.audienceSize} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>testers</span></HealthMetric></div>
+            <Card key={p.id} size={3}>
+              <div className="flex flex-col gap-4">
+                {/* One row: name + subtitle · metric columns (label bold, value grey) · status.
+                    items-start keeps every label on one line and every value on the line below. */}
+                <div className="flex items-start gap-x-4 py-1">
+                  <div className="min-w-0 flex-[2] leading-tight">
+                    {p.type === 'hardware'
+                      ? <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpenDevices(p)}>{p.name}</button>
+                      : <span className="block max-w-full truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>}
+                    <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>{p.type === 'feature' ? 'Feature' : `Hardware${p.currentPhase ? ` · ${p.currentPhase}` : ''}`}</p>
+                  </div>
+                  <div className="flex-1"><HealthMetric label="Audience">{p.audienceSize} testers</HealthMetric></div>
                   <div className="flex-1"><HealthMetric label="Response rate">{p.surveyResponseRate}%</HealthMetric></div>
                   <div className="flex-1">
                     <HealthMetric label="Devices online" onClick={p.type === 'hardware' ? () => onOpenDevices(p) : undefined}>
-                      {p.type === 'feature' ? '—' : <>{online} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>of {deployed}</span></>}
+                      {p.type === 'feature' ? '—' : `${online} of ${deployed}`}
                     </HealthMetric>
                   </div>
                   <div className="flex-1"><HealthMetric label="Feedback">{p.avgFeedbackQuality > 0 ? `${p.avgFeedbackQuality.toFixed(1)} / 5` : '—'}</HealthMetric></div>
@@ -2022,7 +2014,7 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-1 border-t pt-2" style={{ borderColor: TRACK }}>
+                <div className="flex flex-wrap items-center justify-between gap-1">
                   <div className="flex flex-wrap items-center gap-1">
                     {p.type === 'hardware' && <Button type="text" label="View devices" onClick={() => onOpenDevices(p)} />}
                     {p.status === 'active' && <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey(p.id)} />}
@@ -2140,7 +2132,7 @@ export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = 
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--ui-background-bg-secondary, #f5f6f7)' }}>
+    <div className={embedded ? '' : 'min-h-screen'} style={embedded ? undefined : { backgroundColor: 'var(--ui-background-bg-secondary, #f5f6f7)' }}>
       {/* Demo seam banner — standalone route only; hidden when embedded in the app */}
       {!embedded && (
         <div className="w-full px-6 py-2 text-center text-xs" style={{ backgroundColor: 'var(--ui-core-periwinkle-periwinkle-1)', color: 'var(--ui-core-periwinkle-periwinkle-8)' }}>
@@ -2156,7 +2148,7 @@ export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = 
           </p>
         </header>
 
-        <div className="mb-4">
+        <div className="mb-4 w-fit">
           <Segmented
             value={view}
             onChange={(v) => { setView(v); setSelected(null); setOpenProgram(null); }}

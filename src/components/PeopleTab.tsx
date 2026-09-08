@@ -2,9 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
-import { Plus, Monitor } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { OptOutReason, OptOutRecord, Device } from '@/types';
-import { Segmented, Input, TextArea, Select, Button, Tag, Checkbox, Modal } from '@amzn/eero-web-design-components';
+import { Segmented, Input, TextArea, Select, Button, Tag, Checkbox, Modal, Pagination } from '@amzn/eero-web-design-components';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
@@ -34,6 +34,8 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const [optOutQualtricsStatus, setOptOutQualtricsStatus] = useState('');
   const [optOutDevicesDone, setOptOutDevicesDone] = useState(false);
   const [activeView, setActiveView] = useState<'active' | 'opted_out'>('active');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [viewDevice, setViewDevice] = useState<Device | null>(null);
   const [duplicateMatches, setDuplicateMatches] = useState<any[]>([]);
   const [pendingNewPerson, setPendingNewPerson] = useState<{ name: string; email: string; team: string } | null>(null);
@@ -219,38 +221,72 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
         {/* Main Content */}
         {!selectedPerson ? (
           <>
-            {/* Active People */}
-            {activeView === 'active' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredPeople.filter((p) => !optedOutEmails.has(p.email.toLowerCase())).map((person) => (
-                  <div
-                    key={person.email || person.name}
-                    className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => setSelectedPerson(person.email || person.name)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[var(--ui-support-fill-support-success)] rounded-full flex items-center justify-center">
-                        <span className="text-[var(--ui-support-text-support-success)] font-semibold text-sm">
-                          {person.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-[var(--ui-text-text-primary)] truncate">{person.name}</h3>
-                        <p className="text-xs text-[var(--ui-text-text-tertiary)] truncate">{person.email}</p>
-                        {(() => { const p = getTesterProfile(person.email); return p?.testerId ? <p className="text-xs text-[var(--ui-text-text-placeholder)] font-mono">{p.testerId}</p> : null; })()}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 text-sm text-[var(--ui-text-text-tertiary)]">
-                      <Monitor size={14} />
-                      <span>{person.devices.length} device(s)</span>
-                      {person.devices.some((d) => d.status === 'deactivated') && (
-                        <span className="text-xs text-[var(--ui-text-text-placeholder)]">· {person.devices.filter((d) => d.status === 'deactivated').length} archived</span>
-                      )}
-                    </div>
+            {/* Active People — full-width compact rows */}
+            {activeView === 'active' && (() => {
+              const activePeople = filteredPeople.filter((p) => !optedOutEmails.has(p.email.toLowerCase()));
+              const totalPages = Math.max(1, Math.ceil(activePeople.length / pageSize));
+              const current = Math.min(page, totalPages);
+              const pageStart = (current - 1) * pageSize;
+              const pagePeople = activePeople.slice(pageStart, pageStart + pageSize);
+              return (
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm font-medium text-[var(--ui-text-text-secondary)]">{activePeople.length} {activePeople.length === 1 ? 'person' : 'people'}</p>
+                  <div className="flex flex-col gap-3">
+                    {pagePeople.map((person) => {
+                      const online = person.devices.filter((d) => d.status === 'online').length;
+                      const archived = person.devices.filter((d) => d.status === 'deactivated').length;
+                      const activePrograms = Array.from(new Set(person.devices.filter((d) => d.status !== 'deactivated').map((d) => d.program).filter(Boolean)));
+                      return (
+                        <div
+                          key={person.email || person.name}
+                          className="flex items-center gap-x-4 rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] bg-[var(--ui-background-layer-layer-page)] px-6 py-6 cursor-pointer hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors"
+                          onClick={() => setSelectedPerson(person.email || person.name)}
+                        >
+                          <div className="flex min-w-0 flex-[2] items-center gap-2.5">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--ui-support-fill-support-success)]">
+                              <span className="text-xs font-semibold text-[var(--ui-support-text-support-success)]">{person.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+                            </div>
+                            <div className="min-w-0 leading-tight">
+                              <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{person.name}</p>
+                              <p className="truncate text-xs text-[var(--ui-text-text-tertiary)]">{person.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex-1 leading-tight">
+                            <p className="text-xs text-[var(--ui-text-text-tertiary)]">Programs</p>
+                            <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{activePrograms.length ? activePrograms.map((p) => p.toUpperCase()).join(', ') : '—'}</p>
+                          </div>
+                          <div className="flex-1 leading-tight">
+                            <p className="text-xs text-[var(--ui-text-text-tertiary)]">Devices</p>
+                            <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">{person.devices.length} <span className="text-xs font-normal text-[var(--ui-text-text-tertiary)]">{archived > 0 ? `· ${archived} archived` : ''}</span></p>
+                          </div>
+                          <div className="flex-1 leading-tight">
+                            <p className="text-xs text-[var(--ui-text-text-tertiary)]">Online</p>
+                            <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">{online}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {activePeople.length === 0 && (
+                      <div className="rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] bg-[var(--ui-background-layer-layer-page)] p-8 text-center text-sm text-[var(--ui-text-text-placeholder)]">No people found</div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                  {activePeople.length > pageSize && (
+                    <Pagination
+                      pagination={{ totalItems: activePeople.length, totalPages, hasPreviousPage: current > 1, hasNextPage: current < totalPages }}
+                      currentPage={current}
+                      pageSize={pageSize}
+                      onPageChange={setPage}
+                      onNextPage={() => setPage((n) => Math.min(totalPages, n + 1))}
+                      onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
+                      onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                      pageSizeOptions={[{ value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }]}
+                      maxVisiblePages={5}
+                      ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
+                    />
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Opted Out People */}
             {activeView === 'opted_out' && (

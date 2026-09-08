@@ -12,7 +12,6 @@ import SeedDataProvider from '@/components/SeedDataProvider';
 import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
 import NetworkSyncButton from '@/components/NetworkSyncButton';
 import PendingReturnReminder from '@/components/PendingReturnReminder';
-import TodayBriefing from '@/components/TodayBriefing';
 import LoginPage from '@/components/LoginPage';
 import DogfooderPortal from '@/components/DogfooderPortal';
 import DogfoodOnboarding from '@/components/DogfoodOnboarding';
@@ -79,7 +78,7 @@ export default function Home() {
     <SeedDataProvider>
       <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab}>
         <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
-        {activeTab !== 'devices' && activeTab !== 'surveys' && (
+        {activeTab !== 'devices' && activeTab !== 'surveys' && activeTab !== 'people' && (
           <>
             <OverdueAlertsBanner />
             {canEdit() && (
@@ -89,11 +88,10 @@ export default function Home() {
             )}
           </>
         )}
-        <div className={activeTab === 'surveys' ? '' : 'mt-6'}>
+        <div className={activeTab === 'surveys' || activeTab === 'people' ? '' : 'mt-6'}>
           {activeTab === 'devices' && (
             <div className="flex flex-col gap-6">
               <OverviewDashboard />
-              {canEdit() && <TodayBriefing onNavigate={handleSetActiveTab} />}
               <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />
             </div>
           )}

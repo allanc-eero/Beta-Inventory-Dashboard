@@ -107,7 +107,7 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
         header={headerElement}
         mainContentElementId="main-content"
       >
-        <div id="main-content" className="h-full overflow-y-auto py-6 px-6">
+        <div id="main-content" className="h-full overflow-y-auto py-6 px-12">
           {children}
         </div>
       </Layout>

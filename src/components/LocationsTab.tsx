@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleLinear } from 'd3-scale';
-import { Select, Tag } from '@amzn/eero-web-design-components';
+import { Select, Tag, Pagination } from '@amzn/eero-web-design-components';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -39,6 +39,8 @@ export default function LocationsTab() {
   const [programFilter, setProgramFilter] = useState<string>('all');
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([20, 20]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const programs = useMemo(() => {
     return Array.from(new Set(devices.map((d) => d.program).filter(Boolean)));
@@ -86,6 +88,12 @@ export default function LocationsTab() {
     if (!selectedCountry) return [];
     return filteredDevices.filter((d) => (d.country || 'Unknown') === selectedCountry);
   }, [filteredDevices, selectedCountry]);
+
+  // Reset pagination when the selected country changes
+  useEffect(() => { setPage(1); }, [selectedCountry]);
+  const countryTotalPages = Math.max(1, Math.ceil(countryDevices.length / pageSize));
+  const countryPage = Math.min(page, countryTotalPages);
+  const pagedCountryDevices = countryDevices.slice((countryPage - 1) * pageSize, (countryPage - 1) * pageSize + pageSize);
 
   return (
     <div className="space-y-6">
@@ -273,7 +281,7 @@ export default function LocationsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
-              {countryDevices.slice(0, 20).map((d) => (
+              {pagedCountryDevices.map((d) => (
                 <tr key={d.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)]">
                   <td className="px-4 py-2 font-mono text-xs">{d.serialNumber}</td>
                   <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.model}</td>
@@ -286,11 +294,23 @@ export default function LocationsTab() {
                   </td>
                 </tr>
               ))}
-              {countryDevices.length > 20 && (
-                <tr><td colSpan={5} className="px-4 py-2 text-xs text-[var(--ui-text-text-placeholder)] text-center">+ {countryDevices.length - 20} more devices</td></tr>
-              )}
             </tbody>
           </table>
+          {countryDevices.length > pageSize && (
+            <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-2">
+              <Pagination
+                pagination={{ totalItems: countryDevices.length, totalPages: countryTotalPages, hasPreviousPage: countryPage > 1, hasNextPage: countryPage < countryTotalPages }}
+                currentPage={countryPage}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onNextPage={() => setPage((n) => Math.min(countryTotalPages, n + 1))}
+                onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
+                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                pageSizeOptions={[{ value: 10, label: '10' }, { value: 25, label: '25' }, { value: 50, label: '50' }]}
+                ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

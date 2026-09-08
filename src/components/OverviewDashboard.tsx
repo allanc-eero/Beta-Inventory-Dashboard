@@ -5,23 +5,6 @@ import { Card } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
-// KPI tile — follows the Insight stat-row pattern (WDS Card + flex-col metric).
-function StatCard({ icon, value, label, iconBg }: { icon: string; value: number; label: string; iconBg: string }) {
-  return (
-    <Card size={1}>
-      <div className="flex items-center gap-2.5">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sm" style={{ backgroundColor: iconBg }}>
-          <span>{icon}</span>
-        </div>
-        <div className="min-w-0">
-          <p className="text-lg font-semibold leading-tight text-[var(--ui-text-text-primary)]">{value}</p>
-          <p className="truncate text-xs leading-tight text-[var(--ui-text-text-tertiary)]">{label}</p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 function DonutChart({ title, items, total, size, strokeWidth, centerLabel, centerValue }: {
   title: string; items: { name: string; count: number; color: string }[]; total: number; size: number; strokeWidth: number; centerLabel: string; centerValue?: string | number;
 }) {
@@ -113,15 +96,24 @@ export default function OverviewDashboard() {
 
   return (
     <div className="space-y-4">
-      {/* ROW 1: Stat Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <StatCard icon="💻" value={total} label="Total Devices" iconBg="var(--ui-core-periwinkle-periwinkle-2)" />
-        <StatCard icon="✓" value={online} label="Online" iconBg="var(--ui-core-green-green-2)" />
-        <StatCard icon="👥" value={notOnline} label="Not Online" iconBg="var(--ui-core-yellow-yellow-2)" />
-        <StatCard icon="🌍" value={countries} label="Countries" iconBg="var(--ui-core-red-red-2)" />
-        <StatCard icon="🔬" value={programs} label="Programs" iconBg="var(--ui-core-purple-purple-2)" />
-        <StatCard icon="👤" value={people} label="People" iconBg="var(--ui-core-periwinkle-periwinkle-2)" />
-      </div>
+      {/* ROW 1: KPI strip — one card with evenly-spread columns (matches the other menus) */}
+      <Card size={2}>
+        <div className="flex flex-wrap gap-y-3">
+          {[
+            { label: 'Total Devices', value: total },
+            { label: 'Online', value: online },
+            { label: 'Not Online', value: notOnline },
+            { label: 'Countries', value: countries },
+            { label: 'Programs', value: programs },
+            { label: 'People', value: people },
+          ].map((s, i) => (
+            <div key={s.label} className={`min-w-0 flex-1 basis-1/3 px-4 sm:basis-0 ${i > 0 ? 'border-l border-[var(--ui-background-layer-border-border-layer-page)]' : ''}`}>
+              <p className="text-xs text-[var(--ui-text-text-tertiary)]">{s.label}</p>
+              <p className="mt-0.5 text-lg font-semibold text-[var(--ui-text-text-primary)]">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* ROW 2: Three Donut Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
