@@ -13,7 +13,7 @@ import '@amzn/eero-web-design-components/library/styles.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'eero Fetch',
+  title: 'Insight Beta',
   description: 'Track and manage beta and dogfood test devices across programs',
 }
 

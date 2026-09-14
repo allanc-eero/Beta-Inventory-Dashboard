@@ -132,7 +132,7 @@ export default function LoginPage() {
           <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-md border border-[var(--ui-background-layer-border-border-layer-page)] p-8">
             <div className="text-center mb-8">
               <Wifi size={48} className="mx-auto text-[var(--ui-core-periwinkle-periwinkle-6)] mb-4" strokeWidth={1.5} />
-              <h1 className="text-2xl font-bold text-[var(--ui-text-text-primary)]">eero Fetch</h1>
+              <h1 className="text-2xl font-bold text-[var(--ui-text-text-primary)]">Insight Beta</h1>
               <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-2">Sign in with your @eero.com email</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
@@ -171,7 +171,7 @@ export default function LoginPage() {
           {/* Header */}
           <div className="text-center mb-6">
             <Wifi size={36} className="mx-auto text-[var(--ui-core-periwinkle-periwinkle-6)] mb-3" strokeWidth={1.5} />
-            <h1 className="text-xl font-bold text-[var(--ui-text-text-primary)]">eero Fetch — Dogfood Registration</h1>
+            <h1 className="text-xl font-bold text-[var(--ui-text-text-primary)]">Insight Beta — Dogfood Registration</h1>
             <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-1">Step {step} of 4</p>
           </div>
 

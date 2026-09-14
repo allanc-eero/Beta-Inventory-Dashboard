@@ -174,7 +174,7 @@ async function createDogReport(body: any) {
     `Category: ${category || 'feedback'}`,
     deviceSerial ? `Device: ${deviceSerial}` : null,
     attachmentNames && attachmentNames.length ? `Attachments: ${attachmentNames.join(', ')}` : null,
-    `Submitted via: eero Fetch Dogfooder Portal`,
+    `Submitted via: Insight Beta Dogfooder Portal`,
   ].filter(Boolean) as string[];
 
   const payload: any = {
