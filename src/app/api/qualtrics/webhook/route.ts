@@ -9,22 +9,74 @@ import { recordResponse } from '@/lib/engagementStore';
  * /api/engagement. No polling.
  *
  * ── REGISTER (one-time, needs a PUBLIC url — localhost won't receive callbacks) ─
- *   Subscribe per survey to topic `completedResponse.{surveyId}` with
- *   publicationUrl = https://<host>/api/qualtrics/webhook  (see handoff doc).
+ *   node scripts/register-qualtrics-webhook.mjs --survey SV_xxx --url https://<host>
+ *   Subscribes to topic `surveyengine.completedResponse.{surveyId}` with
+ *   publicationUrl = https://<host>/api/qualtrics/webhook?secret=<QUALTRICS_WEBHOOK_SECRET>
  *
- * ── TODO(verify) when wiring live ─────────────────────────────────────────────
- *   - The exact completedResponse payload field names.
- *   - Whether the tester email + rating are in the payload or require a follow-up
- *     fetch of the full response by ResponseID via the Qualtrics responses API.
- *   - Shared-secret / signature verification scheme Qualtrics offers.
+ * ── PAYLOAD SHAPE ─────────────────────────────────────────────────────────────
+ *   A completedResponse event delivers an ENVELOPE (Topic, SurveyID, ResponseID,
+ *   CompletedDate) — not the answers or the tester email. When those are absent
+ *   we fetch the full response by ResponseID from the Qualtrics responses API
+ *   (enrichResponse below) to pull the email (embedded data) and, if a rating
+ *   question id is configured via QUALTRICS_RATING_QID, the 1-5 rating.
  */
 
 const WEBHOOK_SECRET = process.env.QUALTRICS_WEBHOOK_SECRET;
+const QUALTRICS_BASE_URL = process.env.QUALTRICS_BASE_URL;
+const QUALTRICS_API_TOKEN = process.env.QUALTRICS_API_TOKEN;
+// Optional: the question id that holds the tester's 1-5 rating (survey-specific).
+const RATING_QID = process.env.QUALTRICS_RATING_QID;
+
+// Normalize the base to end at /API/v3 exactly once.
+function apiBase(): string | null {
+  if (!QUALTRICS_BASE_URL) return null;
+  return QUALTRICS_BASE_URL.replace(/\/+$/, '').replace(/\/API\/v3$/, '') + '/API/v3';
+}
+
+/**
+ * Fetch the full response by ID to recover email + rating that the event
+ * envelope omits. Best-effort: returns {} on any failure so the webhook still
+ * records what it can.
+ */
+async function enrichResponse(
+  surveyId: string,
+  responseId: string
+): Promise<{ email?: string; rating?: number; completedAt?: string }> {
+  const base = apiBase();
+  if (!base || !QUALTRICS_API_TOKEN || !surveyId || !responseId) return {};
+  try {
+    const res = await fetch(`${base}/surveys/${surveyId}/responses/${responseId}`, {
+      headers: { 'X-API-TOKEN': QUALTRICS_API_TOKEN },
+    });
+    if (!res.ok) return {};
+    const json = (await res.json()) as any;
+    const values = json?.result?.values ?? {};
+
+    // Email typically lives in embedded data / recipient fields.
+    const email = String(
+      values.email || values.RecipientEmail || values.recipientEmail || values.Q_RecipientEmail || ''
+    ).toLowerCase();
+
+    // Rating only when a specific question id is configured (it's survey-specific);
+    // otherwise leave undefined rather than guessing from arbitrary fields.
+    let rating: number | undefined;
+    if (RATING_QID && values[RATING_QID] != null) {
+      const n = Number(values[RATING_QID]);
+      if (!Number.isNaN(n)) rating = n;
+    }
+
+    const completedAt = values.recordedDate || values.endDate || undefined;
+    return { email: email || undefined, rating, completedAt };
+  } catch {
+    return {};
+  }
+}
 
 export async function POST(request: NextRequest) {
   // Optional shared-secret gate (header or ?secret=) so only Qualtrics can post.
   if (WEBHOOK_SECRET) {
-    const provided = request.headers.get('x-qualtrics-secret') || new URL(request.url).searchParams.get('secret');
+    const provided =
+      request.headers.get('x-qualtrics-secret') || new URL(request.url).searchParams.get('secret');
     if (provided !== WEBHOOK_SECRET) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
@@ -32,17 +84,25 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => ({}))) as Record<string, any>;
 
-  // TODO(verify): confirm field names against a real completedResponse payload.
+  // Event envelope. Qualtrics uses PascalCase; accept camelCase too for local tests.
   const surveyId = String(body.SurveyID || body.surveyId || '');
   const responseId = String(body.ResponseID || body.responseId || '');
   if (!responseId) return NextResponse.json({ error: 'no responseId' }, { status: 400 });
 
-  // Identity + rating: from the payload's embedded data / values. If absent, the
-  // live wiring fetches the full response by ResponseID (TODO(verify)).
-  const email = String(body.email || body.RecipientEmail || body.values?.email || '').toLowerCase();
-  const completedAt = String(body.CompletedDate || body.completedAt || new Date().toISOString());
+  // Prefer values already in the payload (local tests / future payload changes),
+  // else recover them from the full response.
+  let email = String(body.email || body.RecipientEmail || body.values?.email || '').toLowerCase();
+  let rating = typeof body.rating === 'number' ? body.rating : undefined;
+  let completedAt = String(body.CompletedDate || body.completedAt || '');
+
+  if (!email || rating === undefined || !completedAt) {
+    const enriched = await enrichResponse(surveyId, responseId);
+    email = email || enriched.email || '';
+    rating = rating ?? enriched.rating;
+    completedAt = completedAt || enriched.completedAt || new Date().toISOString();
+  }
+
   const sentAt = body.sentAt ? String(body.sentAt) : undefined;
-  const rating = typeof body.rating === 'number' ? body.rating : undefined;
 
   recordResponse({ responseId, surveyId, email, completedAt, sentAt, rating });
 
@@ -50,8 +110,7 @@ export async function POST(request: NextRequest) {
   // A new response landed → the survey's AI summary is now stale. Summaries are
   // generated on demand via POST /api/summarize (Bedrock), so the next results
   // view reflects this response. To pre-warm/cache instead, fetch the survey's
-  // full responses from the Qualtrics responses API here and call the summarizer.
-  // TODO(verify): wire the Qualtrics responses fetch for pre-warm caching.
+  // full responses here and call the summarizer.
 
-  return NextResponse.json({ ok: true, responseId });
+  return NextResponse.json({ ok: true, responseId, enriched: !!email });
 }

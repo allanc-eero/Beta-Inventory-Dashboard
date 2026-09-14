@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "webhook:register": "node scripts/register-qualtrics-webhook.mjs"
   },
   "dependencies": {
     "@amzn/eero-web-design-components": "^2.21.5",

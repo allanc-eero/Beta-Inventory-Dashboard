@@ -275,3 +275,34 @@ Every API adapter now has a real env-gated production path; none is mock-only ex
 Empty dirs `src/app/api/shapeshift` and `src/app/api/welcome-email` contain no routes (placeholders).
 
 **Note:** activation everywhere is "set the env/creds" — no code changes. The only thing I can't do from here is provide the credentials/roles (Bedrock IAM, eero SSO, Midway, JIRA/Databricks tokens); those come from the live environment.
+
+---
+## Go-live readiness tooling + Qualtrics webhook registration (2026-08-30)
+Everything below makes "is it ready?" provable and turns webhook go-live into one command.
+
+### Readiness preflight — `GET /api/health`
+Reports, per integration, whether the LIVE creds are present (booleans only, never secret values) and whether the client seam flag is flipped. `curl -s localhost:3000/api/health | jq`.
+- `ready` = server creds present. `enabled` = `NEXT_PUBLIC_*` flag on the live source. A feature runs fully live only when **both** are true (rolled up under `liveFeatures`).
+- Current `.env.local` (confirmed via this endpoint): **Qualtrics, JIRA, Databricks = ready**; Bedrock, Insight (`EERO_API_TOKEN`), Breadboard, and the webhook secret = not yet set.
+
+### `.env.example`
+Full env template, grouped by integration, with the flag+creds pattern documented for each. Copy to `.env.local` and fill in.
+
+### Qualtrics webhook registration — `scripts/register-qualtrics-webhook.mjs`
+The real registration wiring (Qualtrics event-subscription API). Loads `.env.local` itself so it works as a plain node script at deploy (Next.js env loading doesn't cover standalone scripts).
+```
+npm run webhook:register -- --list                                  # list current subscriptions
+npm run webhook:register -- --survey SV_xxx --url https://<host>    # register completedResponse
+npm run webhook:register -- --delete SUB_xxxxxxxx                   # remove one
+```
+- Topic: `surveyengine.completedResponse.{surveyId}`. Delivers to `https://<host>/api/qualtrics/webhook?secret=<QUALTRICS_WEBHOOK_SECRET>`.
+- **Proven live:** `--list` was run against the real Qualtrics org and returned 0 subscriptions (auth + base-URL normalization + API call all work). The `--url` guard rejects http/localhost because Qualtrics (cloud) cannot deliver to a non-public URL.
+
+### Receiver hardening
+`/api/qualtrics/webhook` now recovers the fields the event envelope omits. A real `completedResponse` event carries `SurveyID`/`ResponseID`/`CompletedDate` but **not** the tester email or answers, so when those are absent the receiver fetches the full response by ID (`GET /surveys/{id}/responses/{id}`) and extracts the email from embedded data. Rating is pulled only when `QUALTRICS_RATING_QID` names the rating question (survey-specific) — no guessing. Enrichment is best-effort and never fails the webhook.
+
+### What is genuinely left for LIVE engagement (not code)
+1. **A public https URL** for `/api/qualtrics/webhook` — i.e. deploy the app (or a tunnel for testing). Qualtrics can't reach localhost. This is the real blocker.
+2. **`QUALTRICS_WEBHOOK_SECRET`** — generate one, put it in `.env.local`, and it's auto-appended to the registration URL.
+3. **Flip `NEXT_PUBLIC_ENGAGEMENT_SOURCE=qualtrics`**, then run `npm run webhook:register -- --survey SV_xxx --url https://<host>`.
+For LIVE AI summaries, additionally set `BEDROCK_MODEL_ID` + region + AWS creds and `NEXT_PUBLIC_AI_SUMMARY=bedrock`. Verify all of it at once with `/api/health`.
