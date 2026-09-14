@@ -48,7 +48,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-10">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 bg-[var(--ui-background-layer-layer-page)] p-4 rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)]">
         <AgentChat />
@@ -228,7 +228,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
   onSelectDevice: (d: Device) => void;
 }) {
   const [page, setPage] = useState(1);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(15);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, totalPages);
   const paged = rows.slice((current - 1) * pageSize, (current - 1) * pageSize + pageSize);
@@ -286,7 +286,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
           </tbody>
         </table>
       </div>
-      {rows.length > pageSize && (
+      {rows.length > 15 && (
         <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-2">
           <Pagination
             pagination={{ totalItems: rows.length, totalPages, hasPreviousPage: current > 1, hasNextPage: current < totalPages }}
@@ -295,8 +295,8 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
             onPageChange={setPage}
             onNextPage={() => setPage((n) => Math.min(totalPages, n + 1))}
             onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
-            onPageSizeChange={() => { /* fixed page size for device containers */ }}
-            pageSizeOptions={[{ value: 15, label: '15' }]}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            pageSizeOptions={[{ value: 15, label: '15' }, { value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }]}
             ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
           />
         </div>
