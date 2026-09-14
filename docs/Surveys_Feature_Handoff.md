@@ -306,3 +306,31 @@ npm run webhook:register -- --delete SUB_xxxxxxxx                   # remove one
 2. **`QUALTRICS_WEBHOOK_SECRET`** — generate one, put it in `.env.local`, and it's auto-appended to the registration URL.
 3. **Flip `NEXT_PUBLIC_ENGAGEMENT_SOURCE=qualtrics`**, then run `npm run webhook:register -- --survey SV_xxx --url https://<host>`.
 For LIVE AI summaries, additionally set `BEDROCK_MODEL_ID` + region + AWS creds and `NEXT_PUBLIC_AI_SUMMARY=bedrock`. Verify all of it at once with `/api/health`.
+
+---
+## ⚠️ REMINDER: final webhook test AFTER the app is on a public URL (2026-08-30)
+**Why this is still open:** locally we proved the hard half — when a `completedResponse`
+alert arrives, the receiver calls the live Qualtrics single-response API, recovers the
+real `recipientEmail` + timestamp, and updates that tester's engagement (verified against
+the "[5GRG] Performance Survey"). What we could NOT test locally is the other half:
+**Qualtrics reaching our app over the open internet.** Qualtrics is cloud-hosted and
+cannot deliver to `localhost`, and this environment blocks public tunnels. That last hop
+only becomes testable once the app is deployed to a public https address.
+
+**Do this once the app is live on a public URL:**
+1. Set env in the deployed environment: `QUALTRICS_WEBHOOK_SECRET`, `NEXT_PUBLIC_ENGAGEMENT_SOURCE=qualtrics`
+   (and for AI summaries: `BEDROCK_MODEL_ID` + region + AWS creds, `NEXT_PUBLIC_AI_SUMMARY=bedrock`).
+2. Confirm readiness: `curl -s https://<host>/api/health | jq` → the relevant `liveFeatures` should be `true`.
+3. Register the webhook against a **real, contact-distributed** survey:
+   `npm run webhook:register -- --survey SV_xxx --url https://<host>`
+   (verify with `npm run webhook:register -- --list`).
+4. Submit ONE real test response to that survey (or ask a tester to).
+5. Confirm it flowed end to end: `curl -s https://<host>/api/engagement` shows that tester,
+   with the correct submission time. This is the piece we haven't yet proven.
+6. Clean up the test: `npm run webhook:register -- --delete SUB_xxx` if it was only for testing.
+
+**Distribution requirement (learned during local testing):** email recovery only works when the
+survey is sent to identified contacts (contact list / personal links) — which the beta performance
+surveys already are. Anonymous-link surveys return no email; either add an `email` embedded-data
+field or capture it as a question. Set `QUALTRICS_RATING_QID` to the rating question id if you want
+the 1-5 feedback score pulled in too.
