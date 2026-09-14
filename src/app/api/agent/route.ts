@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { bedrockConfigured, converseText } from '@/lib/bedrock';
 
-// ─── Local Smart Engine ───────────────────────────────────────────────────────
-// Pattern-matching agent that answers queries against dashboard data.
-// No external API needed. Upgrade to Bedrock Claude when access is granted.
+// ─── Dashboard agent ──────────────────────────────────────────────────────────
+// Uses Bedrock when BEDROCK_MODEL_ID is configured; otherwise falls back to the
+// local pattern-matching engine below so it always works (env-gated seam, same
+// pattern as /api/summarize).
+const AGENT_SYSTEM = `You are an assistant for a beta/dogfood device-tracking dashboard.
+Answer the user's question concisely using ONLY the provided JSON dashboard data (stats, devices, testers).
+If the data doesn't contain the answer, say so plainly. Prefer short, direct answers and cite the relevant numbers.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +15,16 @@ export async function POST(request: NextRequest) {
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
+    }
+
+    // Production: real LLM answer via Bedrock.
+    if (bedrockConfigured()) {
+      try {
+        const answer = await converseText(AGENT_SYSTEM, `Question: ${query}\n\nDashboard data (JSON):\n${context || '{}'}`, 700, 0.2);
+        if (answer.trim()) return NextResponse.json({ answer, source: 'bedrock' });
+      } catch (err: any) {
+        console.error('[agent] Bedrock error:', err?.message); // fall through to local engine
+      }
     }
 
     const data = context ? JSON.parse(context) : null;

@@ -35,6 +35,8 @@ import {
 // (This is the "shared model" wiring; see the handoff doc's simulation note.)
 import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program, DeviceStatus } from '@/types';
+import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
+import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
 
 // ─── Types (inline — demo only) ──────────────────────────────────────────────
 type ProgramType = 'hardware' | 'feature';
@@ -635,22 +637,10 @@ function WaveTimeline({ waves, selectedId, onSelect }: { waves: SurveyWave[]; se
   );
 }
 
-// ─── AI feedback summary (deterministic mock — a real Bedrock call swaps in) ──
-type Tone = 'positive' | 'neutral' | 'negative';
-type Severity = 'high' | 'medium' | 'low';
-type Priority = 'P0' | 'P1' | 'P2';
-
-interface AISummary {
-  headline: string;                                    // one-line TL;DR
-  sentiment: { positive: number; neutral: number; negative: number }; // % (sum ~100)
-  responsesAnalyzed: number;
-  trend?: string;                                      // vs previous wave (recurring surveys)
-  themes: { title: string; detail: string; mentions: number; tone: Tone }[];
-  criticalIssues: { issue: string; severity: Severity; frequency: string; quote?: string }[];
-  featureRequests: { request: string; mentions: number }[];
-  actions: { action: string; priority: Priority }[];
-}
-
+// ─── AI feedback summary ──────────────────────────────────────────────────────
+// Types (AISummary/Tone/Severity/Priority) now live in src/lib/summarize.ts so the
+// Bedrock route and this view share one shape. The map below is the canned demo
+// fallback used when SUMMARIZE_LIVE is off; live summaries come from /api/summarize.
 const AI_SUMMARIES: Record<string, AISummary> = {
   'sv-foghorn-setup': {
     headline: 'Setup succeeds for the large majority, but the ~6-minute reboot with no progress UI is the dominant frustration — and the clearest, highest-leverage fix.',
@@ -777,25 +767,55 @@ function SentimentBar({ s }: { s: AISummary['sentiment'] }) {
   );
 }
 
-function AISummaryPanel({ surveyId, responses }: { surveyId: string; responses: number }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle');
-  const summary = AI_SUMMARIES[surveyId];
+function AISummaryPanel({ survey }: { survey: DemoSurvey }) {
+  const canned = AI_SUMMARIES[survey.id];
+  const textResponses: SummaryResponseInput[] = survey.questions
+    .flatMap((q) => q.textResponses || [])
+    .map((r) => ({ tester: r.tester, text: r.text, sentiment: r.sentiment }));
+  const responsesCount = survey.responses;
 
-  if (!summary) {
+  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [summary, setSummary] = useState<AISummary | null>(null);
+
+  // Nothing to summarize — no canned demo summary and no collected responses.
+  if (!canned && textResponses.length === 0) {
     return <p className="text-sm" style={{ color: TEXT_TERTIARY }}>No responses yet — AI summary available once this survey collects feedback.</p>;
   }
+
+  const generate = () => {
+    setState('loading');
+    // Live (Bedrock) or any survey without a canned summary → hit /api/summarize
+    // (real Bedrock when configured, computed fallback otherwise). Canned demo
+    // surveys with the flag off just replay the seeded summary.
+    if (SUMMARIZE_LIVE || !canned) {
+      fetchSummary({ surveyId: survey.id, surveyTitle: survey.title, responses: textResponses, previousTrend: canned?.trend })
+        .then((s) => { setSummary(s); setState('done'); })
+        .catch(() => { if (canned) { setSummary(canned); setState('done'); } else { setState('error'); } });
+    } else {
+      simulate(canned).then((s) => { setSummary(s); setState('done'); });
+    }
+  };
 
   if (state === 'idle') {
     return (
       <div className="flex items-center gap-3">
-        <Button type="default" leftIcon={ICONS.FUNCTIONAL_INSIGHTAI} label="Generate AI Summary" onClick={() => { setState('loading'); simulate(true).then(() => setState('done')); }} />
-        <span className="text-xs" style={{ color: TEXT_TERTIARY }}>Reads every response via Bedrock and writes the briefing below (simulated)</span>
+        <Button type="default" leftIcon={ICONS.FUNCTIONAL_INSIGHTAI} label="Generate AI Summary" onClick={generate} />
+        <span className="text-xs" style={{ color: TEXT_TERTIARY }}>Reads every response via Bedrock and writes the briefing below{SUMMARIZE_LIVE ? '' : ' (simulated)'}</span>
       </div>
     );
   }
 
   if (state === 'loading') {
-    return <p className="text-sm" style={{ color: TEXT_SECONDARY }}>Reading {responses} responses and summarizing…</p>;
+    return <p className="text-sm" style={{ color: TEXT_SECONDARY }}>Reading {responsesCount} responses and summarizing…</p>;
+  }
+
+  if (state === 'error' || !summary) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm" style={{ color: 'var(--ui-core-red-red-6)' }}>Couldn&apos;t generate the summary.</span>
+        <Button type="text" label="Retry" onClick={generate} />
+      </div>
+    );
   }
 
   const maxReq = Math.max(...summary.featureRequests.map((r) => r.mentions), 1);
@@ -1045,7 +1065,7 @@ function SurveyResults({ survey, onBack, onToast, onDelete }: { survey: DemoSurv
 
       {/* AI summary */}
       <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>AI Feedback Summary</span>}>
-        <AISummaryPanel surveyId={survey.id} responses={survey.responses} />
+        <AISummaryPanel survey={survey} />
       </Card>
 
       {/* Per-question breakdown */}
@@ -1162,6 +1182,27 @@ function Stars({ n }: { n: number }) {
 function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToast: (msg: string) => void }) {
   const [narration, setNarration] = useState<'idle' | 'loading' | 'done'>('idle');
 
+  // Live engagement overlay — when ENGAGEMENT_LIVE, real Qualtrics response data
+  // (ingested via the completedResponse webhook) overrides the simulated per-tester
+  // metrics, matched by email. Off → the roster keeps its simulated numbers.
+  const [liveEngagement, setLiveEngagement] = useState<Record<string, LiveEngagement>>({});
+  useEffect(() => {
+    if (!ENGAGEMENT_LIVE) return;
+    let cancelled = false;
+    fetchLiveEngagement()
+      .then((feed) => { if (!cancelled) setLiveEngagement(feed.byEmail || {}); })
+      .catch(() => { if (!cancelled) setLiveEngagement({}); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const effectivePrograms = useMemo(() => programs.map((p) => ({
+    ...p,
+    testers: p.testers.map((t) => {
+      const e = liveEngagement[t.email.toLowerCase()];
+      return e ? { ...t, reliability: e.reliability, avgResponseDays: e.avgResponseDays, feedbackQuality: e.feedbackQuality, missedSurveys: e.missedSurveys } : t;
+    }),
+  })), [programs, liveEngagement]);
+
   // Rules engine — deterministic, explainable. AI only narrates the output.
   const isAtRisk = (t: DemoTester) => {
     const offline = t.deviceOnline === false;             // hardware: device offline
@@ -1171,16 +1212,16 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
   };
 
   // Roster comes from each program's testers (real Qualtrics contacts for programs
-  // created from a live list; sampled seed for the example programs). Grouped by
-  // program, in program order.
-  const atRisk = useMemo(() => programs.flatMap((p) => p.testers).filter(isAtRisk), [programs]);
+  // created from a live list; sampled seed for the example programs). Engagement
+  // metrics are the live overlay when available, else simulated. Grouped by program.
+  const atRisk = useMemo(() => effectivePrograms.flatMap((p) => p.testers).filter(isAtRisk), [effectivePrograms]);
   const atRiskByProgram = useMemo(
-    () => programs.map((p) => ({ name: p.name, testers: p.testers.filter(isAtRisk) })).filter((g) => g.testers.length > 0),
-    [programs],
+    () => effectivePrograms.map((p) => ({ name: p.name, testers: p.testers.filter(isAtRisk) })).filter((g) => g.testers.length > 0),
+    [effectivePrograms],
   );
   const engagementByProgram = useMemo(
-    () => programs.map((p) => ({ name: p.name, testers: p.testers })).filter((g) => g.testers.length > 0),
-    [programs],
+    () => effectivePrograms.map((p) => ({ name: p.name, testers: p.testers })).filter((g) => g.testers.length > 0),
+    [effectivePrograms],
   );
 
   // Engagement columns — Program column dropped since rows are grouped under a program header.

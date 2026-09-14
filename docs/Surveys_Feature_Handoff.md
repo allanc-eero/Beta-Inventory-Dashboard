@@ -218,3 +218,60 @@ Redesigned the Programs feature's three tabs to match the real Insight summary p
 Verified after each step: `tsc --noEmit` clean; `/` and `/demo-surveys` HTTP 200.
 
 **Next session:** apply the same treatment (compact even-column rows, full width, small text, pagination) to the app-level **Devices / People / Locations** menus. Then the standing reminder: **the eero SSO login is still the blocker for live data** (see "To make it live", step 1).
+
+---
+
+## Live engagement via Qualtrics webhook (2026-08-30)
+
+Engagement is now event-driven instead of simulated-only. When a tester submits a survey, Qualtrics fires a `completedResponse` webhook → we ingest it → the Engagement view overlays real metrics. No polling.
+
+**Files**
+- `src/lib/engagement.ts` — client seam: `LiveEngagement`/`EngagementFeed` types, `fetchLiveEngagement()`, and the `ENGAGEMENT_LIVE` flag (`NEXT_PUBLIC_ENGAGEMENT_SOURCE=qualtrics`).
+- `src/lib/engagementStore.ts` — server ingestion store: `recordResponse()`, `computeEngagement()`, `setInvited()`. In-memory on `globalThis` for now; **production → DynamoDB** (same surface).
+- `src/app/api/qualtrics/webhook/route.ts` — POST receiver for `completedResponse`. Optional shared-secret gate (`QUALTRICS_WEBHOOK_SECRET`, header `x-qualtrics-secret` or `?secret=`). Records the response; has a marked **re-summarize call point** (Bedrock) for when a new response lands.
+- `src/app/api/engagement/route.ts` — GET, returns the computed per-tester feed.
+- `SurveysDemo.tsx` `EngagementView` — overlays the live feed onto the roster by email when `ENGAGEMENT_LIVE`; else keeps simulated metrics (At-Risk + Tester Engagement both read the overlaid roster).
+
+**Verified locally:** `POST /api/qualtrics/webhook` with a fake completedResponse → `GET /api/engagement` returns the tester's computed engagement (responses, reliability, avgResponseDays, feedbackQuality). tsc clean.
+
+**To register the webhook (one-time per survey; needs a PUBLIC url — localhost can't receive callbacks):**
+1. Deploy so `/api/qualtrics/webhook` is publicly reachable (or tunnel).
+2. Create an event subscription: topic `completedResponse.{surveyId}`, publicationUrl `https://<host>/api/qualtrics/webhook`. (Qualtrics event-subscriptions API / the `create_webhook` tool.)
+3. Set `QUALTRICS_WEBHOOK_SECRET` and include it on the subscription so only Qualtrics can post.
+4. Set `NEXT_PUBLIC_ENGAGEMENT_SOURCE=qualtrics` to turn the overlay on.
+
+**TODO(verify) when live:**
+- The real `completedResponse` payload field names (SurveyID/ResponseID confirmed-ish; email + rating may need a follow-up fetch of the full response by ResponseID via the Qualtrics responses API).
+- Invited counts per tester (from Qualtrics distributions or the program roster) so `reliability` + `missedSurveys` are real, not "all invited responded."
+- Wire the Bedrock re-summarize at the marked call point.
+
+---
+
+## Bedrock AI summarizer + API production-readiness audit (2026-08-30)
+
+### Bedrock summarizer (built)
+Turns a survey's free-text responses into the structured `AISummary` the results view renders.
+- `src/lib/summarize.ts` — shared types (`AISummary`/`Tone`/`Severity`/`Priority`), `SummarizeRequest`, `fetchSummary()`, `SUMMARIZE_LIVE` flag (`NEXT_PUBLIC_AI_SUMMARY=bedrock`). SurveysDemo imports these (inline copies removed).
+- `src/lib/bedrock.ts` — `converseText()` (generic Bedrock Converse call, shared) + `summarizeWithBedrock()` (strict-JSON prompt → parse → normalize/validate). Env: `BEDROCK_MODEL_ID`, `BEDROCK_REGION`/`AWS_REGION`, AWS creds via default provider chain (task/instance role in prod).
+- `src/app/api/summarize/route.ts` — Bedrock when `BEDROCK_MODEL_ID` set, else a computed fallback from the responses (so the UI always works). `@aws-sdk/client-bedrock-runtime` is already a dependency.
+- `SurveysDemo` `AISummaryPanel` — now takes the `survey`, collects its text responses, and calls `/api/summarize` when `SUMMARIZE_LIVE` (or whenever there's no canned demo summary); canned demo summaries replay when the flag is off. Loading/error/retry states added.
+- Webhook re-summarize point updated: summaries regenerate on demand via `/api/summarize`; a pre-warm/cache path (fetch full responses from Qualtrics) is left as `TODO(verify)`.
+- **To go live:** set `BEDROCK_MODEL_ID` (+ region + AWS creds) and `NEXT_PUBLIC_AI_SUMMARY=bedrock`.
+
+### API production-readiness audit
+Every API adapter now has a real env-gated production path; none is mock-only except by fallback design.
+
+| Route | Prod path | To activate |
+|---|---|---|
+| `/api/summarize` | Bedrock Converse | `BEDROCK_MODEL_ID` + AWS creds; `NEXT_PUBLIC_AI_SUMMARY=bedrock` |
+| `/api/agent` | **Now Bedrock** (was local-only) → falls back to the local pattern-matching engine | same Bedrock env |
+| `/api/qualtrics/webhook` + `/api/engagement` | webhook ingest → engagement feed | register `completedResponse.{surveyId}`; `QUALTRICS_WEBHOOK_SECRET`; `NEXT_PUBLIC_ENGAGEMENT_SOURCE=qualtrics` |
+| `/api/insight` | eero User/Admin API by serial (+ seeded fallback) | `EERO_API_TOKEN` (+ eero SSO); confirm `TODO(verify)` paths |
+| `/api/breadboard` | Breadboard inventory (+ seeded fallback) | `BREADBOARD_API_BASE` + Midway/SigV4; confirm endpoint shape |
+| `/api/jira`, `/api/jira-webhook` | live JIRA REST + inbound webhook | `JIRA_BASE_URL`/`JIRA_USER_EMAIL`/`JIRA_API_TOKEN`/`JIRA_PROJECT_KEY`; register the webhook |
+| `/api/databricks` | live SQL warehouse queries | `DATABRICKS_HOST`/`DATABRICKS_TOKEN`/`DATABRICKS_WAREHOUSE_ID` (+ table envs) |
+| `/api/qualtrics`, `/api/demo-qualtrics-lists`, `/api/demo-qualtrics-surveys` | live Qualtrics (directory lists/contacts/surveys) + seeded fallback | `QUALTRICS_BASE_URL`/`QUALTRICS_API_TOKEN`/`QUALTRICS_DIRECTORY_ID` (already used live) |
+
+Empty dirs `src/app/api/shapeshift` and `src/app/api/welcome-email` contain no routes (placeholders).
+
+**Note:** activation everywhere is "set the env/creds" — no code changes. The only thing I can't do from here is provide the credentials/roles (Bedrock IAM, eero SSO, Midway, JIRA/Databricks tokens); those come from the live environment.
