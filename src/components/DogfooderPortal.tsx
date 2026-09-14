@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useProgramsStore } from '@/store/programsStore';
-import { OptOutReason } from '@/types';
+import { OptOutReason, Device } from '@/types';
+import { BREADBOARD_ENABLED, fetchDogfoodInventory, DogfoodAnnouncement } from '@/lib/dogfoodInventory';
 import { getTrackingUrl, isDomesticCountry } from '@/constants';
 import { Button, Input, TextArea, Select, Checkbox, Tag, Card } from '@amzn/eero-web-design-components';
 import { Wifi, Smartphone, Bug, Video, LayoutDashboard, LogOut, Layers, Upload, BookOpen, ExternalLink, MessageSquare, Mail, FileText, PlayCircle, PartyPopper, X, UserCog, Save, DoorOpen, CheckCircle, Circle, Rocket, Calendar, Users, PackageCheck } from 'lucide-react';
@@ -23,8 +24,34 @@ export default function DogfooderPortal() {
     if (goTo) setActiveTab(goTo);
   };
 
-  // Filter devices assigned to this user (by email match)
-  const myDevices = devices.filter(
+  // Device source: in the live eero environment (BREADBOARD_ENABLED) the portal
+  // reads this dogfooder's devices from Breadboard via /api/breadboard; locally
+  // it falls back to the seed store so the demo keeps working. Same seam pattern
+  // as /api/insight — the UI below doesn't change when the source flips.
+  const [breadboardDevices, setBreadboardDevices] = useState<Device[] | null>(null);
+  const [announcements, setAnnouncements] = useState<DogfoodAnnouncement[]>([]);
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    let cancelled = false;
+    // Always fetch (announcements show in the demo too); only take devices from
+    // Breadboard when it's the live source.
+    fetchDogfoodInventory(currentUser.email)
+      .then((inv) => {
+        if (cancelled) return;
+        setAnnouncements(inv.announcements || []);
+        if (BREADBOARD_ENABLED) setBreadboardDevices(inv.devices);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAnnouncements([]);
+        if (BREADBOARD_ENABLED) setBreadboardDevices(null);
+      });
+    return () => { cancelled = true; };
+  }, [currentUser?.email]);
+
+  // Filter devices assigned to this user (by email/name match). When devices come
+  // from Breadboard they're already scoped to the caller, so the filter is a no-op.
+  const myDevices = (breadboardDevices ?? devices).filter(
     (d) => {
       const email = currentUser?.email?.toLowerCase();
       const name = currentUser?.name?.toLowerCase();
@@ -155,6 +182,7 @@ export default function DogfooderPortal() {
             programCount={myPrograms.length}
             programs={myPrograms}
             endingReturns={endingReturns}
+            announcements={announcements}
             onGoToReturns={() => setActiveTab('returns')}
           />
         )}
@@ -317,7 +345,11 @@ function WelcomeModal({ name, onClose, onGoToLearn, onBrowsePrograms }: { name: 
 }
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
-function DashboardView({ name, deviceCount, programCount, programs, endingReturns, onGoToReturns }: { name: string; deviceCount: number; programCount: number; programs: string[]; endingReturns: any[]; onGoToReturns: () => void }) {
+function DashboardView({ name, deviceCount, programCount, programs, endingReturns, announcements, onGoToReturns }: { name: string; deviceCount: number; programCount: number; programs: string[]; endingReturns: any[]; announcements: DogfoodAnnouncement[]; onGoToReturns: () => void }) {
+  const announcementTag = (level: DogfoodAnnouncement['level']) =>
+    level === 'action' ? { color: 'orange' as const, label: 'Action' }
+    : level === 'warning' ? { color: 'red' as const, label: 'Heads up' }
+    : { color: 'periwinkle' as const, label: 'Info' };
   return (
     <div className="space-y-6">
       {/* End-of-program return alert */}
@@ -355,6 +387,30 @@ function DashboardView({ name, deviceCount, programCount, programs, endingReturn
           )}
         </div>
       </Card>
+
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <Card size={4}>
+          <div className="p-6">
+            <h3 className="text-sm font-semibold text-[var(--ui-text-text-primary)] mb-4">Announcements</h3>
+            <div className="space-y-4">
+              {announcements.map((a) => {
+                const t = announcementTag(a.level);
+                return (
+                  <div key={a.id} className="flex items-start gap-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] pb-4 last:border-0 last:pb-0">
+                    <Tag color={t.color} size="regular">{t.label}</Tag>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--ui-text-text-primary)]">{a.title}</p>
+                      <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-0.5">{a.body}</p>
+                      <p className="text-xs text-[var(--ui-text-text-placeholder)] mt-1">{new Date(a.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card size={3}>
