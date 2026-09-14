@@ -104,6 +104,16 @@ export async function POST(request: NextRequest) {
 
   const sentAt = body.sentAt ? String(body.sentAt) : undefined;
 
+  // Without a tester email we can't attribute the response to anyone, so skip
+  // it rather than polluting the feed with an unattributed bucket. In prod this
+  // shouldn't happen: contact-list distributions carry the recipient email.
+  if (!email) {
+    return NextResponse.json(
+      { ok: true, recorded: false, reason: 'no email resolved for response', responseId },
+      { status: 202 }
+    );
+  }
+
   recordResponse({ responseId, surveyId, email, completedAt, sentAt, rating });
 
   // ── Re-summarize call point ───────────────────────────────────────────────
