@@ -2205,7 +2205,7 @@ export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = 
         </div>
       )}
 
-      <div className={`w-full ${embedded ? 'p-0' : 'p-6'}`}>
+      <div className={`w-full ${embedded ? 'px-0 pt-0 pb-10' : 'px-6 pt-6 pb-10'}`}>
         <header className="mb-3">
           <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>Surveys &amp; Engagement</h1>
           <p className="mt-0.5 text-xs" style={{ color: TEXT_TERTIARY }}>
