@@ -1706,10 +1706,6 @@ function ProgramDevicesView({ program, onBack, onToast }: {
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  // Paginate the roster so a program with hundreds of testers pages through
-  // instead of one endless scroll — same paginator the Programs list uses.
-  const [page, setPage] = useState(1);
-  const [rosterPageSize, setRosterPageSize] = useState(10);
 
   // ── Shared-store bridge ──────────────────────────────────────────────────────
   // Every assigned device is upserted into the real deviceStore (idempotent by
@@ -1853,12 +1849,6 @@ function ProgramDevicesView({ program, onBack, onToast }: {
     );
   }
 
-  // Roster pagination (feature programs have no roster list, so this is inert there).
-  const rosterTotalPages = Math.max(1, Math.ceil(roster.length / rosterPageSize));
-  const rosterPage = Math.min(page, rosterTotalPages);
-  const rosterStart = (rosterPage - 1) * rosterPageSize;
-  const rosterPageItems = roster.slice(rosterStart, rosterStart + rosterPageSize);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1907,7 +1897,7 @@ function ProgramDevicesView({ program, onBack, onToast }: {
           )}
 
           <div className="flex flex-col gap-3">
-            {rosterPageItems.map((t) => {
+            {roster.map((t) => {
               const devs = assignments[t.id] || [];
               const isBusy = busy === t.id;
               return (
@@ -1973,20 +1963,6 @@ function ProgramDevicesView({ program, onBack, onToast }: {
               <Card size={4}><p className="text-sm" style={{ color: TEXT_TERTIARY }}>No testers on this program yet. Add one above or import a Qualtrics audience.</p></Card>
             )}
           </div>
-
-          {roster.length > 0 && (
-            <Pagination
-              pagination={{ totalItems: roster.length, totalPages: rosterTotalPages, hasPreviousPage: rosterPage > 1, hasNextPage: rosterPage < rosterTotalPages }}
-              currentPage={rosterPage}
-              pageSize={rosterPageSize}
-              onPageChange={setPage}
-              onNextPage={() => setPage((n) => Math.min(rosterTotalPages, n + 1))}
-              onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
-              onPageSizeChange={(s) => { setRosterPageSize(s); setPage(1); }}
-              pageSizeOptions={[{ value: 10, label: '10' }, { value: 25, label: '25' }, { value: 50, label: '50' }]}
-              ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
-            />
-          )}
         </>
       )}
     </div>
