@@ -1825,7 +1825,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
     setAssignments((prev) => ({ ...prev, [tester.id]: next }));
     next.forEach((d) => syncToStore(tester, d));
     setBusy(null);
-    onToast(`Rechecked ${tester.name}'s device${devs.length > 1 ? 's' : ''} against Insight`);
+    onToast(`Refreshed ${tester.name}'s device${devs.length > 1 ? 's' : ''} info from Insight`);
   };
 
   const syncAll = async () => {
@@ -1957,7 +1957,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                         <p className="truncate text-xs" style={{ color: TEXT_TERTIARY }}>{t.email}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {devs.length > 0 && <Button type="text" leftIcon={ICONS.FUNCTIONAL_REFRESH} label={isBusy ? 'Rechecking…' : 'Recheck'} onClick={() => recheckTester(t)} />}
+                        {devs.length > 0 && <Button type="text" leftIcon={ICONS.FUNCTIONAL_REFRESH} label={isBusy ? 'Refreshing…' : 'Refresh info'} onClick={() => recheckTester(t)} />}
                         <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel="Remove tester" onClick={() => removeTester(t)} />
                       </div>
                     </div>
