@@ -360,6 +360,14 @@ const INITIAL_PROGRAMS: DemoProgram[] = [
   { id: 'pg-app-beta', name: 'App Experience Beta', type: 'feature', status: 'active', audienceSize: 24, devicesDeployed: 0, devicesOnline: 0, surveyResponseRate: 0, avgFeedbackQuality: 0, testers: TESTERS.filter((t) => t.programName === 'App Experience Beta') },
 ];
 
+// Flattened roster for global People seeding — every program's testers as
+// {name, email, program}. Makes the People menu roster-aware: a tester shows up
+// as a person the moment they're on a program's Qualtrics roster, even before any
+// device ships (device-less testers read "awaiting devices" with their program).
+export const ROSTER_SEED: { name: string; email: string; program: string }[] = INITIAL_PROGRAMS.flatMap((p) =>
+  p.testers.map((t) => ({ name: t.name, email: t.email, program: p.name })),
+);
+
 // Turn a real Qualtrics contact into a program tester. The identity (name/email)
 // is REAL (from the live Qualtrics list); engagement metrics are deterministically
 // simulated from the email until survey-response data is wired in — so a real

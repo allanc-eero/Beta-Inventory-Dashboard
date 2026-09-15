@@ -236,6 +236,12 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       const online = person.devices.filter((d) => d.status === 'online').length;
                       const archived = person.devices.filter((d) => d.status === 'deactivated').length;
                       const activePrograms = Array.from(new Set(person.devices.filter((d) => d.status !== 'deactivated').map((d) => d.program).filter(Boolean)));
+                      // Roster-aware fallback: a device-less tester still shows the program
+                      // they're on, pulled from their tester profile (seeded from the roster).
+                      const rosterPrograms = getTesterProfile(person.email)?.programs || [];
+                      const programsLabel = activePrograms.length
+                        ? activePrograms.map((p) => p.toUpperCase()).join(', ')
+                        : (rosterPrograms.length ? rosterPrograms.join(', ') : '—');
                       return (
                         <div
                           key={person.email || person.name}
@@ -253,7 +259,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           </div>
                           <div className="flex-1 leading-tight">
                             <p className="text-xs text-[var(--ui-text-text-tertiary)]">Programs</p>
-                            <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{activePrograms.length ? activePrograms.map((p) => p.toUpperCase()).join(', ') : '—'}</p>
+                            <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{programsLabel}</p>
                           </div>
                           <div className="flex-1 leading-tight">
                             <p className="text-xs text-[var(--ui-text-text-tertiary)]">Devices</p>
