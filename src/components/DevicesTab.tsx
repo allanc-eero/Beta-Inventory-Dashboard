@@ -228,7 +228,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
   onSelectDevice: (d: Device) => void;
 }) {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, totalPages);
   const paged = rows.slice((current - 1) * pageSize, (current - 1) * pageSize + pageSize);
@@ -286,7 +286,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
           </tbody>
         </table>
       </div>
-      {rows.length > 15 && (
+      {rows.length > 10 && (
         <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-2">
           <Pagination
             pagination={{ totalItems: rows.length, totalPages, hasPreviousPage: current > 1, hasNextPage: current < totalPages }}
@@ -296,7 +296,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
             onNextPage={() => setPage((n) => Math.min(totalPages, n + 1))}
             onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-            pageSizeOptions={[{ value: 15, label: '15' }, { value: 25, label: '25' }, { value: 50, label: '50' }, { value: 100, label: '100' }]}
+            pageSizeOptions={[{ value: 10, label: '10' }, { value: 25, label: '25' }, { value: 50, label: '50' }]}
             ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
           />
         </div>
