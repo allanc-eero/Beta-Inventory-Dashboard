@@ -54,6 +54,16 @@ export default function SeedDataProvider({ children }: { children: React.ReactNo
       }
       upsertTesterProfile({ email, name, programs: [program] });
     });
+
+    // Illustrative duplicate for the People "Possible Duplicates" review: the
+    // same seed tester (Shakeel Ahmad, who has a device under shkahma@amazon.com
+    // in Kew, VIC) also appears under a personal email with no device. Same name
+    // + same location → surfaced as a possible duplicate to confirm-merge.
+    // Safe to remove — purely to demonstrate the feature.
+    if (!getPersonByEmail('shakeel.ahmad@gmail.com')) {
+      addPerson({ id: crypto.randomUUID(), name: 'Shakeel Ahmad', email: 'shakeel.ahmad@gmail.com', team: '', devices: [] });
+    }
+    upsertTesterProfile({ email: 'shakeel.ahmad@gmail.com', name: 'Shakeel Ahmad', location: 'Kew, VIC', programs: ['Merci Beta'] });
   }, [addPerson, getPersonByEmail, removePerson, upsertTesterProfile]);
 
   return <>{children}</>;

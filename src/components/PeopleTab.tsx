@@ -33,7 +33,8 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const [optOutQualtricsDone, setOptOutQualtricsDone] = useState(false);
   const [optOutQualtricsStatus, setOptOutQualtricsStatus] = useState('');
   const [optOutDevicesDone, setOptOutDevicesDone] = useState(false);
-  const [activeView, setActiveView] = useState<'active' | 'opted_out'>('active');
+  const [activeView, setActiveView] = useState<'active' | 'opted_out' | 'possible_duplicates'>('active');
+  const [dismissedDupes, setDismissedDupes] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [viewDevice, setViewDevice] = useState<Device | null>(null);
@@ -110,6 +111,71 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
         d.checkedOutTo?.toLowerCase() === key
     );
   }, [devices, selectedPerson]);
+
+  // ── Possible-duplicate detection ───────────────────────────────────────────
+  // Finds pairs of people that look like the SAME person but sit on different
+  // cards (different canonical emails, no recorded alias yet). Uses name (exact
+  // or 2+ word overlap) plus a corroborating signal (same location or a shared
+  // device network). We only auto-collapse recorded aliases elsewhere; these are
+  // surfaced for a human to confirm-merge, never merged silently — so two truly
+  // different people who share a name are never fused by accident.
+  const dupePairKey = (a: string, b: string) => [a, b].sort().join('|');
+
+  const duplicateCandidates = useMemo(() => {
+    const norm = (s: string) => (s || '').toLowerCase().trim();
+    const words = (n: string) => norm(n).split(/\s+/).filter((w) => w.length > 2);
+    const locOf = (p: { email: string; devices: Device[] }) =>
+      norm(getTesterProfile(p.email)?.location || p.devices.find((d) => d.location)?.location || '');
+    const netsOf = (p: { devices: Device[] }) => new Set(p.devices.map((d) => d.network).filter(Boolean));
+
+    const out: { a: (typeof derivedPeople)[number]; b: (typeof derivedPeople)[number]; reasons: string[]; confidence: 'high' | 'medium' }[] = [];
+    const list = derivedPeople;
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const A = list[i], B = list[j];
+        const aId = A.email || A.name, bId = B.email || B.name;
+        if (norm(A.email) && norm(A.email) === norm(B.email)) continue; // already one identity
+        if (dismissedDupes.has(dupePairKey(aId, bId))) continue;
+
+        const exactName = !!norm(A.name) && norm(A.name) === norm(B.name);
+        const aW = words(A.name), bW = words(B.name);
+        const nameOverlap = aW.filter((w) => bW.includes(w)).length >= 2;
+        if (!exactName && !nameOverlap) continue; // name is the required anchor
+
+        const aLoc = locOf(A), bLoc = locOf(B);
+        const sharedLoc = !!aLoc && aLoc === bLoc;
+        const aNet = netsOf(A);
+        const sharedNet = [...netsOf(B)].some((n) => aNet.has(n));
+
+        const reasons: string[] = [];
+        reasons.push(exactName ? 'Same name' : 'Similar name');
+        if (sharedLoc) reasons.push('Same location');
+        if (sharedNet) reasons.push('Shared network');
+
+        let confidence: 'high' | 'medium' | null = null;
+        if ((exactName && (sharedLoc || sharedNet)) || (sharedNet && nameOverlap)) confidence = 'high';
+        else if (exactName || (nameOverlap && sharedLoc)) confidence = 'medium';
+        if (confidence) out.push({ a: A, b: B, reasons, confidence });
+      }
+    }
+    return out.sort((x, y) => (x.confidence === y.confidence ? 0 : x.confidence === 'high' ? -1 : 1));
+  }, [derivedPeople, testerProfiles, getTesterProfile, dismissedDupes, devices]);
+
+  // Confirm: fold B's email into A's profile as an alias. Canonical dedup then
+  // collapses them into a single card automatically (and stays collapsed).
+  const handleMergeDuplicate = (a: { name: string; email: string }, b: { name: string; email: string }) => {
+    if (!a.email) return;
+    let target = getTesterProfile(a.email);
+    if (!target) {
+      upsertTesterProfile({ email: a.email, name: a.name, programs: [] });
+      target = getTesterProfile(a.email);
+    }
+    if (target) mergeProfiles(target.id, b.email || b.name);
+  };
+
+  const handleDismissDuplicate = (a: { name: string; email: string }, b: { name: string; email: string }) => {
+    setDismissedDupes((prev) => new Set(prev).add(dupePairKey(a.email || a.name, b.email || b.name)));
+  };
 
   const handleAdd = () => {
     if (!newPerson.name || !newPerson.email) return;
@@ -192,10 +258,11 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
           <div className="flex items-center gap-3">
             <Segmented
               value={activeView}
-              onChange={(val) => setActiveView(val as 'active' | 'opted_out')}
+              onChange={(val) => setActiveView(val as 'active' | 'opted_out' | 'possible_duplicates')}
               items={[
                 { label: `Active (${derivedPeople.filter((p) => !optedOutEmails.has(p.email.toLowerCase())).length})`, value: 'active' },
                 { label: `Opted Out (${optOuts.length})`, value: 'opted_out' },
+                { label: `Possible Duplicates (${duplicateCandidates.length})`, value: 'possible_duplicates' },
               ]}
             />
             {canEdit() && (
@@ -357,6 +424,45 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                 )) : (
                   <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
                     <p className="text-[var(--ui-text-text-placeholder)] text-sm">No testers have opted out</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Possible Duplicates — same person on two cards, pending review */}
+            {activeView === 'possible_duplicates' && (
+              <div className="space-y-3">
+                <p className="text-xs text-[var(--ui-text-text-tertiary)]">
+                  Likely the same person on separate cards. Confirming a merge links their emails so it collapses to one card and stays that way. Exact-identity matches are merged automatically — these need your OK because they match on name plus location/network, which isn&apos;t proof on its own.
+                </p>
+                {duplicateCandidates.length > 0 ? duplicateCandidates.map(({ a, b, reasons, confidence }) => (
+                  <div key={dupePairKey(a.email || a.name, b.email || b.name)} className="rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] bg-[var(--ui-background-layer-layer-page)] p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-[var(--ui-text-text-primary)]">Possible duplicate</span>
+                        <Tag color={confidence === 'high' ? 'orange' : 'yellow'} size="regular">{confidence === 'high' ? 'High confidence' : 'Needs review'}</Tag>
+                      </div>
+                      <span className="text-xs text-[var(--ui-text-text-tertiary)]">{reasons.join(' · ')}</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[a, b].map((p, idx) => (
+                        <div key={idx} className="rounded-lg border border-[var(--ui-background-layer-border-border-layer-page)] p-3">
+                          <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{p.name}{idx === 0 && <span className="ml-1.5 text-xs font-normal text-[var(--ui-text-text-tertiary)]">(kept)</span>}</p>
+                          <p className="truncate text-xs text-[var(--ui-text-text-tertiary)]">{p.email || '—'}</p>
+                          <p className="mt-1 text-xs text-[var(--ui-text-text-tertiary)]">{p.devices.length} device(s)</p>
+                        </div>
+                      ))}
+                    </div>
+                    {canEdit() && (
+                      <div className="flex justify-end gap-2 mt-3">
+                        <Button type="default" label="Not a match" onClick={() => handleDismissDuplicate(a, b)} />
+                        <Button type="primary" label={`Merge into ${a.name}`} onClick={() => handleMergeDuplicate(a, b)} />
+                      </div>
+                    )}
+                  </div>
+                )) : (
+                  <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
+                    <p className="text-[var(--ui-text-text-placeholder)] text-sm">No possible duplicates found</p>
                   </div>
                 )}
               </div>
