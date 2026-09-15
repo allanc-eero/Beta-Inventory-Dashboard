@@ -112,6 +112,7 @@ interface DemoTester {
   feedbackQuality: number;    // 1-5
   deviceOnline: boolean | null; // null = feature program (no device)
   missedSurveys: number;
+  noSeedDevice?: boolean;     // roster filler — never gets a seeded device (keeps device counts unchanged)
 }
 
 interface DemoProgram {
@@ -322,7 +323,35 @@ const TESTERS: DemoTester[] = [
   { id: 't6', name: 'John Pelebo', email: 'john.pelebo@eero.com', programName: 'Outdoor Dogfood', technicalLevel: 'Intermediate', reliability: 18, avgResponseDays: 12.0, feedbackQuality: 1, deviceOnline: false, missedSurveys: 5 },
   { id: 't7', name: 'Stacia Wong', email: 'stacia@eero.com', programName: 'Outdoor Dogfood', technicalLevel: 'Advanced', reliability: 95, avgResponseDays: 0.9, feedbackQuality: 5, deviceOnline: true, missedSurveys: 0 },
   { id: 't8', name: 'Lalitha Rao', email: 'lalitha@eero.com', programName: 'Merci Beta', technicalLevel: 'Intermediate', reliability: 29, avgResponseDays: 8.2, feedbackQuality: 2, deviceOnline: false, missedSurveys: 3 },
+  // Device-less roster fillers so a real-sized roster pages through (numbered
+  // page menu needs >1 page). noSeedDevice keeps them out of the device store,
+  // so Devices/People/Locations counts are unchanged — they read "awaiting devices".
+  ...makeRosterFillers('Merci Beta', 18, 0),
 ];
+
+function makeRosterFillers(programName: string, count: number, startIdx: number): DemoTester[] {
+  const first = ['Ava', 'Liam', 'Noah', 'Emma', 'Mia', 'Ethan', 'Sofia', 'Lucas', 'Zoe', 'Kai', 'Nina', 'Omar', 'Priya', 'Ravi', 'Tara', 'Uma', 'Wei', 'Yara', 'Diego', 'Elena'];
+  const last = ['Park', 'Nguyen', 'Silva', 'Khan', 'Meyer', 'Rossi', 'Cohen', 'Ito', 'Adams', 'Bauer', 'Costa', 'Duran', 'Frost', 'Gupta', 'Haas', 'Ivanov', 'Jung', 'Klein', 'Lopez', 'Mora'];
+  const levels: TechnicalLevel[] = ['Beginner', 'Intermediate', 'Advanced'];
+  return Array.from({ length: count }, (_, i) => {
+    const k = startIdx + i;
+    const name = `${first[k % first.length]} ${last[(k * 3) % last.length]}`;
+    const handle = name.toLowerCase().replace(/[^a-z]+/g, '.');
+    return {
+      id: `filler-${programName.replace(/\s+/g, '-').toLowerCase()}-${k}`,
+      name,
+      email: `${handle}@eero.com`,
+      programName,
+      technicalLevel: levels[k % 3],
+      reliability: 60 + (k * 7) % 40,
+      avgResponseDays: 1 + (k % 5),
+      feedbackQuality: 3 + (k % 3),
+      deviceOnline: null,
+      missedSurveys: k % 3,
+      noSeedDevice: true,
+    };
+  });
+}
 
 const INITIAL_PROGRAMS: DemoProgram[] = [
   { id: 'pg-merci-beta', name: 'Merci Beta', type: 'hardware', status: 'active', currentPhase: 'DVT', audienceSize: 62, devicesDeployed: 62, devicesOnline: 51, surveyResponseRate: 63, avgFeedbackQuality: 3.8, testers: TESTERS.filter((t) => t.programName === 'Merci Beta') },
@@ -1594,6 +1623,7 @@ function seedAssignments(program: DemoProgram): Record<string, AssignedDevice[]>
   const model = betaModelFor(program);
   const map: Record<string, AssignedDevice[]> = {};
   program.testers.forEach((t) => {
+    if (t.noSeedDevice) { map[t.id] = []; return; }                   // roster filler — never assign a device
     const seed = hashSeed(t.email);
     const r = seed % 10;
     if (r === 2 || r === 9) { map[t.id] = []; return; }               // not shipped / not assigned yet
