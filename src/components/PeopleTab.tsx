@@ -20,7 +20,7 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 ];
 
 export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
-  const { devices, people, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
+  const { devices, people, testerProfiles, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
   const { canEdit, currentUser } = useAuthStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -44,37 +44,53 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const optOuts = getOptOuts();
   const optedOutEmails = new Set(optOuts.map((o) => o.personEmail.toLowerCase()));
 
-  // Derive people from device assignments — deduplicated by email (master key)
+  // Derive people from device assignments + roster, deduplicated by IDENTITY.
+  // The key is the person's CANONICAL email: if an email is a known alias of a
+  // tester profile (additionalEmails), we collapse to that profile's primary
+  // email so the same person under multiple known emails is ONE card. This only
+  // merges emails already proven to be the same person (recorded aliases) —
+  // fuzzy name/location matches are handled by the Add Person duplicate review,
+  // never auto-merged, to avoid collapsing two different real testers.
   const derivedPeople = useMemo(() => {
     const personMap = new Map<string, { name: string; email: string; devices: typeof devices }>();
 
-    devices.forEach((d) => {
-      const email = d.assignedEmail?.toLowerCase().trim();
-      const name = d.assignedTo || d.checkedOutTo;
-      if (!email && !name) return;
-
-      const key = email || name.toLowerCase().trim();
-
-      if (!personMap.has(key)) {
-        personMap.set(key, { name: name || email || '', email: email || '', devices: [] });
-      } else {
-        const existing = personMap.get(key)!;
-        if (name && name.includes(' ') && !existing.name.includes(' ')) {
-          existing.name = name;
-        }
+    // Resolve any email to its canonical (primary) identity via tester profiles.
+    const canonical = (email?: string, name?: string): { key: string; email: string; name?: string } => {
+      const e = email?.toLowerCase().trim() || '';
+      if (e) {
+        const prof = getTesterProfile(e);
+        if (prof?.email) return { key: prof.email.toLowerCase(), email: prof.email.toLowerCase(), name: prof.name || undefined };
+        return { key: e, email: e };
       }
-      personMap.get(key)!.devices.push(d);
+      return { key: (name || '').toLowerCase().trim(), email: '' };
+    };
+
+    devices.forEach((d) => {
+      const rawEmail = d.assignedEmail?.toLowerCase().trim();
+      const name = d.assignedTo || d.checkedOutTo;
+      if (!rawEmail && !name) return;
+
+      const c = canonical(rawEmail, name);
+      if (!c.key) return;
+
+      if (!personMap.has(c.key)) {
+        personMap.set(c.key, { name: c.name || name || c.email || '', email: c.email, devices: [] });
+      } else {
+        const existing = personMap.get(c.key)!;
+        if (name && name.includes(' ') && !existing.name.includes(' ')) existing.name = name;
+      }
+      personMap.get(c.key)!.devices.push(d);
     });
 
     people.forEach((p) => {
-      const key = p.email.toLowerCase();
-      if (!personMap.has(key)) {
-        personMap.set(key, { name: p.name, email: p.email, devices: [] });
+      const c = canonical(p.email, p.name);
+      if (!personMap.has(c.key)) {
+        personMap.set(c.key, { name: c.name || p.name, email: c.email || p.email, devices: [] });
       }
     });
 
     return Array.from(personMap.values());
-  }, [devices, people]);
+  }, [devices, people, testerProfiles, getTesterProfile]);
 
   const filteredPeople = useMemo(() => {
     if (!search) return derivedPeople;

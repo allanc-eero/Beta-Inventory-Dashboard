@@ -1837,25 +1837,6 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
     onToast('Synced all assigned devices from Insight');
   };
 
-  // One serial resolves a whole network — offer to pull the tester's other beta
-  // units on that mesh (simulated client-side until the network-eeros call is live).
-  const pullMesh = (tester: DemoTester, device: AssignedDevice) => {
-    if (!device.networkId) return;
-    const existing = new Set((assignments[tester.id] || []).map((d) => d.serial));
-    const seed = hashSeed(device.serial);
-    const extra: AssignedDevice[] = [];
-    const count = 1 + (seed % 2); // 1–2 siblings on the same mesh
-    for (let k = 1; k <= count; k++) {
-      const s = mkSerial((seed % 900) + 10 + k);
-      if (existing.has(s)) continue;
-      extra.push({ serial: s, model, networkId: device.networkId, status: 'online', firmware: 'v7.3-beta', source: device.source });
-    }
-    if (!extra.length) { onToast('No additional beta units found on that network'); return; }
-    setAssignments((prev) => ({ ...prev, [tester.id]: [...(prev[tester.id] || []), ...extra] }));
-    extra.forEach((d) => syncToStore(tester, d));
-    onToast(`Pulled ${extra.length} more ${model} unit${extra.length > 1 ? 's' : ''} from network ${device.networkId}`);
-  };
-
   const removeDevice = (tester: DemoTester, serial: string) => {
     setAssignments((prev) => ({ ...prev, [tester.id]: (prev[tester.id] || []).filter((d) => d.serial !== serial) }));
     removeFromStore(serial);
@@ -1928,7 +1909,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
       ) : (
         <>
           <div className="rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: TRACK, backgroundColor: 'var(--ui-core-periwinkle-periwinkle-1)', color: TEXT_SECONDARY }}>
-            Roster comes from the <b style={{ color: TEXT_PRIMARY }}>Qualtrics audience</b>. Assign each tester the <b style={{ color: TEXT_PRIMARY }}>serial(s)</b> you shipped them — Insight resolves each to its <b style={{ color: TEXT_PRIMARY }}>network + live status</b> and links back to the platform. A tester can have more than one unit; use <i>Pull mesh</i> to add the rest of a network at once.
+            Roster comes from the <b style={{ color: TEXT_PRIMARY }}>Qualtrics audience</b>. Assign each tester the <b style={{ color: TEXT_PRIMARY }}>serial(s)</b> you shipped them — Insight resolves each to its <b style={{ color: TEXT_PRIMARY }}>network + live status</b> and links back to the platform. A tester can have more than one unit — assign each serial you shipped them.
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -1999,7 +1980,6 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                               </span>
                             )}
                             <div className="ml-auto flex items-center gap-2">
-                              {d.networkId && <Button type="text" label="Pull mesh" onClick={() => pullMesh(t, d)} />}
                               <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel={`Unassign ${d.serial}`} onClick={() => removeDevice(t, d.serial)} />
                             </div>
                           </div>
