@@ -99,7 +99,7 @@ export default function Home() {
           {activeTab === 'program_signups' && <ProgramSignupsTab />}
           {activeTab === 'locations' && <LocationsTab />}
           {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
-          {activeTab === 'surveys' && <ToastProvider><DemoSurveysInner embedded /></ToastProvider>}
+          {activeTab === 'surveys' && <ToastProvider><DemoSurveysInner embedded onNavigateToPerson={handleNavigateToPerson} /></ToastProvider>}
           {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
         </div>
       </Navbar>

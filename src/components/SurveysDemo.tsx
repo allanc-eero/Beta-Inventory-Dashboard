@@ -1721,10 +1721,11 @@ function deviceStatusTag(status: DeviceLiveStatus) {
 }
 
 // ─── Program → device roster: assign serials, enrich via Insight, link back ────
-function ProgramDevicesView({ program, onBack, onToast }: {
+function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   program: DemoProgram;
   onBack: () => void;
   onToast: (msg: string) => void;
+  onNavigateToPerson?: (email: string) => void;
 }) {
   const model = betaModelFor(program);
   const { addDevice, updateDevice, deleteDevice, getDeviceBySerial } = useDeviceStore();
@@ -1945,7 +1946,18 @@ function ProgramDevicesView({ program, onBack, onToast }: {
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</p>
+                        {onNavigateToPerson && devs.length > 0 ? (
+                          <button
+                            className="block max-w-full truncate text-left text-sm font-medium hover:underline"
+                            style={{ color: ACCENT }}
+                            onClick={() => onNavigateToPerson(t.email)}
+                            title="Open this tester in People"
+                          >
+                            {t.name}
+                          </button>
+                        ) : (
+                          <p className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</p>
+                        )}
                         <p className="truncate text-xs" style={{ color: TEXT_TERTIARY }}>{t.email}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2160,7 +2172,7 @@ export default function DemoSurveysPage() {
   return <ToastProvider><DemoSurveysInner /></ToastProvider>;
 }
 
-export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = {}) {
+export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { embedded?: boolean; onNavigateToPerson?: (email: string) => void } = {}) {
   const [view, setView] = useState<string | number>('health');
   const [selected, setSelected] = useState<DemoSurvey | null>(null);
   // Programs & surveys are now stateful so a newly-created program/survey shows up live.
@@ -2258,7 +2270,7 @@ export function DemoSurveysInner({ embedded = false }: { embedded?: boolean } = 
           : <SurveyList surveys={surveys} onSelect={setSelected} onNewSurvey={() => setNewSurvey({ open: true })} onDelete={handleDeleteSurvey} />)}
         {view === 'engagement' && <EngagementView programs={programs} onToast={showToast} />}
         {view === 'health' && (openProgram
-          ? <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} />
+          ? <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} onNavigateToPerson={onNavigateToPerson} />
           : <ProgramHealthView
               programs={programs}
               surveys={surveys}
