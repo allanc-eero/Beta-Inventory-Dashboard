@@ -3,10 +3,10 @@
 import { useEffect, useRef } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { allSeedDevices, seedPeople } from '@/data/seedData';
-import { ROSTER_SEED } from '@/components/SurveysDemo';
+import { ROSTER_SEED, FILLER_EMAILS } from '@/components/SurveysDemo';
 
 export default function SeedDataProvider({ children }: { children: React.ReactNode }) {
-  const { devices, addDevices, people, addPerson, getPersonByEmail, testerProfiles, upsertTesterProfile } = useDeviceStore();
+  const { devices, addDevices, people, addPerson, getPersonByEmail, removePerson, testerProfiles, upsertTesterProfile } = useDeviceStore();
   const seeded = useRef(false);
   const rosterSeeded = useRef(false);
 
@@ -44,13 +44,17 @@ export default function SeedDataProvider({ children }: { children: React.ReactNo
   useEffect(() => {
     if (rosterSeeded.current) return;
     rosterSeeded.current = true;
+    // Purge any pagination-only filler testers that a prior version seeded into
+    // the persisted People store, so they don't clutter People.
+    FILLER_EMAILS.forEach((email) => removePerson(email));
+    // Seed real roster testers as people (idempotent per-email).
     ROSTER_SEED.forEach(({ name, email, program }) => {
       if (!getPersonByEmail(email)) {
         addPerson({ id: crypto.randomUUID(), name, email, team: '', devices: [] });
       }
       upsertTesterProfile({ email, name, programs: [program] });
     });
-  }, [addPerson, getPersonByEmail, upsertTesterProfile]);
+  }, [addPerson, getPersonByEmail, removePerson, upsertTesterProfile]);
 
   return <>{children}</>;
 }

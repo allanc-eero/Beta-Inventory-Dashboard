@@ -75,6 +75,7 @@ interface DeviceStore {
   // People actions
   addPerson: (person: Person) => void;
   updatePerson: (id: string, updates: Partial<Person>) => void;
+  removePerson: (email: string) => void;
   getPersonByEmail: (email: string) => Person | undefined;
   searchPeople: (query: string) => Person[];
 
@@ -302,6 +303,11 @@ export const useDeviceStore = create<DeviceStore>()(
           people: state.people.map((p) =>
             p.id === id ? { ...p, ...updates } : p
           ),
+        })),
+
+      removePerson: (email) =>
+        set((state) => ({
+          people: state.people.filter((p) => p.email.toLowerCase() !== email.toLowerCase()),
         })),
 
       getPersonByEmail: (email) =>
