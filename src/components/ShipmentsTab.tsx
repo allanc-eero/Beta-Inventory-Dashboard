@@ -457,7 +457,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
               value: 'pending_returns',
               label: (
                 <span className="flex items-center gap-1.5">
-                  Pending Returns {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
+                  Archived {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
                   {testerShippedDevices.length > 0 && (
                     <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold text-white bg-[var(--ui-core-periwinkle-periwinkle-6)] rounded-full" title={`${testerShippedDevices.length} shipped by tester`}>
                       {testerShippedDevices.length}
@@ -760,9 +760,9 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
           {/* Explanation */}
           <div className="bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-warning)] mb-1">Pending Device Returns</h3>
+            <h3 className="text-sm font-semibold text-[var(--ui-support-text-icon-support-warning)] mb-1">Archived Devices</h3>
             <p className="text-xs text-[var(--ui-support-text-icon-support-warning)]">
-              These devices have been requested for return — a return email was sent to the tester. They remain here until you confirm the device has been physically received back. Devices overdue by 2+ weeks are highlighted in red.
+              Devices from closed programs land here. Track each return individually — the tester can enter a return tracking number, and you mark the device Archived once it&apos;s handled. Devices waiting 2+ weeks are highlighted in red.
             </p>
           </div>
 
@@ -827,10 +827,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                                     timestamp: new Date().toISOString(),
                                     action: 'return_confirmed',
                                     user: 'Admin',
-                                    description: 'Device return confirmed. Removed from pending returns and marked as deactivated.',
+                                    description: 'Device archived. Removed from the tracking queue and marked as deactivated.',
                                   });
                                 }}
-                                label="✓ Confirm Received"
+                                label="✓ Mark as Archived"
                               />
                             ) : (
                               <span className="text-xs text-[var(--ui-text-text-placeholder)]">View only</span>
