@@ -120,6 +120,7 @@ interface DemoProgram {
   name: string;
   type: ProgramType;
   status: 'active' | 'completed'; // 'completed' = the beta is over (closed, kept for the record)
+  closedAt?: string;          // when the program was closed (drives the archived-devices record)
   currentPhase?: Phase;       // hardware only — the phase currently running
   audienceSize: number;       // testers imported from Qualtrics — the survey audience for this program
   devicesDeployed: number;    // 0 for feature programs
@@ -2083,6 +2084,9 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
           const progDevices = p.type === 'feature' ? [] : devices.filter((d) => d.program === programEnumFor(p));
           const deployed = progDevices.length;
           const online = progDevices.filter((d) => d.status === 'online').length;
+          // This program's devices in the archive lifecycle (linked by name), for the
+          // closed-program record shown on completed cards.
+          const archivedForProgram = p.type === 'feature' ? [] : devices.filter((d) => d.testbedName === p.name && (d.status === 'pending_return' || (d.status === 'deactivated' && d.archivedAt)));
           return (
             <Card key={p.id} size={3}>
               <div className="flex flex-col gap-4">
@@ -2109,6 +2113,12 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
                       : <Tag color="green" size="regular">In progress</Tag>}
                   </div>
                 </div>
+
+                {p.status === 'completed' && p.type === 'hardware' && (
+                  <div className="rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--ui-background-layer-layer-page-hover)', color: TEXT_SECONDARY }}>
+                    Closed{p.closedAt ? ` ${new Date(p.closedAt).toLocaleDateString()}` : ''} · <b style={{ color: TEXT_PRIMARY }}>{archivedForProgram.length}</b> device{archivedForProgram.length !== 1 ? 's' : ''} archived — track returns in <b style={{ color: TEXT_PRIMARY }}>Device Ingestion &amp; Returns → Archived</b>.
+                  </div>
+                )}
 
                 {noSurveys && (
                   <div className="rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--ui-core-ocean-blue-ocean-1)', color: TEXT_SECONDARY }}>
@@ -2180,6 +2190,7 @@ export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { emb
 
   const { openToast } = useToast();
   const showToast = (msg: string) => openToast({ type: ToastType.success, description: msg });
+  const { devices, updateDevice } = useDeviceStore();
 
   // Launch ONE survey INTO an existing program — the repeatable everyday path
   // (OOBE, weekly Performance, RTM, Re-setup…), each started individually when ready.
@@ -2219,9 +2230,22 @@ export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { emb
   // Close/reopen a program — "completed" ends the beta but keeps it (and its surveys)
   // on the record. This is the non-destructive counterpart to delete.
   const handleToggleProgramStatus = (program: DemoProgram) => {
-    const next = program.status === 'active' ? 'completed' : 'active';
-    setPrograms((prev) => prev.map((p) => (p.id === program.id ? { ...p, status: next } : p)));
-    showToast(next === 'completed' ? `Closed ${program.name} — marked complete` : `Reopened ${program.name}`);
+    if (program.status === 'active') {
+      // Closing: push this program's still-active devices to Archived so each
+      // return can be tracked individually (Device Ingestion & Returns → Archived).
+      const progDevices = devices.filter((d) => d.testbedName === program.name && d.status !== 'deactivated' && d.status !== 'pending_return');
+      const ok = window.confirm(
+        `Close “${program.name}”?\n\n${progDevices.length} device(s) will be moved to Archived. Track each device's return individually there and mark it Archived once handled.`
+      );
+      if (!ok) return;
+      const now = new Date().toISOString();
+      progDevices.forEach((d) => updateDevice(d.id, { status: 'pending_return', returnEmailSentAt: d.returnEmailSentAt || now, programClosedAt: now }));
+      setPrograms((prev) => prev.map((p) => (p.id === program.id ? { ...p, status: 'completed', closedAt: now } : p)));
+      showToast(`Closed ${program.name} — ${progDevices.length} device${progDevices.length !== 1 ? 's' : ''} moved to Archived`);
+    } else {
+      setPrograms((prev) => prev.map((p) => (p.id === program.id ? { ...p, status: 'active' } : p)));
+      showToast(`Reopened ${program.name}`);
+    }
   };
 
   // Deleting a program cascades to its surveys (a program is the container for them).

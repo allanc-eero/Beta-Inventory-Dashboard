@@ -17,7 +17,6 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
   const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'>('returned_to_eero');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [brickDevices, setBrickDevices] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -75,7 +74,7 @@ Beta Team`;
   const [perTesterSubjects, setPerTesterSubjects] = useState<Record<string, string>>({});
 
   const requiresReturn = reason === 'defective' || reason === 'end_of_program';
-  const willBrick = reason === 'lost' || (reason === 'end_of_program' && brickDevices);
+  const willBrick = false; // bricking removed — devices are archived, never remotely disabled
 
   // Group devices by assignee for email/label generation (deduplicated by serial)
   const groupedByAssignee = useMemo(() => {
@@ -381,17 +380,6 @@ Beta Team`;
                 />
               </div>
             </div>
-            {/* Brick option for end of program */}
-            {reason === 'end_of_program' && (
-              <div className="p-3 bg-[var(--ui-support-fill-support-warning)] border border-[var(--ui-support-border-support-warning)] rounded-lg">
-                <Checkbox
-                  checked={brickDevices}
-                  onChange={(e: { target: { checked: boolean } }) => setBrickDevices(e.target.checked)}
-                  label="Also brick these devices"
-                />
-                <p className="text-xs text-[var(--ui-core-orange-orange-6)] mt-0.5 ml-6">Remotely deactivate all devices via the Partner API so they can never connect to a network again. Use this when devices should not be reused.</p>
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-medium text-[var(--ui-text-text-secondary)] mb-1">Internal Notes <span className="font-normal text-[var(--ui-text-text-placeholder)]">(not sent to testers — for your team's records only)</span></label>
@@ -507,18 +495,6 @@ Beta Team`;
                   <p className="text-sm text-[var(--ui-text-text-secondary)]"><span className="font-medium">{assigneeCount}</span> return email(s) drafted (grouped by tester — one email per person)</p>
                 </div>
               </>
-            )}
-            {reason === 'lost' && (
-              <div className="flex items-start gap-3">
-                <span className="text-[var(--ui-core-red-red-6)] mt-0.5">⚠️</span>
-                <p className="text-sm text-[var(--ui-support-text-support-error)] font-medium">{uniqueDevices.length} device(s) will be remotely bricked — they will never connect to a network again</p>
-              </div>
-            )}
-            {reason === 'end_of_program' && brickDevices && (
-              <div className="flex items-start gap-3">
-                <span className="text-[var(--ui-core-red-red-6)] mt-0.5">⚠️</span>
-                <p className="text-sm text-[var(--ui-support-text-support-error)] font-medium">{uniqueDevices.length} device(s) will be remotely bricked via the Partner API — they will never connect to a network again</p>
-              </div>
             )}
             <div className="flex items-start gap-3">
               <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>

@@ -100,6 +100,18 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
   const allShipments = getAllShipments();
   const pendingReturnDevices = devices.filter((d) => d.status === 'pending_return');
+  const FOUR_MONTHS_MS = 1000 * 60 * 60 * 24 * 122; // ~4 months retention after program close
+  // Archived tab = in-progress returns (pending) + recently-archived devices.
+  // Archived (done) devices are retained ~4 months after the program closed,
+  // then dropped from the view.
+  const archiveDevices = devices.filter((d) => {
+    if (d.status === 'pending_return') return true;
+    if (d.status === 'deactivated' && d.archivedAt) {
+      const anchor = new Date(d.programClosedAt || d.archivedAt).getTime();
+      return Date.now() - anchor < FOUR_MONTHS_MS;
+    }
+    return false;
+  });
   // Devices the tester has marked shipped (entered a return tracking number via the portal)
   const testerShippedDevices = pendingReturnDevices.filter((d) => d.returnTrackingNumber);
 
@@ -457,7 +469,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
               value: 'pending_returns',
               label: (
                 <span className="flex items-center gap-1.5">
-                  Archived {pendingReturnDevices.length > 0 && `(${pendingReturnDevices.length})`}
+                  Archived {archiveDevices.length > 0 && `(${archiveDevices.length})`}
                   {testerShippedDevices.length > 0 && (
                     <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold text-white bg-[var(--ui-core-periwinkle-periwinkle-6)] rounded-full" title={`${testerShippedDevices.length} shipped by tester`}>
                       {testerShippedDevices.length}
@@ -734,7 +746,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 📦 Shipped by Tester ({testerShippedDevices.length})
               </h3>
               <p className="text-xs text-[var(--ui-support-text-icon-support-info)] mb-3">
-                These testers clicked "mark as returned" in their portal and provided a tracking number. Track the package, then confirm receipt below — from there you can archive or brick the device.
+                These testers clicked "mark as returned" in their portal and provided a tracking number. Track the package, then mark the device Archived below once it&apos;s received.
               </p>
               <div className="space-y-2">
                 {testerShippedDevices.map((d) => {
@@ -766,9 +778,9 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             </p>
           </div>
 
-          {pendingReturnDevices.length === 0 ? (
+          {archiveDevices.length === 0 ? (
             <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-12 text-center">
-              <p className="text-[var(--ui-text-text-placeholder)] text-sm">No devices pending return</p>
+              <p className="text-[var(--ui-text-text-placeholder)] text-sm">No archived devices</p>
             </div>
           ) : (
             <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
@@ -778,62 +790,74 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Serial</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Tester</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Return Tracking</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Email Sent</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Days Waiting</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Waiting / Archived</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
-                  {pendingReturnDevices
-                    .sort((a, b) => new Date(a.returnEmailSentAt || '').getTime() - new Date(b.returnEmailSentAt || '').getTime())
+                  {archiveDevices
+                    .sort((a, b) => {
+                      const ap = a.status === 'pending_return' ? 0 : 1;
+                      const bp = b.status === 'pending_return' ? 0 : 1;
+                      if (ap !== bp) return ap - bp; // pending first
+                      if (ap === 0) return new Date(a.returnEmailSentAt || '').getTime() - new Date(b.returnEmailSentAt || '').getTime();
+                      return new Date(b.archivedAt || '').getTime() - new Date(a.archivedAt || '').getTime();
+                    })
                     .map((d) => {
+                      const isPending = d.status === 'pending_return';
                       const daysOut = daysSinceFn(d.returnEmailSentAt);
-                      const isOverdue = daysOut >= 14;
+                      const isOverdue = isPending && daysOut >= 14;
                       return (
                         <tr key={d.id} className={isOverdue ? 'bg-[var(--ui-support-fill-support-error)]' : 'hover:bg-[var(--ui-background-layer-layer-page-hover)]'}>
                           <td className="px-4 py-3 font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</td>
                           <td className="px-4 py-3 text-[var(--ui-text-text-secondary)]">{d.assignedTo || '—'}</td>
                           <td className="px-4 py-3 text-[var(--ui-text-text-tertiary)] text-xs">{d.assignedEmail || '—'}</td>
+                          <td className="px-4 py-3">
+                            <Tag color={isPending ? 'orange' : 'grey'} size="regular">{isPending ? 'Pending return' : 'Archived'}</Tag>
+                          </td>
                           <td className="px-4 py-3 text-xs">
                             {d.returnTrackingNumber ? (
                               <span className="font-mono text-[var(--ui-core-periwinkle-periwinkle-6)] font-medium">{d.returnTrackingNumber}</span>
                             ) : (
-                              <span className="text-[var(--ui-text-text-placeholder)]">not shipped yet</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--ui-text-text-tertiary)]">
-                            {d.returnEmailSentAt ? new Date(d.returnEmailSentAt).toLocaleDateString() : '—'}
-                            {d.returnEmailCount && d.returnEmailCount > 1 && (
-                              <span className="ml-1 text-[var(--ui-core-orange-orange-6)]">({d.returnEmailCount}× sent)</span>
+                              <span className="text-[var(--ui-text-text-placeholder)]">{isPending ? 'not shipped yet' : '—'}</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <Tag color={isOverdue ? 'red' : daysOut >= 7 ? 'orange' : 'grey'} size="regular">
-                              {daysOut} day{daysOut !== 1 ? 's' : ''}
-                              {isOverdue && ' — OVERDUE'}
-                            </Tag>
-                          </td>
-                          <td className="px-4 py-3">
-                            {canEdit() ? (
-                              <Button
-                                type="default"
-                                size="medium"
-                                onClick={() => {
-                                  updateDevice(d.id, { status: 'deactivated' as DeviceStatus, deactivated: true });
-                                  addHistoryEntry({
-                                    id: crypto.randomUUID(),
-                                    deviceId: d.id,
-                                    timestamp: new Date().toISOString(),
-                                    action: 'return_confirmed',
-                                    user: 'Admin',
-                                    description: 'Device archived. Removed from the tracking queue and marked as deactivated.',
-                                  });
-                                }}
-                                label="✓ Mark as Archived"
-                              />
+                            {isPending ? (
+                              <Tag color={isOverdue ? 'red' : daysOut >= 7 ? 'orange' : 'grey'} size="regular">
+                                {daysOut} day{daysOut !== 1 ? 's' : ''}
+                                {isOverdue && ' — OVERDUE'}
+                              </Tag>
                             ) : (
-                              <span className="text-xs text-[var(--ui-text-text-placeholder)]">View only</span>
+                              <span className="text-xs text-[var(--ui-text-text-tertiary)]">Archived {d.archivedAt ? new Date(d.archivedAt).toLocaleDateString() : ''}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isPending ? (
+                              canEdit() ? (
+                                <Button
+                                  type="default"
+                                  size="medium"
+                                  onClick={() => {
+                                    updateDevice(d.id, { status: 'deactivated' as DeviceStatus, deactivated: true, archivedAt: new Date().toISOString() });
+                                    addHistoryEntry({
+                                      id: crypto.randomUUID(),
+                                      deviceId: d.id,
+                                      timestamp: new Date().toISOString(),
+                                      action: 'archived',
+                                      user: 'Admin',
+                                      description: 'Device marked Archived. Kept in the Archived view for ~4 months after program close.',
+                                    });
+                                  }}
+                                  label="✓ Mark as Archived"
+                                />
+                              ) : (
+                                <span className="text-xs text-[var(--ui-text-text-placeholder)]">View only</span>
+                              )
+                            ) : (
+                              <span className="text-xs text-[var(--ui-text-text-placeholder)]">—</span>
                             )}
                           </td>
                         </tr>

@@ -93,6 +93,9 @@ export interface Device {
   // Return shipment (tester-entered, US/CA self-ship)
   returnTrackingNumber?: string;
   returnShippedAt?: string;
+  // Archive lifecycle
+  programClosedAt?: string; // set when the device's program is closed → pushed to Archived
+  archivedAt?: string;      // set when an admin marks the device Archived (done)
 }
 
 export interface Testbed {
