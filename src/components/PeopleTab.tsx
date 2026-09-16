@@ -10,6 +10,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
+import { adminUserUrl, insightNetworkUrl, initials } from '@/lib/format';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
   { value: 'no_longer_interested', label: 'No longer interested in testing' },
@@ -333,7 +334,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         >
                           <div className="flex min-w-0 flex-[2] items-center gap-2.5">
                             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--ui-support-fill-support-success)]">
-                              <span className="text-xs font-semibold text-[var(--ui-support-text-support-success)]">{person.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+                              <span className="text-xs font-semibold text-[var(--ui-support-text-support-success)]">{initials(person.name)}</span>
                             </div>
                             <div className="min-w-0 leading-tight">
                               <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{person.name}</p>
@@ -386,7 +387,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-[var(--ui-background-layer-layer-page-hover)] rounded-full flex items-center justify-center">
                           <span className="text-[var(--ui-text-text-tertiary)] font-semibold text-sm">
-                            {record.personName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            {initials(record.personName)}
                           </span>
                         </div>
                         <div>
@@ -491,7 +492,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-[var(--ui-support-fill-support-success)] rounded-full flex items-center justify-center">
                           <span className="text-[var(--ui-support-text-support-success)] font-bold text-lg">
-                            {(personName || '').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            {initials(personName)}
                           </span>
                         </div>
                         <div>
@@ -559,7 +560,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         {profile?.networkId ? (
                           <div className="flex items-baseline gap-3">
                             <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
-                            <a href={`https://insight.eero.com/networks/${profile.networkId}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
+                            <a href={insightNetworkUrl(profile.networkId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
                           </div>
                         ) : (
                           <ProfileField label="INSIGHT NETWORK" value="" />
@@ -567,7 +568,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         {profile?.adminId ? (
                           <div className="flex items-baseline gap-3">
                             <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
-                            <a href={`https://admin.e2ro.com/users/${profile.adminId.replace(/^UID0*/, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.adminId} ↗</a>
+                            <a href={adminUserUrl(profile.adminId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.adminId} ↗</a>
                           </div>
                         ) : (
                           <ProfileField label="ADMIN ID" value="" />
@@ -611,7 +612,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           <span className="text-sm text-[var(--ui-text-text-primary)] font-medium">Removed from eero Admin</span>
                           <p className="text-xs text-[var(--ui-text-text-tertiary)]">Reverted to default user role in admin panel</p>
                         </div>
-                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? `https://admin.e2ro.com/users/${aid.replace(/^UID0*/, '')}` : nid ? `https://insight.eero.com/networks/${nid}` : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
+                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? adminUserUrl(aid) : nid ? insightNetworkUrl(nid) : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
                       <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--ui-background-layer-layer-page)] cursor-pointer">
                         <Checkbox checked={optOutDevicesDone} onChange={(e: CheckboxChangeEvent) => setOptOutDevicesDone(e.target.checked)} className="mt-0.5" />

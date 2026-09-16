@@ -5,6 +5,7 @@ import { OptOutRecord } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { CheckCircle, Circle, ExternalLink, Bell, UserPlus } from 'lucide-react';
+import { adminUserUrl, insightNetworkUrl } from '@/lib/format';
 
 interface OptBackInChecklistPanelProps {
   record: OptOutRecord;
@@ -55,7 +56,7 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
       description: 'Set their user role back to tester in the admin panel',
       done: adminReAdded,
       onCheck: () => setAdminReAdded(true),
-      link: adminId ? `https://admin.e2ro.com/users/${adminId.replace(/^UID0*/, '')}` : networkId ? `https://insight.eero.com/networks/${networkId}` : undefined,
+      link: adminId ? adminUserUrl(adminId) : networkId ? insightNetworkUrl(networkId) : undefined,
       linkLabel: adminId ? 'Open in Admin' : networkId ? 'Open in Insight' : undefined,
     },
   ];

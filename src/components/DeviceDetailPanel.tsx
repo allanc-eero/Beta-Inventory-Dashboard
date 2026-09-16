@@ -14,6 +14,7 @@ import DeactivateDeviceModal from './DeactivateDeviceModal';
 import AttachmentsPanel from './AttachmentsPanel';
 import SalesforcePanel from './SalesforcePanel';
 import { STATUS_CONFIG as SHARED_STATUS_CONFIG, downloadCSV, daysSince } from '@/constants';
+import { adminUserUrl, insightNetworkUrl } from '@/lib/format';
 
 interface DeviceDetailPanelProps {
   device: Device;
@@ -35,14 +36,14 @@ const DEVICE_FIELDS: FieldDef[] = [
   { label: 'SKU', field: 'sku' },
   { label: 'PART NUMBER', field: 'partNumber' },
   { label: 'COUNTRY', field: 'country' },
-  { label: 'ADMIN ID', field: 'unitId', linkUrl: (d) => d.unitId ? `https://admin.e2ro.com/users/${d.unitId.replace(/^UID0*/, '')}` : undefined },
+  { label: 'ADMIN ID', field: 'unitId', linkUrl: (d) => d.unitId ? adminUserUrl(d.unitId) : undefined },
   { label: 'FIRMWARE', field: 'firmwareVersion' },
   { label: 'ENVIRONMENT', field: 'environment', options: ['', 'stage', 'prod'] },
 ];
 
 const ASSIGNMENT_FIELDS: FieldDef[] = [
   { label: 'COUNTRY', field: 'country' },
-  { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => d.network ? `https://insight.eero.com/networks/${d.network}` : undefined },
+  { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => d.network ? insightNetworkUrl(d.network) : undefined },
 ];
 
 const LOGISTICS_FIELDS: FieldDef[] = [

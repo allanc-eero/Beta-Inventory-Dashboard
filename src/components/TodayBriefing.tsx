@@ -17,6 +17,7 @@
 import { useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { TabType } from '@/types';
+import { isReturnOverdue, RETURN_OVERDUE_MS } from '@/lib/format';
 
 interface TodayBriefingProps {
   onNavigate: (tab: TabType) => void;
@@ -29,19 +30,15 @@ export default function TodayBriefing({ onNavigate }: TodayBriefingProps) {
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const oneWeekMs = 7 * oneDayMs;
-    const twoWeeksMs = 14 * oneDayMs;
 
     // Pending returns overdue 2+ weeks
-    const overdueReturns = devices.filter((d) =>
-      d.status === 'pending_return' && d.returnEmailSentAt &&
-      (now - new Date(d.returnEmailSentAt).getTime()) >= twoWeeksMs
-    );
+    const overdueReturns = devices.filter((d) => d.status === 'pending_return' && isReturnOverdue(d.returnEmailSentAt, now));
 
     // Pending returns needing follow-up (1-2 weeks)
     const needsFollowUp = devices.filter((d) =>
       d.status === 'pending_return' && d.returnEmailSentAt &&
       (now - new Date(d.returnEmailSentAt).getTime()) >= oneWeekMs &&
-      (now - new Date(d.returnEmailSentAt).getTime()) < twoWeeksMs
+      (now - new Date(d.returnEmailSentAt).getTime()) < RETURN_OVERDUE_MS
     );
 
     // All pending returns

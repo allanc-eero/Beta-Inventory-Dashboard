@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Device, Testbed, Location, Person, CheckoutRecord, DeviceStatus, Program, HistoryEntry, SpeedTestResult, JiraTicket, DeactivationRecord, OverdueAlert, FirmwareInfo, Shipment, ShipmentStatus, Carrier, Attachment, AttachmentType, SyncMetadata, ClosedProgramRecord, OptOutRecord, TesterProfile } from '@/types';
 import { getReturnEpic } from '@/constants';
+import { isReturnOverdue } from '@/lib/format';
 
 // Build a HistoryEntry with auto-filled id + timestamp. Consolidates the
 // repeated `{ id: crypto.randomUUID(), timestamp: new Date().toISOString(), ... }`
@@ -523,14 +524,13 @@ export const useDeviceStore = create<DeviceStore>()(
       // ─── Overdue Alerts ─────────────────────────────────────────────────────
       getOverdueDevices: () => {
         const now = new Date();
-        const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
 
         const overdueDevices = get().devices.filter((d) => {
           if (d.deactivated) return false;
           // Original: past due date and checked out
           if (d.dueDate && new Date(d.dueDate) < now && d.checkedOutTo) return true;
           // New: pending_return with return email sent 2+ weeks ago
-          if (d.status === 'pending_return' && d.returnEmailSentAt && (now.getTime() - new Date(d.returnEmailSentAt).getTime()) >= twoWeeksMs) return true;
+          if (d.status === 'pending_return' && isReturnOverdue(d.returnEmailSentAt, now.getTime())) return true;
           return false;
         });
 

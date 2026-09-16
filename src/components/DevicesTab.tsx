@@ -11,6 +11,7 @@ import BulkReturnPanel from './BulkReturnPanel';
 import AgentChat from './AgentChat';
 import { getStatusBadge } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
+import { insightNetworkUrl, adminNetworkUrl } from '@/lib/format';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
   const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
@@ -266,13 +267,13 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
                 </td>
                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                   {device.network ? (
-                    <a href={`https://insight.eero.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title="Open this device's network in Insight">{device.serialNumber} ↗</a>
+                    <a href={insightNetworkUrl(device.network)} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title="Open this device's network in Insight">{device.serialNumber} ↗</a>
                   ) : (
                     <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title="No network yet — device not online in Insight">{device.serialNumber}</span>
                   )}
                   {device.network && (
                     <div>
-                      <a href={`https://admin.e2ro.com/networks/${device.network}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title="Open this network in Admin">Admin ↗</a>
+                      <a href={adminNetworkUrl(device.network)} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title="Open this network in Admin">Admin ↗</a>
                     </div>
                   )}
                 </td>

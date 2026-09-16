@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Card } from '@amzn/eero-web-design-components';
 import { Monitor, Users, MapPin, FlaskConical, CheckCircle, AlertTriangle } from 'lucide-react';
+import { isReturnOverdue } from '@/lib/format';
 
 interface DashboardStatsProps {
   onOverdueClick?: () => void;
@@ -18,10 +19,9 @@ export default function DashboardStats({ onOverdueClick }: DashboardStatsProps) 
     const countries = new Set(devices.map((d) => d.country).filter(Boolean)).size;
     const programs = testbeds.length || new Set(devices.map((d) => d.program)).size;
     const now = new Date();
-    const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
     const overdue = devices.filter((d) => {
       if (d.dueDate && new Date(d.dueDate) < now && d.status === 'not_online') return true;
-      if (d.status === 'pending_return' && d.returnEmailSentAt && (now.getTime() - new Date(d.returnEmailSentAt).getTime()) >= twoWeeksMs) return true;
+      if (d.status === 'pending_return' && isReturnOverdue(d.returnEmailSentAt, now.getTime())) return true;
       return false;
     }).length;
 

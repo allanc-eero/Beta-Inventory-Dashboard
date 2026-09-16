@@ -37,6 +37,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
+import { adminUserUrl, insightNetworkUrl, adminNetworkUrl } from '@/lib/format';
 
 // ─── Types (inline — demo only) ──────────────────────────────────────────────
 type ProgramType = 'hardware' | 'feature';
@@ -1509,7 +1510,7 @@ function ProgramDeviceDetail({ detail, onBack, onToast }: {
           <DetailRow label="SKU" value={detail.sku} />
           <DetailRow label="Part Number" value={detail.partNumber} />
           <DetailRow label="Country" value={detail.country} />
-          <DetailRow label="Admin ID" value={detail.adminId} link={`https://admin.e2ro.com/users/${detail.adminId.replace(/^UID0*/, '')}`} />
+          <DetailRow label="Admin ID" value={detail.adminId} link={adminUserUrl(detail.adminId)} />
           <DetailRow label="Firmware" value={detail.firmware} />
           <DetailRow label="Environment" value={detail.environment} />
           <DetailRow label="Deactivated" value={detail.deactivated ? 'yes' : 'no'} />
@@ -1520,7 +1521,7 @@ function ProgramDeviceDetail({ detail, onBack, onToast }: {
             <DetailRow label="Status" value={detail.status} />
             <DetailRow label="Assigned To" value={detail.assignedTo} />
             <DetailRow label="Country" value={detail.country} />
-            <DetailRow label="Insight Network" value={detail.insightNetwork} link={`https://insight.eero.com/networks/${detail.insightNetwork}`} />
+            <DetailRow label="Insight Network" value={detail.insightNetwork} link={insightNetworkUrl(detail.insightNetwork)} />
           </DetailSection>
           <DetailSection title="Logistics">
             <DetailRow label="Asset Tag" value={detail.assetTag} />
@@ -1602,12 +1603,6 @@ interface AssignedDevice {
   firmware: string;
   source: 'live' | 'seed';
 }
-
-// Insight + Admin deep links, anchored on the resolved network — this is what
-// makes a serial clickable back to the platform it lives on. Both tools key the
-// network view on /networks/{id} (confirmed against the live tools).
-const insightNetworkUrl = (networkId: string) => `https://insight.eero.com/networks/${networkId}`;
-const adminNetworkUrl = (networkId: string) => `https://admin.e2ro.com/networks/${networkId}`;
 
 // Enrich one serial through the /api/insight route (serial-anchored lookup).
 async function enrichSerial(serial: string, fallbackModel: string): Promise<AssignedDevice> {
