@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Select, Checkbox, Tag, Modal } from '@amzn/eero-web-design-components';
+import { Button, Select, Tag, Modal } from '@amzn/eero-web-design-components';
 import { Device, DeviceStatus } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import JiraToast from './JiraToast';
@@ -16,7 +16,6 @@ export default function BulkReturnPanel({ devices, onClose }: BulkReturnPanelPro
   const { updateDevice, addHistoryEntry, createJiraTicket } = useDeviceStore();
   const [reason, setReason] = useState<'returned_to_eero' | 'defective' | 'end_of_program' | 'lost'>('returned_to_eero');
   const [notes, setNotes] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -74,7 +73,6 @@ Beta Team`;
   const [perTesterSubjects, setPerTesterSubjects] = useState<Record<string, string>>({});
 
   const requiresReturn = reason === 'defective' || reason === 'end_of_program';
-  const willBrick = false; // bricking removed — devices are archived, never remotely disabled
 
   // Group devices by assignee for email/label generation (deduplicated by serial)
   const groupedByAssignee = useMemo(() => {
@@ -140,32 +138,17 @@ Beta Team`;
     const epic = getReturnEpic(program);
     const ticketKey = `QA-${Math.floor(Math.random() * 90000) + 10000}`;
 
-    // Process each device — mark as pending return (not deactivated until confirmed)
+    // Process each device — mark as pending return (archived once received)
     uniqueDevices.forEach((device) => {
-      const newStatus = willBrick ? 'deactivated' : 'pending_return';
-      updateDevice(device.id, { status: newStatus as DeviceStatus, deactivated: willBrick });
+      updateDevice(device.id, { status: 'pending_return', deactivated: false });
       addHistoryEntry({
         id: crypto.randomUUID(),
         deviceId: device.id,
         timestamp: new Date().toISOString(),
-        action: willBrick ? 'deactivated' : 'return_requested',
+        action: 'return_requested',
         user: 'Admin',
-        description: willBrick
-          ? `Bulk return — reason: ${reason.replace(/_/g, ' ')} (bricked via API). Consolidated JIRA: ${ticketKey}. ${notes}`
-          : `Return requested — reason: ${reason.replace(/_/g, ' ')}. Device marked as pending return. Consolidated JIRA: ${ticketKey}. ${notes}`,
+        description: `Return requested — reason: ${reason.replace(/_/g, ' ')}. Device marked as pending return. Consolidated JIRA: ${ticketKey}. ${notes}`,
       });
-
-      // If bricking, log the API call
-      if (willBrick) {
-        addHistoryEntry({
-          id: crypto.randomUUID(),
-          deviceId: device.id,
-          timestamp: new Date().toISOString(),
-          action: 'bricked',
-          user: 'Admin',
-          description: `Device remotely bricked via Partner API (POST /2.2/eeros/:id/activation_state — active: false)`,
-        });
-      }
     });
 
     // Create ONE consolidated JIRA ticket for the entire batch
@@ -252,7 +235,7 @@ Beta Team`;
           d.serialNumber,
           d.assignedTo || d.checkedOutTo || '',
           d.assignedEmail || '',
-          willBrick ? 'Bricked & Deactivated' : 'Deactivated',
+          'Pending Return',
           reason.replace(/_/g, ' '),
           new Date().toLocaleDateString(),
         ]);
@@ -482,7 +465,7 @@ Beta Team`;
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>
-              <p className="text-sm text-[var(--ui-text-text-secondary)]"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as {willBrick ? 'deactivated (bricked)' : 'pending return'}</p>
+              <p className="text-sm text-[var(--ui-text-text-secondary)]"><span className="font-medium">{uniqueDevices.length}</span> device(s) will be marked as pending return</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-[var(--ui-core-green-green-6)] mt-0.5">✓</span>
@@ -503,21 +486,6 @@ Beta Team`;
           </div>
         </div>
 
-        {/* Brick confirmation — for lost OR end-of-program with brick enabled */}
-        {willBrick && (
-          <div className="bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-xl p-5 mb-8">
-            <Checkbox
-              checked={confirmed}
-              onChange={(e: { target: { checked: boolean } }) => setConfirmed(e.target.checked)}
-              label={
-                reason === 'lost'
-                  ? `I confirm these ${uniqueDevices.length} device(s) are lost or unrecoverable and should be permanently bricked. This action cannot be undone.`
-                  : `I confirm these ${uniqueDevices.length} device(s) should be permanently bricked as part of the end-of-program process. They will never connect to a network again. This action cannot be undone.`
-              }
-            />
-          </div>
-        )}
-
         {/* Actions */}
         <div className="flex items-center justify-between pb-12">
           <Button
@@ -527,10 +495,9 @@ Beta Team`;
           />
           <Button
             type="primary"
-            danger={willBrick}
             label="Preview Changes →"
             onClick={() => setShowPreview(true)}
-            disabled={processing || (willBrick && !confirmed)}
+            disabled={processing}
           />
         </div>
 
@@ -549,21 +516,10 @@ Beta Team`;
               <div className="flex items-center gap-3 p-3 bg-[var(--ui-background-layer-layer-page-hover)] border border-[var(--ui-background-layer-border-border-layer-page)] rounded-lg">
                 <span className="text-lg">📦</span>
                 <div>
-                  <p className="text-sm font-medium text-[var(--ui-text-text-secondary)]">{uniqueDevices.length} device(s) will be marked as {willBrick ? 'BRICKED & DEACTIVATED' : 'Pending Return'}</p>
-                  <p className="text-xs text-[var(--ui-text-text-tertiary)]">{willBrick ? 'Permanently deactivated via Partner API — cannot be undone' : 'Return emails will be sent. Devices stay active until confirmed received.'}</p>
+                  <p className="text-sm font-medium text-[var(--ui-text-text-secondary)]">{uniqueDevices.length} device(s) will be marked as Pending Return</p>
+                  <p className="text-xs text-[var(--ui-text-text-tertiary)]">Return emails will be sent. Devices stay active until confirmed received.</p>
                 </div>
               </div>
-
-              {willBrick && (
-                <div className="p-3 bg-[var(--ui-support-fill-support-error)] border border-[var(--ui-support-border-support-error)] rounded-lg">
-                  <p className="text-xs font-semibold text-[var(--ui-support-text-support-error)] mb-2">🚨 Devices being bricked:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {uniqueDevices.map((d) => (
-                      <span key={d.id} className="text-xs font-mono bg-[var(--ui-support-fill-support-error)] text-[var(--ui-support-text-support-error)] px-1.5 py-0.5 rounded">{d.serialNumber}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {requiresReturn && (
                 <div className="p-3 bg-[var(--ui-support-fill-support-info)] border border-[var(--ui-support-border-support-info)] rounded-lg">
@@ -594,8 +550,7 @@ Beta Team`;
               />
               <Button
                 type="primary"
-                danger={willBrick}
-                label={willBrick ? `Confirm & Brick ${uniqueDevices.length} Device(s)` : `Confirm & Process ${uniqueDevices.length} Device(s)`}
+                label={`Confirm & Process ${uniqueDevices.length} Device(s)`}
                 onClick={() => { setShowPreview(false); handleSubmit(); }}
               />
             </div>
