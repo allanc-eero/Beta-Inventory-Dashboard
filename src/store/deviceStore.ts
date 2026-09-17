@@ -862,11 +862,18 @@ export const useDeviceStore = create<DeviceStore>()(
           if (profileData.programs) {
             updates.programs = Array.from(new Set([...existing.programs, ...profileData.programs]));
           }
-          // Merge additional emails — add the incoming email if it's not already tracked
+          // Merge aliases — every known address for this tester (incoming email,
+          // contact/personal, alternate, plus any explicit additionalEmails) becomes
+          // a matchable alias, so their amazon / eero / personal emails all resolve
+          // to one identity.
           const allEmails = new Set([...(existing.additionalEmails || []).map((e) => e.toLowerCase())]);
           if (email !== existing.email.toLowerCase()) allEmails.add(email);
-          if (profileData.additionalEmails) profileData.additionalEmails.forEach((e) => allEmails.add(e.toLowerCase()));
-          updates.additionalEmails = Array.from(allEmails).filter((e) => e !== existing.email.toLowerCase());
+          [
+            ...(profileData.additionalEmails || []),
+            profileData.contactEmail, profileData.alternateEmail,
+            existing.contactEmail, existing.alternateEmail,
+          ].forEach((e) => { if (e) allEmails.add(e.toLowerCase()); });
+          updates.additionalEmails = Array.from(allEmails).filter((e) => e && e !== existing.email.toLowerCase());
 
           set((state) => ({
             testerProfiles: state.testerProfiles.map((p) =>
@@ -882,7 +889,13 @@ export const useDeviceStore = create<DeviceStore>()(
             id: crypto.randomUUID(),
             testerId,
             email: email,
-            additionalEmails: profileData.additionalEmails || [],
+            // Seed aliases from all known addresses (contact/personal, alternate)
+            // so this tester resolves across amazon / eero / personal emails.
+            additionalEmails: Array.from(new Set(
+              [...(profileData.additionalEmails || []), profileData.contactEmail, profileData.alternateEmail]
+                .filter((e): e is string => !!e && e.toLowerCase() !== email)
+                .map((e) => e.toLowerCase())
+            )),
             name: profileData.name || '',
             contactEmail: profileData.contactEmail || '',
             alternateEmail: profileData.alternateEmail || '',

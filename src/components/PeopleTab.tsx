@@ -117,26 +117,17 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   // roster-only programs from their profile that never shipped a device — the
   // cross-program history reference for this tester.
   const personProgramGroups = useMemo(() => {
-    // The program NAME a device belongs to. Survey-flow devices (id "prog-…")
-    // carry the real program name in testbedName; for others testbedName is a
-    // network group, so fall back to the product + program label (matches the
-    // Devices menu) — never show a network group as a "program".
-    const programLabel = (d: Device) =>
-      (d.id.startsWith('prog-') && d.testbedName)
-        ? d.testbedName
-        : ([d.product, (d.program || '').toUpperCase()].filter(Boolean).join(' ').trim() || 'Unknown');
-
     const map = new Map<string, Device[]>();
     selectedPersonDevices.forEach((d) => {
-      const key = programLabel(d);
+      const key = deviceProgramLabel(d);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(d);
     });
     // Roster-only programs from the profile (participated but no device shipped).
-    const seen = new Set([...map.keys()].map((k) => k.toLowerCase().replace(/\s+/g, '')));
+    const seen = new Set([...map.keys()].map((k) => normalizeProgramKey(k)));
     const prof = selectedPerson ? getTesterProfile(selectedPerson) : undefined;
     (prof?.programs || []).forEach((p) => {
-      if (!seen.has(p.toLowerCase().replace(/\s+/g, ''))) map.set(p, []);
+      if (!seen.has(normalizeProgramKey(p))) map.set(p, []);
     });
     return Array.from(map.entries()).map(([name, devs]) => ({ name, devices: devs }));
   }, [selectedPersonDevices, selectedPerson, testerProfiles, getTesterProfile]);
@@ -347,13 +338,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                     {pagePeople.map((person) => {
                       const online = person.devices.filter((d) => d.status === 'online').length;
                       const archived = person.devices.filter((d) => d.status === 'deactivated').length;
-                      const activePrograms = Array.from(new Set(person.devices.filter((d) => d.status !== 'deactivated').map((d) => d.program).filter(Boolean)));
-                      // Roster-aware fallback: a device-less tester still shows the program
-                      // they're on, pulled from their tester profile (seeded from the roster).
-                      const rosterPrograms = getTesterProfile(person.email)?.programs || [];
-                      const programsLabel = activePrograms.length
-                        ? activePrograms.map((p) => p.toUpperCase()).join(', ')
-                        : (rosterPrograms.length ? rosterPrograms.join(', ') : '—');
+                      const programCount = programCountFor(person.devices, getTesterProfile(person.email)?.programs || []);
                       return (
                         <div
                           key={person.email || person.name}
@@ -371,7 +356,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           </div>
                           <div className="flex-1 leading-tight">
                             <p className="text-xs text-[var(--ui-text-text-tertiary)]">Programs</p>
-                            <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{programsLabel}</p>
+                            <p className="truncate text-sm font-medium text-[var(--ui-text-text-primary)]">{programCount}</p>
                           </div>
                           <div className="flex-1 leading-tight">
                             <p className="text-xs text-[var(--ui-text-text-tertiary)]">Devices</p>
@@ -822,4 +807,23 @@ function ProfileField({ label, value }: { label: string; value: string }) {
       <span className="text-sm text-[var(--ui-text-text-primary)]">{value || '—'}</span>
     </div>
   );
+}
+
+const normalizeProgramKey = (s: string) => s.toLowerCase().replace(/\s+/g, '');
+
+// The program NAME a device belongs to. Survey-flow devices (id "prog-…") carry
+// the real program name in testbedName; for others testbedName is a network
+// group, so fall back to the product + program label (matches the Devices menu).
+function deviceProgramLabel(d: Device) {
+  return (d.id.startsWith('prog-') && d.testbedName)
+    ? d.testbedName
+    : ([d.product, (d.program || '').toUpperCase()].filter(Boolean).join(' ').trim() || 'Unknown');
+}
+
+// Count of distinct programs a person is part of (devices + roster) — the People row summary.
+function programCountFor(devices: Device[], programs: string[] = []) {
+  const keys = new Set<string>();
+  devices.forEach((d) => keys.add(normalizeProgramKey(deviceProgramLabel(d))));
+  programs.forEach((p) => keys.add(normalizeProgramKey(p)));
+  return keys.size;
 }
