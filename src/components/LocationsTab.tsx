@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
+import { Device } from '@/types';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleLinear } from 'd3-scale';
-import { Select, Tag, Pagination } from '@amzn/eero-web-design-components';
+import { Select, Tag, Pagination, Button } from '@amzn/eero-web-design-components';
+import { downloadCSV } from '@/constants';
+import DeviceDetailPanel from './DeviceDetailPanel';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -31,9 +34,22 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
 };
 
 type FilterMode = 'all' | 'online' | 'offline' | 'deactivated';
+type DetailStatus = 'all' | 'online' | 'not_online' | 'deactivated';
+
+interface RegionData { total: number; online: number; offline: number; deactivated: number }
+
+// Small live stat tile for the KPI strip.
+function StatTile({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
+  return (
+    <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] p-3">
+      <p className="text-xs text-[var(--ui-text-text-tertiary)]">{label}</p>
+      <p className="text-xl font-bold" style={{ color: accent || 'var(--ui-text-text-primary)' }}>{value}</p>
+    </div>
+  );
+}
 
 export default function LocationsTab() {
-  const { devices } = useDeviceStore();
+  const { devices, syncMetadata } = useDeviceStore();
   const [filter, setFilter] = useState<FilterMode>('all');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [programFilter, setProgramFilter] = useState<string>('all');
@@ -41,6 +57,8 @@ export default function LocationsTab() {
   const [center, setCenter] = useState<[number, number]>([20, 20]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [detailStatus, setDetailStatus] = useState<DetailStatus>('all');
+  const [openDevice, setOpenDevice] = useState<Device | null>(null);
 
   const programs = useMemo(() => {
     return Array.from(new Set(devices.map((d) => d.program).filter(Boolean)));
@@ -59,7 +77,7 @@ export default function LocationsTab() {
 
   // Group by country
   const countryData = useMemo(() => {
-    const map = new Map<string, { total: number; online: number; offline: number; deactivated: number }>();
+    const map = new Map<string, RegionData>();
     filteredDevices.forEach((d) => {
       const country = d.country || 'Unknown';
       if (!map.has(country)) map.set(country, { total: 0, online: 0, offline: 0, deactivated: 0 });
@@ -70,6 +88,18 @@ export default function LocationsTab() {
       else entry.offline++;
     });
     return map;
+  }, [filteredDevices]);
+
+  // Live totals across the current filter — updates as devices are uploaded / come online.
+  const totals = useMemo(() => {
+    let online = 0, offline = 0, deactivated = 0;
+    filteredDevices.forEach((d) => {
+      if (d.status === 'online') online++;
+      else if (d.status === 'deactivated') deactivated++;
+      else offline++;
+    });
+    const total = filteredDevices.length;
+    return { total, online, offline, deactivated, rate: total ? Math.round((online / total) * 100) : 0 };
   }, [filteredDevices]);
 
   const maxDevices = Math.max(...Array.from(countryData.values()).map((v) => v.total), 1);
@@ -83,17 +113,58 @@ export default function LocationsTab() {
     .domain([0, maxDevices])
     .range([12, 40]);
 
-  // Devices in selected country
+  // Fly the map to a region (used when a marker or region container is clicked).
+  const flyTo = (country: string) => {
+    const coords = COUNTRY_COORDS[country];
+    if (coords) { setCenter(coords); setZoom((z) => Math.max(z, 4)); }
+  };
+  const selectRegion = (country: string) => { setSelectedCountry(country); flyTo(country); };
+
+  // Devices in selected country (respects the top-level filter), then the in-panel status chip.
   const countryDevices = useMemo(() => {
     if (!selectedCountry) return [];
     return filteredDevices.filter((d) => (d.country || 'Unknown') === selectedCountry);
   }, [filteredDevices, selectedCountry]);
 
-  // Reset pagination when the selected country changes
-  useEffect(() => { setPage(1); }, [selectedCountry]);
-  const countryTotalPages = Math.max(1, Math.ceil(countryDevices.length / pageSize));
+  const detailDevices = useMemo(() => {
+    if (detailStatus === 'all') return countryDevices;
+    return countryDevices.filter((d) => d.status === detailStatus);
+  }, [countryDevices, detailStatus]);
+
+  const detailCounts = useMemo(() => {
+    let online = 0, notOnline = 0, deactivated = 0;
+    countryDevices.forEach((d) => {
+      if (d.status === 'online') online++;
+      else if (d.status === 'deactivated') deactivated++;
+      else notOnline++;
+    });
+    return { online, notOnline, deactivated };
+  }, [countryDevices]);
+
+  // Reset pagination when the selection or in-panel filter changes.
+  useEffect(() => { setPage(1); setDetailStatus('all'); }, [selectedCountry]);
+  useEffect(() => { setPage(1); }, [detailStatus]);
+  const countryTotalPages = Math.max(1, Math.ceil(detailDevices.length / pageSize));
   const countryPage = Math.min(page, countryTotalPages);
-  const pagedCountryDevices = countryDevices.slice((countryPage - 1) * pageSize, (countryPage - 1) * pageSize + pageSize);
+  const pagedCountryDevices = detailDevices.slice((countryPage - 1) * pageSize, (countryPage - 1) * pageSize + pageSize);
+
+  const lastSync = syncMetadata?.lastFullSync ? new Date(syncMetadata.lastFullSync).toLocaleString() : 'never';
+
+  const exportRegionCSV = () => {
+    if (!selectedCountry) return;
+    const rows: (string | number)[][] = [['Serial', 'Model', 'Assigned To', 'Email', 'Program', 'Status', 'Country']];
+    detailDevices.forEach((d) => rows.push([
+      d.serialNumber, d.model, d.assignedTo || '', d.assignedEmail || '', d.program, d.status.replace(/_/g, ' '), d.country || '',
+    ]));
+    downloadCSV(`${selectedCountry.replace(/\s+/g, '_')}_devices.csv`, rows);
+  };
+
+  const DETAIL_CHIPS: { value: DetailStatus; label: string; count: number }[] = [
+    { value: 'all', label: 'All', count: countryDevices.length },
+    { value: 'online', label: 'Online', count: detailCounts.online },
+    { value: 'not_online', label: 'Not online', count: detailCounts.notOnline },
+    { value: 'deactivated', label: 'Deactivated', count: detailCounts.deactivated },
+  ];
 
   return (
     <div className="space-y-6">
@@ -130,6 +201,16 @@ export default function LocationsTab() {
             />
           </div>
         </div>
+      </div>
+
+      {/* Live KPI strip — reflects uploads and online syncs as they happen */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatTile label="Regions" value={countryData.size} />
+        <StatTile label="Devices" value={totals.total} />
+        <StatTile label="Online" value={totals.online} accent="var(--ui-core-green-green-6)" />
+        <StatTile label="Not online" value={totals.offline} accent="var(--ui-core-orange-orange-5)" />
+        <StatTile label="Deactivated" value={totals.deactivated} accent="var(--ui-text-text-tertiary)" />
+        <StatTile label="Online rate" value={`${totals.rate}%`} accent={totals.rate >= 70 ? 'var(--ui-core-green-green-6)' : 'var(--ui-core-orange-orange-5)'} />
       </div>
 
       {/* Map */}
@@ -181,25 +262,27 @@ export default function LocationsTab() {
               }
             </Geographies>
 
-            {/* Device markers */}
+            {/* Device markers — center shows online/total so coming-online is visible on the map */}
             {Array.from(countryData.entries()).map(([country, data]) => {
               const coords = COUNTRY_COORDS[country];
               if (!coords) return null;
               const size = sizeScale(data.total);
               const color = colorScale(data.total);
+              const isSelected = selectedCountry === country;
+              const centerLabel = filter === 'all' ? `${data.online}/${data.total}` : `${data.total}`;
 
               return (
                 <Marker
                   key={country}
                   coordinates={coords}
-                  onClick={() => setSelectedCountry(country)}
+                  onClick={() => selectRegion(country)}
                 >
                   <circle
                     r={size / zoom}
                     fill={color}
                     fillOpacity={0.8}
-                    stroke="#1e40af"
-                    strokeWidth={2 / zoom}
+                    stroke={isSelected ? '#16a34a' : '#1e40af'}
+                    strokeWidth={(isSelected ? 3.5 : 2) / zoom}
                     style={{ cursor: 'pointer' }}
                   />
                   <text
@@ -212,9 +295,9 @@ export default function LocationsTab() {
                   <text
                     textAnchor="middle"
                     y={4 / zoom}
-                    style={{ fontSize: `${Math.max(11, size * 0.7) / zoom}px`, fill: '#000000', fontWeight: 800 }}
+                    style={{ fontSize: `${Math.max(11, size * 0.55) / zoom}px`, fill: '#000000', fontWeight: 800 }}
                   >
-                    {data.total}
+                    {centerLabel}
                   </text>
                 </Marker>
               );
@@ -229,8 +312,9 @@ export default function LocationsTab() {
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-2)]" /> Low density</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-5)]" /> Medium</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-9)]" /> High density</span>
+            {filter === 'all' && <span className="text-[var(--ui-text-text-placeholder)]">· marker shows online/total</span>}
           </div>
-          <p className="text-xs text-[var(--ui-text-text-placeholder)]">{filteredDevices.length} devices across {countryData.size} countries</p>
+          <p className="text-xs text-[var(--ui-text-text-placeholder)]">{filteredDevices.length} devices across {countryData.size} countries · synced {lastSync}</p>
         </div>
       </div>
 
@@ -243,7 +327,7 @@ export default function LocationsTab() {
             return (
               <div
                 key={country}
-                onClick={() => setSelectedCountry(country)}
+                onClick={() => selectRegion(country)}
                 className={`bg-[var(--ui-background-layer-layer-page)] rounded-xl border p-4 cursor-pointer transition-all hover:shadow-sm ${selectedCountry === country ? 'border-[var(--ui-core-periwinkle-periwinkle-5)] ring-1 ring-[var(--ui-core-periwinkle-periwinkle-2)]' : 'border-[var(--ui-background-layer-border-border-layer-page)]'}`}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -255,7 +339,11 @@ export default function LocationsTab() {
                   <div className="h-full bg-[var(--ui-core-green-green-6)] rounded-full" style={{ width: `${onlinePercent}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-xs text-[var(--ui-text-text-tertiary)]">
-                  <span className="text-[var(--ui-core-green-green-6)]">{data.online} online</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-[var(--ui-core-green-green-6)]">{data.online} online</span>
+                    {data.offline > 0 && <span className="text-[var(--ui-core-orange-orange-5)]">{data.offline} not online</span>}
+                    {data.deactivated > 0 && <span>{data.deactivated} deact.</span>}
+                  </span>
                   <span>{onlinePercent}% healthy</span>
                 </div>
               </div>
@@ -266,9 +354,28 @@ export default function LocationsTab() {
       {/* Country detail */}
       {selectedCountry && (
         <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden">
-          <div className="p-4 border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[var(--ui-text-text-primary)]">{selectedCountry} — {countryDevices.length} devices</h3>
-            <button onClick={() => setSelectedCountry(null)} className="text-xs text-[var(--ui-text-text-tertiary)] hover:text-[var(--ui-text-text-secondary)]">Close ×</button>
+          <div className="p-4 border-b border-[var(--ui-background-layer-border-border-layer-page)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--ui-text-text-primary)]">{selectedCountry} — {countryDevices.length} devices</h3>
+              <div className="flex items-center gap-3">
+                <Button type="text" label="Export CSV" onClick={exportRegionCSV} />
+                <button onClick={() => setSelectedCountry(null)} className="text-xs text-[var(--ui-text-text-tertiary)] hover:text-[var(--ui-text-text-secondary)]">Close ×</button>
+              </div>
+            </div>
+            {/* Status filter chips */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              {DETAIL_CHIPS.map((chip) => (
+                <button
+                  key={chip.value}
+                  onClick={() => setDetailStatus(chip.value)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${detailStatus === chip.value
+                    ? 'bg-[var(--ui-core-periwinkle-periwinkle-1)] border-[var(--ui-core-periwinkle-periwinkle-5)] text-[var(--ui-core-periwinkle-periwinkle-7)]'
+                    : 'bg-[var(--ui-background-layer-layer-page)] border-[var(--ui-background-layer-border-border-layer-page)] text-[var(--ui-text-text-tertiary)] hover:bg-[var(--ui-background-layer-layer-page-hover)]'}`}
+                >
+                  {chip.label} · {chip.count}
+                </button>
+              ))}
+            </div>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -282,8 +389,12 @@ export default function LocationsTab() {
             </thead>
             <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
               {pagedCountryDevices.map((d) => (
-                <tr key={d.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)]">
-                  <td className="px-4 py-2 font-mono text-xs">{d.serialNumber}</td>
+                <tr
+                  key={d.id}
+                  onClick={() => setOpenDevice(d)}
+                  className="hover:bg-[var(--ui-background-layer-layer-page-hover)] cursor-pointer"
+                >
+                  <td className="px-4 py-2 font-mono text-xs text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</td>
                   <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.model}</td>
                   <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.assignedTo || d.assignedEmail || '—'}</td>
                   <td className="px-4 py-2"><Tag color="periwinkle" size="regular">{d.program}</Tag></td>
@@ -294,12 +405,15 @@ export default function LocationsTab() {
                   </td>
                 </tr>
               ))}
+              {pagedCountryDevices.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-[var(--ui-text-text-placeholder)]">No devices match this filter.</td></tr>
+              )}
             </tbody>
           </table>
-          {countryDevices.length > pageSize && (
+          {detailDevices.length > pageSize && (
             <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-4 py-2">
               <Pagination
-                pagination={{ totalItems: countryDevices.length, totalPages: countryTotalPages, hasPreviousPage: countryPage > 1, hasNextPage: countryPage < countryTotalPages }}
+                pagination={{ totalItems: detailDevices.length, totalPages: countryTotalPages, hasPreviousPage: countryPage > 1, hasNextPage: countryPage < countryTotalPages }}
                 currentPage={countryPage}
                 pageSize={pageSize}
                 onPageChange={setPage}
@@ -312,6 +426,11 @@ export default function LocationsTab() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Shared editable device panel — same one used in Devices / People / Surveys */}
+      {openDevice && (
+        <DeviceDetailPanel device={openDevice} onClose={() => setOpenDevice(null)} />
       )}
     </div>
   );
