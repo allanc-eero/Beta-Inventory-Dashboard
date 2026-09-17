@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { Plus } from 'lucide-react';
-import { OptOutReason, OptOutRecord, Device } from '@/types';
+import { OptOutReason, OptOutRecord, Device, TesterProfile } from '@/types';
 import { Segmented, Input, TextArea, Select, Button, Tag, Checkbox, Modal, Pagination } from '@amzn/eero-web-design-components';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import DeviceDetailPanel from './DeviceDetailPanel';
@@ -42,6 +42,24 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   const [duplicateMatches, setDuplicateMatches] = useState<any[]>([]);
   const [pendingNewPerson, setPendingNewPerson] = useState<{ name: string; email: string; team: string } | null>(null);
   const [optBackInRecord, setOptBackInRecord] = useState<OptOutRecord | null>(null);
+  // Profile edit mode — fix a mislinked account / correct any tester field.
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileEdit, setProfileEdit] = useState<Partial<TesterProfile>>({});
+  const onProfileEditChange = (field: keyof TesterProfile, v: string) => setProfileEdit((prev) => ({ ...prev, [field]: v }));
+  const startEditProfile = () => {
+    const p = getTesterProfile(selectedPerson || '');
+    setProfileEdit({
+      name: p?.name || '', contactEmail: p?.contactEmail || '', alternateEmail: p?.alternateEmail || '',
+      country: p?.country || '', location: p?.location || '', networkId: p?.networkId || '',
+      adminId: p?.adminId || '', internetSpeed: p?.internetSpeed || '',
+    });
+    setEditingProfile(true);
+  };
+  const saveEditProfile = () => {
+    const email = getTesterProfile(selectedPerson || '')?.email || selectedPerson || '';
+    if (email) upsertTesterProfile({ email, ...profileEdit });
+    setEditingProfile(false);
+  };
 
   const optOuts = getOptOuts();
   const optedOutEmails = new Set(optOuts.map((o) => o.personEmail.toLowerCase()));
@@ -486,7 +504,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
           /* Person Detail View — Expanded Profile */
           <div className="space-y-4">
             <button
-              onClick={() => setSelectedPerson(null)}
+              onClick={() => { setSelectedPerson(null); setEditingProfile(false); }}
               className="text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] text-sm font-medium"
             >
               ← All people
@@ -521,7 +539,19 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                         </div>
                       </div>
                       {canEdit() && (
-                        <Button type="default" label="Record Opt-Out" onClick={() => setShowOptOut(true)} />
+                        <div className="flex items-center gap-2">
+                          {editingProfile ? (
+                            <>
+                              <Button type="default" label="Cancel" onClick={() => setEditingProfile(false)} />
+                              <Button type="primary" label="Save" onClick={saveEditProfile} />
+                            </>
+                          ) : (
+                            <>
+                              <Button type="default" label="Edit profile" onClick={startEditProfile} />
+                              <Button type="default" label="Record Opt-Out" onClick={() => setShowOptOut(true)} />
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -532,21 +562,34 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                     <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5">
                       <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] pb-2">Contact & Identity</h4>
                       <div className="space-y-2.5">
-                        <ProfileField label="PRIMARY EMAIL" value={profile?.email || selectedPerson || ''} />
-                        <ProfileField label="CONTACT EMAIL" value={profile?.contactEmail || ''} />
-                        <ProfileField label="ALTERNATE EMAIL" value={profile?.alternateEmail || ''} />
-                        {(profile?.additionalEmails || []).length > 0 && (
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">OTHER EMAILS</span>
-                            <div className="flex flex-wrap gap-1">
-                              {profile!.additionalEmails.map((e) => (
-                                <Tag key={e} color="grey" size="regular">{e}</Tag>
-                              ))}
-                            </div>
-                          </div>
+                        {editingProfile ? (
+                          <>
+                            <EditableRow label="NAME" field="name" value={profileEdit.name || ''} onChange={onProfileEditChange} />
+                            <ProfileField label="PRIMARY EMAIL" value={profile?.email || selectedPerson || ''} />
+                            <EditableRow label="CONTACT EMAIL" field="contactEmail" value={profileEdit.contactEmail || ''} onChange={onProfileEditChange} />
+                            <EditableRow label="ALTERNATE EMAIL" field="alternateEmail" value={profileEdit.alternateEmail || ''} onChange={onProfileEditChange} />
+                            <EditableRow label="COUNTRY" field="country" value={profileEdit.country || ''} onChange={onProfileEditChange} />
+                            <EditableRow label="LOCATION" field="location" value={profileEdit.location || ''} onChange={onProfileEditChange} />
+                          </>
+                        ) : (
+                          <>
+                            <ProfileField label="PRIMARY EMAIL" value={profile?.email || selectedPerson || ''} />
+                            <ProfileField label="CONTACT EMAIL" value={profile?.contactEmail || ''} />
+                            <ProfileField label="ALTERNATE EMAIL" value={profile?.alternateEmail || ''} />
+                            {(profile?.additionalEmails || []).length > 0 && (
+                              <div className="flex items-baseline gap-3">
+                                <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">OTHER EMAILS</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {profile!.additionalEmails.map((e) => (
+                                    <Tag key={e} color="grey" size="regular">{e}</Tag>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <ProfileField label="COUNTRY" value={profile?.country || selectedPersonDevices[0]?.country || ''} />
+                            <ProfileField label="LOCATION" value={profile?.location || selectedPersonDevices[0]?.location || ''} />
+                          </>
                         )}
-                        <ProfileField label="COUNTRY" value={profile?.country || selectedPersonDevices[0]?.country || ''} />
-                        <ProfileField label="LOCATION" value={profile?.location || selectedPersonDevices[0]?.location || ''} />
                       </div>
                     </div>
 
@@ -570,23 +613,33 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                             ))}
                           </div>
                         </div>
-                        {profile?.networkId ? (
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
-                            <a href={insightNetworkUrl(profile.networkId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
-                          </div>
+                        {editingProfile ? (
+                          <>
+                            <EditableRow label="INSIGHT NETWORK" field="networkId" value={profileEdit.networkId || ''} onChange={onProfileEditChange} />
+                            <EditableRow label="ADMIN ID" field="adminId" value={profileEdit.adminId || ''} onChange={onProfileEditChange} />
+                            <EditableRow label="INTERNET SPEED" field="internetSpeed" value={profileEdit.internetSpeed || ''} onChange={onProfileEditChange} />
+                          </>
                         ) : (
-                          <ProfileField label="INSIGHT NETWORK" value="" />
+                          <>
+                            {profile?.networkId ? (
+                              <div className="flex items-baseline gap-3">
+                                <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
+                                <a href={insightNetworkUrl(profile.networkId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
+                              </div>
+                            ) : (
+                              <ProfileField label="INSIGHT NETWORK" value="" />
+                            )}
+                            {profile?.adminId ? (
+                              <div className="flex items-baseline gap-3">
+                                <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
+                                <a href={adminUserUrl(profile.adminId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.adminId} ↗</a>
+                              </div>
+                            ) : (
+                              <ProfileField label="ADMIN ID" value="" />
+                            )}
+                            <ProfileField label="INTERNET SPEED" value={profile?.internetSpeed || ''} />
+                          </>
                         )}
-                        {profile?.adminId ? (
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
-                            <a href={adminUserUrl(profile.adminId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.adminId} ↗</a>
-                          </div>
-                        ) : (
-                          <ProfileField label="ADMIN ID" value="" />
-                        )}
-                        <ProfileField label="INTERNET SPEED" value={profile?.internetSpeed || ''} />
                         {profile?.testerId && <ProfileField label="TESTER ID" value={profile.testerId} />}
                       </div>
                     </div>
@@ -805,6 +858,19 @@ function ProfileField({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline gap-3">
       <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">{label}</span>
       <span className="text-sm text-[var(--ui-text-text-primary)]">{value || '—'}</span>
+    </div>
+  );
+}
+
+function EditableRow({ label, field, value, onChange }: {
+  label: string; field: keyof TesterProfile; value: string; onChange: (field: keyof TesterProfile, v: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">{label}</span>
+      <div className="flex-1">
+        <Input id={`edit-profile-${String(field)}`} value={value} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(field, e.target.value)} />
+      </div>
     </div>
   );
 }
