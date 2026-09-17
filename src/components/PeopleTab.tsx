@@ -113,6 +113,21 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
     );
   }, [devices, selectedPerson]);
 
+  // Group the selected person's devices by program (past + active), plus any
+  // roster-only programs from their profile that never shipped a device — the
+  // cross-program history reference for this tester.
+  const personProgramGroups = useMemo(() => {
+    const map = new Map<string, Device[]>();
+    selectedPersonDevices.forEach((d) => {
+      const key = d.testbedName || (d.program ? d.program.toUpperCase() : 'Unknown');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(d);
+    });
+    const prof = selectedPerson ? getTesterProfile(selectedPerson) : undefined;
+    (prof?.programs || []).forEach((p) => { if (!map.has(p)) map.set(p, []); });
+    return Array.from(map.entries()).map(([name, devs]) => ({ name, devices: devs }));
+  }, [selectedPersonDevices, selectedPerson, testerProfiles, getTesterProfile]);
+
   // ── Possible-duplicate detection ───────────────────────────────────────────
   // Finds pairs of people that look like the SAME person but sit on different
   // cards (different canonical emails, no recorded alias yet). Uses name (exact
@@ -581,6 +596,45 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                 </>
               );
             })()}
+
+            {/* Program History — every program this tester has been part of, past + active */}
+            <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-5">
+              <h4 className="text-xs font-semibold text-[var(--ui-text-text-tertiary)] uppercase tracking-wider mb-3 border-b border-[var(--ui-background-layer-border-border-layer-page)] pb-2">
+                Program History ({personProgramGroups.length})
+              </h4>
+              {personProgramGroups.length === 0 ? (
+                <p className="text-sm text-[var(--ui-text-text-placeholder)]">No program history yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {personProgramGroups.map((g) => {
+                    const active = g.devices.some((d) => d.status === 'online' || d.status === 'not_online');
+                    const label = g.devices.length === 0 ? 'Roster only' : active ? 'Active' : 'Closed';
+                    const color = label === 'Active' ? 'green' : label === 'Closed' ? 'grey' : 'periwinkle';
+                    return (
+                      <div key={g.name} className="rounded-lg border border-[var(--ui-background-layer-border-border-layer-page)] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-[var(--ui-text-text-primary)]">{g.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-[var(--ui-text-text-tertiary)]">{g.devices.length} device{g.devices.length !== 1 ? 's' : ''}</span>
+                            <Tag color={color} size="regular">{label}</Tag>
+                          </div>
+                        </div>
+                        {g.devices.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {g.devices.map((d) => (
+                              <button key={d.id} onClick={() => setViewDevice(d)} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ui-background-layer-border-border-layer-page)] px-2 py-1 hover:bg-[var(--ui-background-layer-layer-page-hover)]">
+                                <span className="font-mono text-xs text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</span>
+                                <Tag color={getStatusTagColor(d.status)} size="regular">{d.status.replace(/_/g, ' ')}</Tag>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Opt-Out Form */}
             {showOptOut && (
