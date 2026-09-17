@@ -34,6 +34,7 @@ import {
 // here, so the same devices surface in the Devices / People / Locations menus.
 // (This is the "shared model" wiring; see the handoff doc's simulation note.)
 import { useDeviceStore } from '@/store/deviceStore';
+import DeviceDetailPanel from './DeviceDetailPanel';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
@@ -1359,26 +1360,6 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
   );
 }
 
-// ─── Program Health view ─────────────────────────────────────────────────────
-// ─── Device detail (self-contained mock — mirrors the real DeviceDetailPanel) ──
-// Clicking a serial in a program roster opens this. In production it's a live
-// Insight read; here it's deterministic mock behind the same demo seam. Fields
-// mirror the real DeviceDetailPanel (Device / Assignment / Logistics / Notes /
-// Testbed / Contact + Firmware + Network Health).
-interface RosterDeviceDetail {
-  serial: string;
-  model: string; manufacturer: string; revision: string; revisionNotes: string;
-  hardwareConfig: string; mac: string; internalName: string; sku: string;
-  partNumber: string; country: string; adminId: string; firmware: string;
-  environment: string; deactivated: boolean;
-  status: string; assignedTo: string; insightNetwork: string;
-  assetTag: string; poExpensify: string; tracking: string; returnTracking: string; jira: string;
-  notes: string; testbed: string;
-  email: string; contactEmail: string; alternateEmail: string; dueDate: string; program: string;
-  firmwareCurrent: string; firmwareLatest: string;
-  speedDown: number | null; speedUp: number | null;
-}
-
 const COUNTRY_POOL = [
   { name: 'Australia', code: 'AUS' }, { name: 'United States', code: 'USA' },
   { name: 'United Kingdom', code: 'GBR' }, { name: 'Germany', code: 'DEU' },
@@ -1395,192 +1376,6 @@ function hashSeed(s: string): number {
 // geo-IP/timezone from Insight (where it's installed), not the shipped-to address.
 function countryForSerial(serial: string): { name: string; code: string } {
   return COUNTRY_POOL[hashSeed(serial) % COUNTRY_POOL.length];
-}
-
-function deviceDetailFor(entry: RosterEntry, serial: string, program: DemoProgram): RosterDeviceDetail {
-  const model = betaModelFor(program);
-  const seed = hashSeed(serial);
-  const online = entry.candidates.find((c) => c.serial === serial)?.online ?? false;
-  const country = countryForSerial(serial);
-  const handle = entry.email.split('@')[0];
-  return {
-    serial,
-    model: 'eero Max 7',
-    manufacturer: 'eero',
-    revision: '',
-    revisionNotes: '',
-    hardwareConfig: '',
-    mac: '',
-    internalName: `${model} 10.2`,
-    sku: '',
-    partNumber: '',
-    country: country.name,
-    adminId: `UID000${2900000 + (seed % 99999)}`,
-    firmware: '',
-    environment: '',
-    deactivated: false,
-    status: online ? 'Online' : 'Not online',
-    assignedTo: entry.tester,
-    insightNetwork: String(17000000 + (seed % 99999)),
-    assetTag: '',
-    poExpensify: '',
-    tracking: '',
-    returnTracking: '',
-    jira: '',
-    notes: '',
-    testbed: program.name,
-    email: entry.email,
-    contactEmail: `${handle}@amazon.com`,
-    alternateEmail: '',
-    dueDate: '',
-    program: program.type === 'feature' ? 'feature' : 'beta',
-    firmwareCurrent: 'Unknown',
-    firmwareLatest: '7.3.8',
-    speedDown: online ? 99.5 : null,
-    speedUp: online ? 17.0 : null,
-  };
-}
-
-function DetailRow({ label, value, link }: { label: string; value?: string; link?: string }) {
-  return (
-    <div className="flex items-baseline gap-3">
-      <span className="w-36 shrink-0 text-xs font-medium uppercase" style={{ color: TEXT_TERTIARY }}>{label}</span>
-      {link && value
-        ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:underline" style={{ color: ACCENT }}>{value} ↗</a>
-        : <span className="text-sm" style={{ color: TEXT_PRIMARY }}>{value || '—'}</span>}
-    </div>
-  );
-}
-
-function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h3 className="mb-3 border-b pb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: TEXT_TERTIARY, borderColor: TRACK }}>{title}</h3>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-
-function ProgramDeviceDetail({ detail, onBack, onToast }: {
-  detail: RosterDeviceDetail;
-  onBack: () => void;
-  onToast: (msg: string) => void;
-}) {
-  const [speed, setSpeed] = useState<{ down: number | null; up: number | null }>({ down: detail.speedDown, up: detail.speedUp });
-  const [testing, setTesting] = useState(false);
-  const online = detail.status.toLowerCase() === 'online';
-
-  const runSpeedTest = () => {
-    setTesting(true);
-    simulate(true, 1200).then(() => {
-      setSpeed({ down: Math.round((80 + Math.random() * 60) * 10) / 10, up: Math.round((10 + Math.random() * 15) * 10) / 10 });
-      setTesting(false);
-      onToast('Speed test complete (simulated)');
-    });
-  };
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <Button type="text" label="← Back to devices" onClick={onBack} />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="font-mono text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>{detail.serial}</h1>
-            <div className="mt-1 flex items-center gap-3">
-              <Tag color={online ? 'green' : 'orange'} size="regular">{detail.status}</Tag>
-              <span className="text-sm" style={{ color: 'var(--ui-core-red-red-6)' }}>📍 {detail.country}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button type="default" leftIcon={ICONS.FUNCTIONAL_DOWNLOAD} label="Export" onClick={() => onToast('Exported device info to CSV (simulated)')} />
-            <Button type="primary" label="Edit details" onClick={() => onToast('Edit mode (simulated) — fields become editable when wired to Insight')} />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <DetailSection title="Device">
-          <DetailRow label="Model" value={detail.model} />
-          <DetailRow label="Manufacturer" value={detail.manufacturer} />
-          <DetailRow label="Revision" value={detail.revision} />
-          <DetailRow label="Revision Notes" value={detail.revisionNotes} />
-          <DetailRow label="Hardware Config" value={detail.hardwareConfig} />
-          <DetailRow label="MAC" value={detail.mac} />
-          <DetailRow label="Internal Name" value={detail.internalName} />
-          <DetailRow label="SKU" value={detail.sku} />
-          <DetailRow label="Part Number" value={detail.partNumber} />
-          <DetailRow label="Country" value={detail.country} />
-          <DetailRow label="Admin ID" value={detail.adminId} link={adminUserUrl(detail.adminId)} />
-          <DetailRow label="Firmware" value={detail.firmware} />
-          <DetailRow label="Environment" value={detail.environment} />
-          <DetailRow label="Deactivated" value={detail.deactivated ? 'yes' : 'no'} />
-        </DetailSection>
-
-        <div className="space-y-6">
-          <DetailSection title="Assignment">
-            <DetailRow label="Status" value={detail.status} />
-            <DetailRow label="Assigned To" value={detail.assignedTo} />
-            <DetailRow label="Country" value={detail.country} />
-            <DetailRow label="Insight Network" value={detail.insightNetwork} link={insightNetworkUrl(detail.insightNetwork)} />
-          </DetailSection>
-          <DetailSection title="Logistics">
-            <DetailRow label="Asset Tag" value={detail.assetTag} />
-            <DetailRow label="PO / Expensify" value={detail.poExpensify} />
-            <DetailRow label="Tracking" value={detail.tracking} />
-            <DetailRow label="Return Tracking" value={detail.returnTracking} />
-            <DetailRow label="JIRA" value={detail.jira} />
-          </DetailSection>
-        </div>
-
-        <div className="space-y-6">
-          <DetailSection title="Notes">
-            <p className="text-sm" style={{ color: TEXT_SECONDARY }}>{detail.notes || '—'}</p>
-          </DetailSection>
-          <DetailSection title="Testbed">
-            <p className="text-sm" style={{ color: TEXT_PRIMARY }}>{detail.testbed}</p>
-          </DetailSection>
-          <DetailSection title="Contact">
-            <DetailRow label="Email" value={detail.email} />
-            <DetailRow label="Contact Email" value={detail.contactEmail} />
-            <DetailRow label="Alternate Email" value={detail.alternateEmail} />
-            <DetailRow label="Due Date" value={detail.dueDate} />
-            <DetailRow label="Program" value={detail.program} />
-          </DetailSection>
-        </div>
-      </div>
-
-      <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Firmware</span>}>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-sm">
-            <span style={{ color: TEXT_TERTIARY }}>Current Version</span>
-            <span style={{ color: TEXT_PRIMARY }}>{detail.firmwareCurrent}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span style={{ color: TEXT_TERTIARY }}>Latest Available</span>
-            <span style={{ color: TEXT_PRIMARY }}>{detail.firmwareLatest}</span>
-          </div>
-        </div>
-      </Card>
-
-      <Card size={4} title={
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Network Health</span>
-          <Button type="primary" label={testing ? 'Testing…' : 'Run Speed Test'} onClick={runSpeedTest} />
-        </div>
-      }>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg p-4 text-center" style={{ backgroundColor: 'var(--ui-background-layer-layer-page-backplate)' }}>
-            <p className="text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>{speed.down ?? '—'}</p>
-            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Mbps Down</p>
-          </div>
-          <div className="rounded-lg p-4 text-center" style={{ backgroundColor: 'var(--ui-background-layer-layer-page-backplate)' }}>
-            <p className="text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>{speed.up ?? '—'}</p>
-            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Mbps Up</p>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
 }
 
 // ─── Program → device roster drill-in (merged from the old Programs menu) ─────
@@ -1653,26 +1448,6 @@ function seedAssignments(program: DemoProgram): Record<string, AssignedDevice[]>
     map[t.id] = devices;
   });
   return map;
-}
-
-// Reuse the existing device-detail view by shaping a one-candidate RosterEntry,
-// then overriding the fields the assigned device actually knows (network/status).
-function assignedDetail(tester: DemoTester, device: AssignedDevice, program: DemoProgram): RosterDeviceDetail {
-  const entry: RosterEntry = {
-    id: tester.id,
-    tester: tester.name,
-    email: tester.email,
-    match: 'matched',
-    candidates: [{ serial: device.serial, model: device.model, online: device.status === 'online' }],
-    selectedSerial: device.serial,
-  };
-  const detail = deviceDetailFor(entry, device.serial, program);
-  return {
-    ...detail,
-    insightNetwork: device.networkId ?? detail.insightNetwork,
-    status: device.status === 'online' ? 'Online' : device.status === 'offline' ? 'Not online' : 'Pending activation',
-    firmwareCurrent: device.firmware || detail.firmwareCurrent,
-  };
 }
 
 // Map a demo program onto the real deviceStore Program enum — this is the key
@@ -1867,11 +1642,16 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   };
 
   if (open) {
+    // Reuse the real, fully-editable DeviceDetailPanel (same one used in the
+    // Devices / People / Search menus). The device was synced into the store on
+    // click, so edits persist to the shared record; fall back to a synthesized
+    // Device if it's somehow not present yet.
+    const stored = getDeviceBySerial(open.device.serial) || toStoreDevice(open.tester, open.device, program);
     return (
-      <ProgramDeviceDetail
-        detail={assignedDetail(open.tester, open.device, program)}
-        onBack={() => setOpen(null)}
-        onToast={onToast}
+      <DeviceDetailPanel
+        device={stored}
+        onClose={() => setOpen(null)}
+        onNavigateToPerson={onNavigateToPerson}
       />
     );
   }
@@ -1962,7 +1742,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                       <div className="flex flex-col divide-y" style={{ borderColor: TRACK }}>
                         {devs.map((d) => (
                           <div key={d.serial} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                            <button className="font-mono text-sm hover:underline" style={{ color: ACCENT }} onClick={() => setOpen({ tester: t, device: d })}>{d.serial}</button>
+                            <button className="font-mono text-sm hover:underline" style={{ color: ACCENT }} onClick={() => { syncToStore(t, d); setOpen({ tester: t, device: d }); }}>{d.serial}</button>
                             <Tag color="grey" size="regular">{d.model}</Tag>
                             {deviceStatusTag(d.status)}
                             {d.networkId
