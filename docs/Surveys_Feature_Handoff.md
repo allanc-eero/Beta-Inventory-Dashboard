@@ -334,3 +334,33 @@ survey is sent to identified contacts (contact list / personal links) — which 
 surveys already are. Anonymous-link surveys return no email; either add an `email` embedded-data
 field or capture it as a question. Set `QUALTRICS_RATING_QID` to the rating question id if you want
 the 1-5 feedback score pulled in too.
+
+---
+## Device online-status sync — cadence + production wiring (2026-08-31)
+Uploaded devices start as `not_online` / `in_transit_to_tester`. Their real online
+status comes from a Databricks sync, now triggered on two cadences:
+- **On upload** — `ShipmentsTab` calls `runDatabricksSync(newSerials)` right after
+  ingest, so freshly uploaded devices are checked immediately (best-effort; if
+  Databricks isn't connected they simply stay "not online").
+- **Weekly** — `isSyncStale()` is now 7 days (was 24h); when the dashboard opens
+  and the last sync is >7d old, an auto-sync runs. This keeps API load low.
+
+Shared logic lives in **`src/lib/networkSync.ts` → `runDatabricksSync(serials?)`**
+(drives the store via `getState()`, so it's callable from the button, post-upload,
+or a scheduler). The manual **Databricks Sync** button now calls the same helper.
+Overlap is prevented by `syncMetadata.syncInProgress`; `isRateLimited()` guards
+against hammering the API.
+
+### To be production-ready
+1. **Databricks credentials** on the `/api/databricks` route: `DATABRICKS_HOST`,
+   `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_TESTER_TABLE`
+   (+ optional `DATABRICKS_*_TABLE` overrides). Until set, sync returns "not
+   connected" and devices stay `not_online`.
+2. **A real server-side weekly scheduler.** The current weekly auto-sync is
+   *client-triggered* — it only fires when someone opens the dashboard. For a
+   guaranteed weekly run regardless of user activity, add a scheduled job
+   (Vercel Cron / EventBridge+Lambda / cron) that calls the sync. That also
+   implies **persisting device state server-side** (today it's client Zustand/
+   localStorage), so the scheduled job has somewhere to write.
+3. **Rate-limit / backoff** already gated client-side (`syncInProgress`,
+   `isSyncStale`, `isRateLimited`); mirror the same guards in the scheduled job.

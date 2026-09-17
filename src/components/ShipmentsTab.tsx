@@ -5,6 +5,7 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Carrier, Shipment, Device, ShipmentStatus, DeviceStatus } from '@/types';
 import * as XLSX from 'xlsx';
 import { useAuthStore } from '@/store/authStore';
+import { runDatabricksSync } from '@/lib/networkSync';
 import JiraToast from './JiraToast';
 import { createJiraIssue } from '@/services/jiraService';
 import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
@@ -442,6 +443,11 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     setFileName('');
     if (fileInputRef.current) fileInputRef.current.value = '';
     setTimeout(() => setSuccessMsg(''), 5000);
+
+    // Auto-check the freshly ingested serials against Databricks right away so
+    // their online status is current (no waiting for the weekly cadence).
+    // Best-effort: if Databricks isn't connected, devices stay "not online".
+    runDatabricksSync(allSerials);
   };
 
   const totalSerials = parsedRows.reduce((sum, r) => sum + r.serials.length, 0);

@@ -746,7 +746,7 @@ export const useDeviceStore = create<DeviceStore>()(
         const { lastFullSync } = get().syncMetadata;
         if (!lastFullSync) return true;
         const hoursSinceSync = (Date.now() - new Date(lastFullSync).getTime()) / (1000 * 60 * 60);
-        return hoursSinceSync >= 24;
+        return hoursSinceSync >= 24 * 7; // weekly cadence — avoid overloading the API
       },
 
       isRateLimited: () => {

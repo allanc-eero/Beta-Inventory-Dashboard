@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Tag } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
+import { runDatabricksSync } from '@/lib/networkSync';
 import { timeAgo } from '@/constants';
 
 // ─── Databricks Sync (one button: online status + tester info) ────────────────
@@ -11,7 +12,8 @@ import { timeAgo } from '@/constants';
 //   • status  → online if alive in Databricks, else not_online
 //   • tester  → assignedTo / assignedEmail / network / location (network owner)
 // Lifecycle states (deactivated/in_repair/in_testing/pending_return) are left
-// untouched. Auto-runs daily (when last sync >24h and dashboard is opened).
+// untouched. Auto-runs weekly (when last sync >7d and the dashboard is opened)
+// and right after a serial-sheet upload. Core sync logic lives in lib/networkSync.
 
 interface SyncResult {
   checked: number;
@@ -24,7 +26,7 @@ interface SyncResult {
 // (relative time provided by shared timeAgo helper)
 
 export default function NetworkSyncButton() {
-  const { devices, syncNetworkStatus, updateDevice, getDeviceBySerial, syncMetadata, updateSyncMetadata, isSyncStale } = useDeviceStore();
+  const { devices, syncMetadata, isSyncStale } = useDeviceStore();
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [error, setError] = useState('');
@@ -52,65 +54,23 @@ export default function NetworkSyncButton() {
   const stale = isSyncStale();
 
   const handleSync = useCallback(async () => {
-    if (syncMetadata.syncInProgress) return;
     setSyncing(true);
     setError('');
     setResult(null);
-    updateSyncMetadata({ syncInProgress: true });
-
-    try {
-      const serials = checkableDevices.map((d) => d.serialNumber).filter(Boolean);
-      if (serials.length === 0) { updateSyncMetadata({ syncInProgress: false }); setSyncing(false); return; }
-
-      const res = await fetch('/api/databricks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'sync', serials }),
-      });
-      const data = await res.json();
-
-      if (!data.success) {
-        // Never apply a failed lookup — would wrongly mark everything offline.
-        setError(data.error || 'Databricks sync failed.');
-        updateSyncMetadata({ syncInProgress: false });
-        return;
-      }
-
-      // 1) Apply online/offline status (authoritative).
-      const onlineSerials = (data.statuses || []).filter((s: any) => s.online).map((s: any) => s.serial);
-      const statusChanges = syncNetworkStatus(onlineSerials);
-
-      // 2) Apply tester info to matched devices.
-      let testerUpdates = 0;
-      (data.testers || []).forEach((t: any) => {
-        if (!t.serial) return;
-        const device = getDeviceBySerial(t.serial);
-        if (!device) return;
-        const updates: Record<string, string> = {};
-        if (t.name && t.name !== device.assignedTo) updates.assignedTo = t.name;
-        if (t.email && t.email !== device.assignedEmail) updates.assignedEmail = t.email;
-        if (t.network && t.network !== device.network) updates.network = t.network;
-        if (t.location && t.location !== device.location) updates.location = t.location;
-        // Country: CSV is the source of truth. Only fill from Databricks when the
-        // device has no country yet — never overwrite a value you uploaded.
-        if (t.country && !device.country) updates.country = t.country;
-        if (Object.keys(updates).length > 0) { updateDevice(device.id, updates as any); testerUpdates++; }
-      });
-
+    const outcome = await runDatabricksSync();
+    if (!outcome.success) {
+      if (outcome.error && outcome.error !== 'A sync is already in progress') setError(outcome.error);
+    } else {
       setResult({
-        checked: serials.length,
-        statusChanges,
-        testerUpdates,
-        online: data.onlineCount ?? onlineSerials.length,
-        notFound: (data.notFound || []).length,
+        checked: outcome.checked,
+        statusChanges: outcome.statusChanges,
+        testerUpdates: outcome.testerUpdates,
+        online: outcome.online,
+        notFound: outcome.notFound,
       });
-    } catch (e: any) {
-      setError(e?.message || 'Sync failed — will retry on next attempt');
-      updateSyncMetadata({ syncInProgress: false });
-    } finally {
-      setSyncing(false);
     }
-  }, [checkableDevices, syncMetadata.syncInProgress, syncNetworkStatus, updateDevice, getDeviceBySerial, updateSyncMetadata]);
+    setSyncing(false);
+  }, []);
 
   // Auto-sync once per page load if stale (>24h). Runs daily.
   useEffect(() => {
@@ -131,7 +91,7 @@ export default function NetworkSyncButton() {
             {stale && ready && !syncing && <Tag color="orange" size="regular">Stale</Tag>}
           </div>
           <p className="text-xs text-[var(--ui-text-text-tertiary)] mt-0.5">
-            One click pulls real online status <em>and</em> current tester info (name, email, network) from Databricks. Online = online, everything else = not online. Auto-syncs every 24h.
+            One click pulls real online status <em>and</em> current tester info (name, email, network) from Databricks. Online = online, everything else = not online. Auto-syncs weekly and right after an upload.
           </p>
         </div>
         <div className="flex items-center gap-2">
