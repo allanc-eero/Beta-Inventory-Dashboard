@@ -189,6 +189,15 @@ export async function GET(request: NextRequest) {
   const email = searchParams.get('email');
   const betaModel = searchParams.get('model'); // optional beta-model hint for the email filter
 
+  // ── Readiness probe (for the sync connection badge) ──────────────────────────
+  if (searchParams.get('op') === 'status') {
+    return NextResponse.json({
+      ready: !!EERO_API_TOKEN,
+      source: EERO_API_TOKEN ? 'live' : 'seed',
+      identity: EERO_API_TOKEN ? 'eero User API' : 'seeded (no eero creds)',
+    });
+  }
+
   // ── PREFERRED: serial-anchored. You know serial↔tester from your sheet; this
   //    just enriches that pairing with live Insight status (no email guessing). ──
   if (serial) {
@@ -236,4 +245,54 @@ export async function GET(request: NextRequest) {
     // On any live failure, fall back to seed so the demo never breaks.
     return NextResponse.json({ ...seededLookup(email, betaModel), warning: err.message });
   }
+}
+
+// ── Batch device sync ─────────────────────────────────────────────────────────
+// POST { op: 'sync', serials: [...] } → the SAME shape /api/databricks returns,
+// so the shared device-sync engine can point at either source. Resolves each
+// serial to its live online status (+ network) via the eero API, or a
+// deterministic seeded fallback when no eero creds are set.
+export async function POST(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as { op?: string; serials?: unknown[] };
+  if (body.op !== 'sync' || !Array.isArray(body.serials)) {
+    return NextResponse.json({ success: false, error: 'expected { op: "sync", serials: [] }' }, { status: 400 });
+  }
+
+  const serials = body.serials.map((s) => String(s)).filter(Boolean);
+
+  const resolve = async (serial: string): Promise<SerialResult> => {
+    if (!EERO_API_TOKEN) return seededSerialLookup(serial);
+    try {
+      const found = await fetchEeroBySerial(serial);
+      return found
+        ? { source: 'live', serial, match: 'matched', networkId: found.networkId, device: found.eero }
+        : { source: 'live', serial, match: 'unmatched', networkId: null, device: null };
+    } catch {
+      return seededSerialLookup(serial);
+    }
+  };
+
+  const results = await Promise.all(serials.map(resolve));
+  const statuses: { serial: string; online: boolean }[] = [];
+  const testers: { serial: string; network: string }[] = [];
+  const notFound: string[] = [];
+
+  results.forEach((r) => {
+    if (r.match === 'unmatched' || !r.device) {
+      notFound.push(r.serial);
+      statuses.push({ serial: r.serial, online: false }); // not known to Insight → not online
+      return;
+    }
+    statuses.push({ serial: r.serial, online: r.device.online });
+    if (r.networkId) testers.push({ serial: r.serial, network: r.networkId });
+  });
+
+  return NextResponse.json({
+    success: true,
+    source: EERO_API_TOKEN ? 'live' : 'seed',
+    statuses,
+    testers,
+    onlineCount: statuses.filter((s) => s.online).length,
+    notFound,
+  });
 }

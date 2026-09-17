@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Tag } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
-import { runDatabricksSync } from '@/lib/networkSync';
+import { runDeviceSync, checkSyncSource, DEVICE_SYNC_SOURCE } from '@/lib/networkSync';
 import { timeAgo } from '@/constants';
 
 // ─── Databricks Sync (one button: online status + tester info) ────────────────
@@ -37,13 +37,9 @@ export default function NetworkSyncButton() {
   const [identity, setIdentity] = useState<string>('');
 
   const checkConn = useCallback(async () => {
-    try {
-      const d = await (await fetch('/api/databricks')).json();
-      setReady(!!d.ready);
-      setIdentity(d.identity || '');
-    } catch {
-      setReady(false);
-    }
+    const c = await checkSyncSource();
+    setReady(c.ready);
+    setIdentity(c.identity);
   }, []);
   useEffect(() => { checkConn(); }, [checkConn]);
 
@@ -57,7 +53,7 @@ export default function NetworkSyncButton() {
     setSyncing(true);
     setError('');
     setResult(null);
-    const outcome = await runDatabricksSync();
+    const outcome = await runDeviceSync();
     if (!outcome.success) {
       if (outcome.error && outcome.error !== 'A sync is already in progress') setError(outcome.error);
     } else {
@@ -85,13 +81,14 @@ export default function NetworkSyncButton() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h4 className="text-sm font-semibold text-[var(--ui-text-text-primary)]">Databricks Sync</h4>
+            <h4 className="text-sm font-semibold text-[var(--ui-text-text-primary)]">Device Sync</h4>
+            <Tag color="periwinkle" size="regular">{DEVICE_SYNC_SOURCE === 'insight' ? 'Insight' : 'Databricks'}</Tag>
             {ready === true && <Tag color="green" size="regular">Connected</Tag>}
             {ready === false && <Tag color="orange" size="regular">Not connected</Tag>}
             {stale && ready && !syncing && <Tag color="orange" size="regular">Stale</Tag>}
           </div>
           <p className="text-xs text-[var(--ui-text-text-tertiary)] mt-0.5">
-            One click pulls real online status <em>and</em> current tester info (name, email, network) from Databricks. Online = online, everything else = not online. Auto-syncs weekly and right after an upload.
+            One click pulls real online status <em>and</em> current tester info from {DEVICE_SYNC_SOURCE === 'insight' ? 'Insight (the eero API)' : 'Databricks'}. Online = online, everything else = not online. Auto-syncs weekly and right after an upload.
           </p>
         </div>
         <div className="flex items-center gap-2">

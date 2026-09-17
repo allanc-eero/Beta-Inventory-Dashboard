@@ -1,14 +1,29 @@
 import { useDeviceStore } from '@/store/deviceStore';
 
 /**
- * Reusable Databricks device sync — pulls live online status + current tester
- * info and applies it to the device records. Callable from anywhere (the manual
- * button, right after an upload, or a scheduled trigger) because it drives the
- * store via getState() rather than React hooks.
+ * Reusable device sync — pulls live online status + tester info and applies it
+ * to the device records. Source-pluggable: Insight (the eero User/Admin API, the
+ * authoritative real-time source) by default, or Databricks for bulk warehouse
+ * sweeps. Both adapters speak the same POST { op:'sync', serials } → { success,
+ * statuses, testers, onlineCount, notFound } protocol, so the engine is identical.
  *
- * Lifecycle statuses (deactivated / in_repair / in_testing / pending_return) are
- * never overwritten — only network-driven online/not_online devices are synced.
+ * Callable from anywhere (the manual button, right after an upload, a scheduler)
+ * because it drives the store via getState() rather than React hooks. Lifecycle
+ * statuses (deactivated / in_repair / in_testing / pending_return) are never
+ * overwritten — only network-driven online/not_online devices are synced.
  */
+export type DeviceSyncSource = 'insight' | 'databricks';
+
+// Default to Insight (real-time, authoritative, native once embedded in Insight).
+// Set NEXT_PUBLIC_DEVICE_SYNC_SOURCE=databricks to use the warehouse instead.
+export const DEVICE_SYNC_SOURCE: DeviceSyncSource =
+  process.env.NEXT_PUBLIC_DEVICE_SYNC_SOURCE === 'databricks' ? 'databricks' : 'insight';
+
+const SYNC_ENDPOINT: Record<DeviceSyncSource, string> = {
+  insight: '/api/insight',
+  databricks: '/api/databricks',
+};
+
 export interface SyncOutcome {
   success: boolean;
   error?: string;
@@ -21,7 +36,18 @@ export interface SyncOutcome {
 
 const ZERO: SyncOutcome = { success: true, checked: 0, statusChanges: 0, testerUpdates: 0, online: 0, notFound: 0 };
 
-export async function runDatabricksSync(serials?: string[]): Promise<SyncOutcome> {
+// Readiness probe for the active source (drives the connection badge).
+export async function checkSyncSource(): Promise<{ ready: boolean; identity: string; source: DeviceSyncSource }> {
+  try {
+    const url = DEVICE_SYNC_SOURCE === 'insight' ? '/api/insight?op=status' : '/api/databricks';
+    const d = await (await fetch(url)).json();
+    return { ready: !!d.ready, identity: d.identity || '', source: DEVICE_SYNC_SOURCE };
+  } catch {
+    return { ready: false, identity: '', source: DEVICE_SYNC_SOURCE };
+  }
+}
+
+export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
   const store = useDeviceStore.getState();
   if (store.syncMetadata.syncInProgress) return { ...ZERO, success: false, error: 'A sync is already in progress' };
 
@@ -34,7 +60,7 @@ export async function runDatabricksSync(serials?: string[]): Promise<SyncOutcome
 
   store.updateSyncMetadata({ syncInProgress: true });
   try {
-    const res = await fetch('/api/databricks', {
+    const res = await fetch(SYNC_ENDPOINT[DEVICE_SYNC_SOURCE], {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'sync', serials: list }),
@@ -43,7 +69,7 @@ export async function runDatabricksSync(serials?: string[]): Promise<SyncOutcome
     if (!data.success) {
       // Never apply a failed lookup — it would wrongly mark everything offline.
       store.updateSyncMetadata({ syncInProgress: false });
-      return { ...ZERO, success: false, error: data.error || 'Databricks sync failed' };
+      return { ...ZERO, success: false, error: data.error || 'Device sync failed' };
     }
 
     // 1) Online/offline status (authoritative). syncNetworkStatus also stamps
@@ -51,7 +77,8 @@ export async function runDatabricksSync(serials?: string[]): Promise<SyncOutcome
     const onlineSerials = (data.statuses || []).filter((s: any) => s.online).map((s: any) => s.serial);
     const statusChanges = store.syncNetworkStatus(onlineSerials);
 
-    // 2) Tester info for matched devices.
+    // 2) Tester info for matched devices (name/email/network/location — whatever
+    //    the source provides; Insight gives network, Databricks gives more).
     let testerUpdates = 0;
     (data.testers || []).forEach((t: any) => {
       if (!t.serial) return;

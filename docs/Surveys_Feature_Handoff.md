@@ -364,3 +364,18 @@ against hammering the API.
    localStorage), so the scheduled job has somewhere to write.
 3. **Rate-limit / backoff** already gated client-side (`syncInProgress`,
    `isSyncStale`, `isRateLimited`); mirror the same guards in the scheduled job.
+
+---
+## Device sync is now Insight-native + source-pluggable (2026-08-31)
+The online-status sync no longer requires Databricks. `src/lib/networkSync.ts`
+now exposes `runDeviceSync(serials?)` + `checkSyncSource()`, choosing the source
+via `DEVICE_SYNC_SOURCE` (from `NEXT_PUBLIC_DEVICE_SYNC_SOURCE`):
+- **`insight`** (default) → `/api/insight` `POST {op:'sync', serials}`. Resolves each
+  serial to live online status (+ network) via the eero User/Admin API, or a
+  deterministic seeded fallback with no creds. Authoritative + real-time — the
+  right source once embedded in Insight. Needs `EERO_API_TOKEN` (+ `EERO_USER_API_BASE`).
+- **`databricks`** → `/api/databricks` (unchanged) for bulk warehouse sweeps.
+Both adapters return the same `{ success, statuses, testers, onlineCount, notFound }`
+shape, so the engine + apply logic is identical. The "Device Sync" card shows the
+active source. Insight is per-serial (fine at hundreds on the weekly + on-upload
+cadence); keep Databricks for very large one-shot sweeps if ever needed.
