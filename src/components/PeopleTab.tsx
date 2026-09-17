@@ -117,14 +117,27 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   // roster-only programs from their profile that never shipped a device — the
   // cross-program history reference for this tester.
   const personProgramGroups = useMemo(() => {
+    // The program NAME a device belongs to. Survey-flow devices (id "prog-…")
+    // carry the real program name in testbedName; for others testbedName is a
+    // network group, so fall back to the product + program label (matches the
+    // Devices menu) — never show a network group as a "program".
+    const programLabel = (d: Device) =>
+      (d.id.startsWith('prog-') && d.testbedName)
+        ? d.testbedName
+        : ([d.product, (d.program || '').toUpperCase()].filter(Boolean).join(' ').trim() || 'Unknown');
+
     const map = new Map<string, Device[]>();
     selectedPersonDevices.forEach((d) => {
-      const key = d.testbedName || (d.program ? d.program.toUpperCase() : 'Unknown');
+      const key = programLabel(d);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(d);
     });
+    // Roster-only programs from the profile (participated but no device shipped).
+    const seen = new Set([...map.keys()].map((k) => k.toLowerCase().replace(/\s+/g, '')));
     const prof = selectedPerson ? getTesterProfile(selectedPerson) : undefined;
-    (prof?.programs || []).forEach((p) => { if (!map.has(p)) map.set(p, []); });
+    (prof?.programs || []).forEach((p) => {
+      if (!seen.has(p.toLowerCase().replace(/\s+/g, ''))) map.set(p, []);
+    });
     return Array.from(map.entries()).map(([name, devs]) => ({ name, devices: devs }));
   }, [selectedPersonDevices, selectedPerson, testerProfiles, getTesterProfile]);
 
