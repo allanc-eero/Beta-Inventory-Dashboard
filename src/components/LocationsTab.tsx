@@ -5,13 +5,18 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { Device } from '@/types';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleLinear } from 'd3-scale';
+import { geoCentroid } from 'd3-geo';
 import { Select, Tag, Pagination, Button } from '@amzn/eero-web-design-components';
 import { downloadCSV } from '@/constants';
 import DeviceDetailPanel from './DeviceDetailPanel';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
-// Country coordinates for markers
+// Hand-tuned marker positions (override the computed centroid for a nicer dot —
+// e.g. the US centroid is dragged NW by Alaska, and tiny states like Singapore
+// aren't in the 110m atlas at all). Anything NOT listed here falls back to the
+// centroid computed from the world-atlas geography (see `centroids` below), so
+// any country present in device data still gets a marker.
 const COUNTRY_COORDS: Record<string, [number, number]> = {
   'Australia': [134, -25],
   'Italy': [12.5, 42],
@@ -32,6 +37,32 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
   'Singapore': [103.8, 1.3],
   'New Zealand': [174, -41],
 };
+
+// Reconcile common device-side country names with the world-atlas `properties.name`
+// canonical spelling (keys + values lowercased). Extend as new naming variants appear.
+const COUNTRY_ALIASES: Record<string, string> = {
+  'united states': 'united states of america',
+  'usa': 'united states of america',
+  'us': 'united states of america',
+  'u.s.': 'united states of america',
+  'u.s.a.': 'united states of america',
+  'uk': 'united kingdom',
+  'u.k.': 'united kingdom',
+  'great britain': 'united kingdom',
+  'south korea': 'south korea',
+  'republic of korea': 'south korea',
+  'north korea': 'north korea',
+  'russia': 'russia',
+  'russian federation': 'russia',
+  'czech republic': 'czechia',
+  'uae': 'united arab emirates',
+};
+
+// Normalize a country name to the key used in the centroid lookup.
+function normalizeCountry(name: string): string {
+  const key = name.trim().toLowerCase();
+  return COUNTRY_ALIASES[key] ?? key;
+}
 
 type FilterMode = 'all' | 'online' | 'offline' | 'deactivated';
 type DetailStatus = 'all' | 'online' | 'not_online' | 'deactivated';
@@ -59,6 +90,10 @@ export default function LocationsTab() {
   const [pageSize, setPageSize] = useState(10);
   const [detailStatus, setDetailStatus] = useState<DetailStatus>('all');
   const [openDevice, setOpenDevice] = useState<Device | null>(null);
+  // Centroids computed once from the loaded world-atlas geographies, keyed by
+  // normalized country name. Used as the fallback marker position for any region
+  // not in the hand-tuned COUNTRY_COORDS table.
+  const [centroids, setCentroids] = useState<Record<string, [number, number]>>({});
 
   const programs = useMemo(() => {
     return Array.from(new Set(devices.map((d) => d.program).filter(Boolean)));
@@ -102,6 +137,13 @@ export default function LocationsTab() {
     return { total, online, offline, deactivated, rate: total ? Math.round((online / total) * 100) : 0 };
   }, [filteredDevices]);
 
+  // Regions present in the data that we can't place on the map (no override and
+  // not in the atlas — e.g. "Unknown" or micro-states). Surfaced in the legend.
+  const unmappedRegions = useMemo(
+    () => Array.from(countryData.keys()).filter((c) => !(COUNTRY_COORDS[c] ?? centroids[normalizeCountry(c)])),
+    [countryData, centroids],
+  );
+
   const maxDevices = Math.max(...Array.from(countryData.values()).map((v) => v.total), 1);
 
   const colorScale = scaleLinear<string>()
@@ -113,9 +155,13 @@ export default function LocationsTab() {
     .domain([0, maxDevices])
     .range([12, 40]);
 
+  // Resolve a marker position: hand-tuned override first, then the atlas centroid.
+  const resolveCoords = (country: string): [number, number] | undefined =>
+    COUNTRY_COORDS[country] ?? centroids[normalizeCountry(country)];
+
   // Fly the map to a region (used when a marker or region container is clicked).
   const flyTo = (country: string) => {
-    const coords = COUNTRY_COORDS[country];
+    const coords = resolveCoords(country);
     if (coords) { setCenter(coords); setZoom((z) => Math.max(z, 4)); }
   };
   const selectRegion = (country: string) => { setSelectedCountry(country); flyTo(country); };
@@ -244,8 +290,22 @@ export default function LocationsTab() {
         >
           <ZoomableGroup zoom={zoom} center={center} onMoveEnd={({ coordinates, zoom: z }) => { setCenter(coordinates); setZoom(z); }} minZoom={1} maxZoom={20}>
             <Geographies geography={GEO_URL}>
-              {({ geographies }) =>
-                geographies.map((geo) => (
+              {({ geographies }) => {
+                // Compute a centroid for every country once, so regions absent from
+                // the hand-tuned table still get a marker. Deferred out of render.
+                if (geographies.length && Object.keys(centroids).length === 0) {
+                  const next: Record<string, [number, number]> = {};
+                  geographies.forEach((geo) => {
+                    const name = geo.properties?.name;
+                    if (!name) return;
+                    try {
+                      const c = geoCentroid(geo);
+                      if (Number.isFinite(c[0]) && Number.isFinite(c[1])) next[normalizeCountry(name)] = [c[0], c[1]];
+                    } catch { /* skip un-centroid-able geometries */ }
+                  });
+                  queueMicrotask(() => setCentroids(next));
+                }
+                return geographies.map((geo) => (
                   <Geography
                     key={geo.rpiKey || geo.properties.name}
                     geography={geo}
@@ -258,13 +318,13 @@ export default function LocationsTab() {
                       pressed: { outline: 'none' },
                     }}
                   />
-                ))
-              }
+                ));
+              }}
             </Geographies>
 
             {/* Device markers — center shows online/total so coming-online is visible on the map */}
             {Array.from(countryData.entries()).map(([country, data]) => {
-              const coords = COUNTRY_COORDS[country];
+              const coords = resolveCoords(country);
               if (!coords) return null;
               const size = sizeScale(data.total);
               const color = colorScale(data.total);
@@ -314,7 +374,10 @@ export default function LocationsTab() {
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[var(--ui-core-periwinkle-periwinkle-9)]" /> High density</span>
             {filter === 'all' && <span className="text-[var(--ui-text-text-placeholder)]">· marker shows online/total</span>}
           </div>
-          <p className="text-xs text-[var(--ui-text-text-placeholder)]">{filteredDevices.length} devices across {countryData.size} countries · synced {lastSync}</p>
+          <p className="text-xs text-[var(--ui-text-text-placeholder)]">
+            {filteredDevices.length} devices across {countryData.size} countries · synced {lastSync}
+            {unmappedRegions.length > 0 && ` · ${unmappedRegions.length} not mappable`}
+          </p>
         </div>
       </div>
 
