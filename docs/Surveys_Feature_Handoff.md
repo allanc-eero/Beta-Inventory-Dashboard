@@ -379,3 +379,75 @@ Both adapters return the same `{ success, statuses, testers, onlineCount, notFou
 shape, so the engine + apply logic is identical. The "Device Sync" card shows the
 active source. Insight is per-serial (fine at hundreds on the weekly + on-upload
 cadence); keep Databricks for very large one-shot sweeps if ever needed.
+
+---
+## Environment-aware deep-links — beta → prod, dogfood → stage (2026-08-30)
+The whole point of this tool is one pane of glass across **both** tester cohorts,
+each with a working jump into its network. Those cohorts live in **different eero
+clouds**: beta testers in **production** Insight/Admin, dogfooders in **stage**.
+So every Insight/Admin deep-link now routes to the correct environment.
+
+**How env is decided** (`src/lib/format.ts` → `resolveEnv(environment?, program?)`):
+1. Explicit `device.environment` (`'stage' | 'prod'`, stamped by shapeshift) wins.
+2. Else inferred from cohort: `program` containing `dogfood` → **stage**, everything
+   else (beta + the hardware phase codes) → **prod**.
+
+**Hosts** (`format.ts`):
+- **Prod (hardcoded, confirmed):** `insight.eero.com`, `admin.e2ro.com`.
+- **Stage (env-driven, NOT guessed):** `NEXT_PUBLIC_INSIGHT_STAGE_URL`,
+  `NEXT_PUBLIC_ADMIN_STAGE_URL`. Until the eero platform team confirms the stage
+  hostnames and these are set, the helpers return `''` and every call site renders
+  the id as **plain text** (with a "…not configured yet" tooltip) — never a broken link.
+- `EeroEnv` type + each helper (`insightNetworkUrl`, `adminUserUrl`, `adminNetworkUrl`)
+  takes an `env` arg defaulting to `'prod'` (backward-compatible).
+
+**Wired through** (device-centric use the device's env; person-centric infer env
+from the person's devices — any dogfood/stage device → stage):
+- `DevicesTab` (serial→Insight + Admin), `DeviceDetailPanel` (Admin ID + Insight
+  Network fields), `SurveysDemo` program roster, `PeopleTab` (profile + offboarding
+  menu link), `OptOutChecklistPanel` / `OptBackInChecklistPanel` (offboarding a
+  dogfooder touches a stage network — routing is correct there by design).
+- Links carry the env in their tooltip (e.g. "Open in Insight (stage)") so with two
+  windows open you always know which cloud you're about to hit.
+
+**To activate stage links:** set `NEXT_PUBLIC_INSIGHT_STAGE_URL` +
+`NEXT_PUBLIC_ADMIN_STAGE_URL` once platform confirms the hostnames. Zero code change.
+Note: deep-links need **no credentials** (the human authenticates interactively in
+each Insight); they're independent of the live-status sync creds below.
+
+Verified: `tsc --noEmit` clean; `/`, `/demo-surveys`, `/api/health` all HTTP 200.
+
+---
+## Hosting decision — standalone (Harmony) vs embed in Insight (2026-08-30)
+**Recommendation: ship standalone (Harmony), and manufacture the visibility that an
+Insight embed would give for free.**
+
+**Why not embed in production Insight:** prod Insight's data plane cannot see **stage**
+networks/devices. Embedding there means dogfooders are either dropped, shown without
+working links, or split into a second list in stage Insight. Since dogfooders are a
+core cohort, that amputates half the tool's purpose. The "two windows" cost (prod vs
+stage Insight are separate apps with separate auth) is **unavoidable in either option**
+— so it isn't a reason to embed; embedding just *also* loses the stage data.
+
+**Why standalone works:** the app makes its own server-side calls and owns its own
+link generation, so it can hold **two credentials** (prod + stage) and route both data
+and links per device. It's the only option that can be genuinely dual-environment.
+Trade-off = less default discovery; buy it back with an **Insight launch tile/nav
+entry into the tool** + socialization, and keep the door open to graduate into Insight
+later (we're on EDS/WDS already, so promotion stays cheap).
+
+**Key decoupling:** deep-links (navigation) need no creds and work cross-env today.
+Live status **sync** needs one credential per env and degrades to seed without them.
+So even if programmatic sync approval is slow, the cross-cohort directory + jump-off
+ships immediately.
+
+### Gating questions for the eero platform / Insight team (confirm before committing)
+1. **Credentials (both envs):** sanctioned machine/service creds for the eero
+   User/Insight API in **prod and stage**, scoped to read device→network→status.
+   (Assume two separate env-scoped creds — confirm the request path.)
+2. **Stage hostnames:** the stage equivalents of `api-user.e2ro.com` /
+   `insight.eero.com` / `admin.e2ro.com` (drive them via the `NEXT_PUBLIC_*_STAGE`
+   vars above — we won't guess).
+3. **Harmony server-side posture:** can a Harmony-hosted tenant run server-side code
+   that holds secrets and makes outbound calls to both eero API planes? If Harmony is
+   static/content-only, where should a small Next.js service live instead?

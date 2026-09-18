@@ -1,6 +1,53 @@
-# Beta Inventory Dashboard
+# Beta Inventory Dashboard (eero Fetch)
 
-A Next.js web application for managing beta/dogfood device inventory, tester assignments, program lifecycle, and shipment tracking for the eero hardware testing team.
+A single control tower for eero's **beta and dogfood** hardware programs: track every tester device, link each one to its live network, run the survey/engagement loop, and manage the program lifecycle from ship → online → return.
+
+---
+
+## What this is
+
+A web app for the team that runs eero's pre-release hardware testing. It answers the questions that are otherwise scattered across spreadsheets, Insight, Admin, Qualtrics, and email:
+
+- Which devices are in the field, who has them, and are they **online**?
+- Which network does a given serial live on, and how do I **jump straight to it**?
+- How are testers **engaging** (survey responses, reliability), and who's **at risk**?
+- What's the state of each **program** (deployed, % online, feedback), and how do returns get handled when it closes?
+
+It unifies **device inventory + tester directory + program lifecycle + surveys/engagement + a geographic map**, all reading from one shared model so a change in one place shows up everywhere.
+
+## The problem it solves
+
+Beta and dogfood fleets are tracked by hand across disconnected tools. There's no one place that shows *every* tester device across *both* cohorts with a working link into its network and its engagement signal. This tool is that place.
+
+## The ultimate goal
+
+**One pane of glass across both tester cohorts, with a live jump into each device's network — and the surrounding workflow (surveys, engagement, program health, returns) that beta program managers actually run.** The north star is real-time device/network truth joined to tester engagement, so the team can spot an at-risk tester (device offline + surveys unanswered) before a program's data is compromised.
+
+## Two cohorts, two clouds (important)
+
+The two cohorts live in **different eero environments**, and the app routes to the right one automatically:
+
+| Cohort | Environment | Insight / Admin |
+|--------|-------------|-----------------|
+| **Beta testers** | Production | `insight.eero.com` / `admin.e2ro.com` |
+| **Dogfooders** | Stage | stage Insight / Admin (env-configured) |
+
+Every deep-link is **environment-aware** (`resolveEnv` in `src/lib/format.ts`): a device's `environment` field decides the target, falling back to its cohort (`dogfood` → stage, else prod). Prod hosts are known; **stage hosts come from `NEXT_PUBLIC_INSIGHT_STAGE_URL` / `NEXT_PUBLIC_ADMIN_STAGE_URL`** and are left unset until the platform team confirms them (links render as plain text until then — never broken).
+
+## Where this will live (hosting)
+
+Current recommendation: **ship standalone (Harmony)**, because only a standalone app can reach *both* the prod and stage data planes and route links to each — an embed inside production Insight structurally can't see stage (dogfood) networks. We then buy back discoverability with an Insight launch entry point. See `docs/Surveys_Feature_Handoff.md` → "Hosting decision" for the full rationale and the three open questions for the eero platform team (credentials for both envs, stage hostnames, Harmony server-side posture).
+
+## Status
+
+Fully functional as a **demo/preview** with seeded data behind clearly-marked "simulated" seams. The UI, counts, links, and workflows are real and derive from one shared store; what's left to go fully live is the eero API sign-in + confirming data shapes + bulk device ingestion (tracked in the handoff doc). Nothing is merged into another product yet.
+
+## Docs for engineers & partner teams
+
+- **This README** — overview, setup, architecture, how to extend.
+- **`docs/Surveys_Feature_Handoff.md`** — the deep engineering log: surveys/engagement build, device sync, env-aware linking, the standalone-vs-embed hosting decision, and every "to go live" hookup.
+
+---
 
 ## Quick Start
 
@@ -84,8 +131,7 @@ src/
 - Full device lifecycle: add → assign → track → deactivate/return
 - Clickable serial numbers throughout the app open the device detail panel
 - Export individual device info as CSV
-- Admin ID links to `https://admin.e2ro.com/users/{id}`
-- Network ID links to `https://insight.eero.com/networks/{id}`
+- **Environment-aware** Admin & Insight links: beta → production, dogfood → stage (see "Two cohorts, two clouds" above). Routing lives in `src/lib/format.ts` (`resolveEnv`)
 
 ### Tester Profiles (Auto-Fill)
 - Persistent tester profiles keyed by email
@@ -102,10 +148,14 @@ src/
 
 ### Program Lifecycle
 - View active programs with device counts (total/online/offline)
-- Close programs: choose per-device action (archive, brick & return, return)
-- Bricking calls eero Partner API (`POST /2.2/eeros/:id/activation_state`)
+- Close a program: its devices move to the **Archived** tab so each return is tracked individually (no bricking — devices stay usable; archived records are retained ~4 months after close)
 - Generates return emails to testers
 - Archived programs preserve full device/tester history with clickable serials
+
+### Surveys, Engagement & Program Health
+- **Surveys** are authored/sent in **Qualtrics**; responses flow back (webhook) and render here as charts + an AI feedback summary (Bedrock), with a closed loop to file a JIRA ticket from a response
+- **Engagement & At-Risk** — reliability / response-time / feedback-quality per tester, and an at-risk view (device offline + surveys unanswered)
+- **Program Health** — per-program deployed / % online / response rate / feedback quality, for both Hardware and Feature programs
 
 ### People Directory
 - Search testers by name or email
@@ -137,9 +187,14 @@ Fresh seed data loads automatically when the store is empty.
 
 | Service | URL Pattern | Purpose |
 |---------|------------|---------|
-| eero Admin | `https://admin.e2ro.com/users/{uid}` | Device admin panel |
-| eero Insight | `https://insight.eero.com/networks/{networkId}` | Network dashboard |
-| eero Partner API | `https://api-user.e2ro.com/2.2/` | Network sync, device bricking |
+| eero Admin (prod) | `https://admin.e2ro.com/{users\|networks}/{id}` | Device/network admin panel (beta) |
+| eero Insight (prod) | `https://insight.eero.com/networks/{networkId}` | Network dashboard (beta) |
+| eero Admin/Insight (stage) | `NEXT_PUBLIC_ADMIN_STAGE_URL` / `NEXT_PUBLIC_INSIGHT_STAGE_URL` | Dogfood (stage) — env-configured, unset until platform confirms |
+| eero User API | `https://api-user.e2ro.com/2.2/` (`EERO_USER_API_BASE`) | Device online-status sync (Insight-native) |
+| Qualtrics | directory/surveys/responses | Survey audience import + response webhook |
+| AWS Bedrock | Converse API | AI feedback summaries |
+
+> **Deep-links are environment-aware.** Each link is routed to prod or stage by the device's `environment`/cohort (`src/lib/format.ts` → `resolveEnv`). Deep-links need no credentials; the live-status sync does (one credential per environment).
 
 ## Development Notes
 
@@ -168,9 +223,10 @@ The import system uses a declarative `COLUMN_MAP` array in `ImportTab.tsx`. Each
 
 ## Known Limitations
 
-- Data is browser-local (localStorage). No server-side persistence or multi-user sync.
-- Partner API integration is stubbed — sync button simulates the flow but doesn't make real API calls without a configured token.
-- `react-simple-maps` lacks TypeScript declarations (suppressed with implicit any).
+- Data is browser-local (localStorage). No server-side persistence or multi-user sync yet (a real deployment needs a server-side store + scheduler — see the handoff doc).
+- eero API sync runs on a deterministic **seeded fallback** until `EERO_API_TOKEN` (+ env base) is set; the live REST paths are marked `TODO(verify)`.
+- **Stage deep-links are inert until configured** — set `NEXT_PUBLIC_INSIGHT_STAGE_URL` / `NEXT_PUBLIC_ADMIN_STAGE_URL` once the platform team confirms the stage hostnames.
+- `react-simple-maps` ships no TypeScript types (local shim in `src/types/react-simple-maps.d.ts`); `d3-geo` uses the real `@types/d3-geo`.
 
 ## Backup Strategy
 
