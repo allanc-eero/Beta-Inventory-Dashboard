@@ -5,14 +5,14 @@ import { OptOutRecord } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { CheckCircle, Circle, ExternalLink, Bell } from 'lucide-react';
-import { adminUserUrl, insightNetworkUrl } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, resolveEnv } from '@/lib/format';
 
 interface OptOutChecklistPanelProps {
   record: OptOutRecord;
 }
 
 export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelProps) {
-  const { updateOptOutChecklist, getTesterProfile } = useDeviceStore();
+  const { updateOptOutChecklist, getTesterProfile, devices } = useDeviceStore();
   const { currentUser } = useAuthStore();
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
 
@@ -24,6 +24,10 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
   const networkId = profile?.networkId || '';
   const adminId = profile?.adminId || '';
   const userName = currentUser?.name || 'Admin';
+  // Route this tester's Insight/Admin links to the right cloud. Dogfood offboarding
+  // touches stage networks, so infer env from the tester's devices.
+  const df = devices.find((d) => d.assignedEmail === record.personEmail && (d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood')));
+  const personEnv = df ? resolveEnv(df.environment, df.program) : 'prod';
 
   const handleCheck = (field: 'adminRemoved' | 'qualtricsRemoved' | 'devicesOffboarded' | 'networkReset') => {
     updateOptOutChecklist(record.id, field, userName);
@@ -43,7 +47,7 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
       done: checklist.adminRemoved,
       doneAt: checklist.adminRemovedAt,
       doneBy: checklist.adminRemovedBy,
-      link: adminId ? adminUserUrl(adminId) : networkId ? insightNetworkUrl(networkId) : undefined,
+      link: adminId ? adminUserUrl(adminId, personEnv) : networkId ? insightNetworkUrl(networkId, personEnv) : undefined,
       linkLabel: adminId ? 'Open in Admin' : networkId ? 'Open in Insight' : undefined,
     },
     {
@@ -73,7 +77,7 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
       done: checklist.networkReset,
       doneAt: checklist.networkResetAt,
       doneBy: checklist.networkResetBy,
-      link: networkId ? insightNetworkUrl(networkId) : undefined,
+      link: networkId ? insightNetworkUrl(networkId, personEnv) : undefined,
       linkLabel: networkId ? 'Open in Insight' : undefined,
     },
   ];

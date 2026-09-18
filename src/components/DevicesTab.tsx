@@ -11,7 +11,7 @@ import BulkReturnPanel from './BulkReturnPanel';
 import AgentChat from './AgentChat';
 import { getStatusBadge } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
-import { insightNetworkUrl, adminNetworkUrl } from '@/lib/format';
+import { insightNetworkUrl, adminNetworkUrl, resolveEnv } from '@/lib/format';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
   const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
@@ -260,20 +260,25 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
-            {paged.map((device) => (
+            {paged.map((device) => {
+              // Route deep-links to the right cloud: beta → prod, dogfood → stage.
+              const env = resolveEnv(device.environment, device.program);
+              const networkUrl = device.network ? insightNetworkUrl(device.network, env) : '';
+              const adminUrl = device.network ? adminNetworkUrl(device.network, env) : '';
+              return (
               <tr key={device.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors cursor-pointer" onClick={() => onSelectDevice(device)}>
                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                   <Checkbox checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} />
                 </td>
                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                  {device.network ? (
-                    <a href={insightNetworkUrl(device.network)} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title="Open this device's network in Insight">{device.serialNumber} ↗</a>
+                  {networkUrl ? (
+                    <a href={networkUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title={`Open this device's network in Insight (${env})`}>{device.serialNumber} ↗</a>
                   ) : (
-                    <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title="No network yet — device not online in Insight">{device.serialNumber}</span>
+                    <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title={device.network ? 'Stage Insight URL not configured yet' : 'No network yet — device not online in Insight'}>{device.serialNumber}</span>
                   )}
-                  {device.network && (
+                  {adminUrl && (
                     <div>
-                      <a href={adminNetworkUrl(device.network)} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title="Open this network in Admin">Admin ↗</a>
+                      <a href={adminUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title={`Open this network in Admin (${env})`}>Admin ↗</a>
                     </div>
                   )}
                 </td>
@@ -283,7 +288,8 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
                 <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.assignedTo || device.checkedOutTo || '—'}</td>
                 <td className="px-4 py-4"><StatusBadge status={device.status} /></td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

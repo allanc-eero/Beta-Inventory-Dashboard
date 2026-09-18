@@ -5,7 +5,7 @@ import { OptOutRecord } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { CheckCircle, Circle, ExternalLink, Bell, UserPlus } from 'lucide-react';
-import { adminUserUrl, insightNetworkUrl } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, resolveEnv } from '@/lib/format';
 
 interface OptBackInChecklistPanelProps {
   record: OptOutRecord;
@@ -14,7 +14,7 @@ interface OptBackInChecklistPanelProps {
 }
 
 export default function OptBackInChecklistPanel({ record, onComplete, onCancel }: OptBackInChecklistPanelProps) {
-  const { getTesterProfile, removeOptOut } = useDeviceStore();
+  const { getTesterProfile, removeOptOut, devices } = useDeviceStore();
   const { currentUser } = useAuthStore();
 
   const [adminReAdded, setAdminReAdded] = useState(false);
@@ -24,6 +24,9 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
   const profile = getTesterProfile(record.personEmail);
   const networkId = profile?.networkId || '';
   const adminId = profile?.adminId || '';
+  // Route links to the right cloud (dogfood → stage, else prod), inferred from devices.
+  const df = devices.find((d) => d.assignedEmail === record.personEmail && (d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood')));
+  const personEnv = df ? resolveEnv(df.environment, df.program) : 'prod';
 
   const allDone = adminReAdded;
 
@@ -56,7 +59,7 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
       description: 'Set their user role back to tester in the admin panel',
       done: adminReAdded,
       onCheck: () => setAdminReAdded(true),
-      link: adminId ? adminUserUrl(adminId) : networkId ? insightNetworkUrl(networkId) : undefined,
+      link: adminId ? adminUserUrl(adminId, personEnv) : networkId ? insightNetworkUrl(networkId, personEnv) : undefined,
       linkLabel: adminId ? 'Open in Admin' : networkId ? 'Open in Insight' : undefined,
     },
   ];

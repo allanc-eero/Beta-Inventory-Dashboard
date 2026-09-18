@@ -10,7 +10,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
-import { adminUserUrl, insightNetworkUrl, initials } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, initials, resolveEnv, EeroEnv } from '@/lib/format';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
   { value: 'no_longer_interested', label: 'No longer interested in testing' },
@@ -514,6 +514,12 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
               const profile = getTesterProfile(selectedPerson || '');
               const personName = profile?.name || selectedPersonDevices[0]?.assignedTo || selectedPerson;
               const activePrograms = [...new Set(selectedPersonDevices.filter((d) => d.status !== 'deactivated').map((d) => d.program))];
+              // Route this person's Insight/Admin links to the right cloud: if any of
+              // their devices is dogfood/stage, use stage; otherwise prod.
+              const dfDevice = selectedPersonDevices.find((d) => d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood'));
+              const personEnv: EeroEnv = dfDevice ? resolveEnv(dfDevice.environment, dfDevice.program) : 'prod';
+              const personInsightUrl = profile?.networkId ? insightNetworkUrl(profile.networkId, personEnv) : '';
+              const personAdminUrl = profile?.adminId ? adminUserUrl(profile.adminId, personEnv) : '';
 
               return (
                 <>
@@ -624,7 +630,9 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                             {profile?.networkId ? (
                               <div className="flex items-baseline gap-3">
                                 <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
-                                <a href={insightNetworkUrl(profile.networkId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.networkId} ↗</a>
+                                {personInsightUrl
+                                  ? <a href={personInsightUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium" title={`Open in Insight (${personEnv})`}>{profile.networkId} ↗</a>
+                                  : <span className="text-sm text-[var(--ui-text-text-secondary)]" title="Stage Insight URL not configured yet">{profile.networkId}</span>}
                               </div>
                             ) : (
                               <ProfileField label="INSIGHT NETWORK" value="" />
@@ -632,7 +640,9 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                             {profile?.adminId ? (
                               <div className="flex items-baseline gap-3">
                                 <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
-                                <a href={adminUserUrl(profile.adminId)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{profile.adminId} ↗</a>
+                                {personAdminUrl
+                                  ? <a href={personAdminUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium" title={`Open in Admin (${personEnv})`}>{profile.adminId} ↗</a>
+                                  : <span className="text-sm text-[var(--ui-text-text-secondary)]" title="Stage Admin URL not configured yet">{profile.adminId}</span>}
                               </div>
                             ) : (
                               <ProfileField label="ADMIN ID" value="" />
@@ -717,7 +727,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           <span className="text-sm text-[var(--ui-text-text-primary)] font-medium">Removed from eero Admin</span>
                           <p className="text-xs text-[var(--ui-text-text-tertiary)]">Reverted to default user role in admin panel</p>
                         </div>
-                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const link = aid ? adminUserUrl(aid) : nid ? insightNetworkUrl(nid) : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
+                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const df = selectedPersonDevices.find((d) => d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood')); const env = df ? resolveEnv(df.environment, df.program) : 'prod'; const link = aid ? adminUserUrl(aid, env) : nid ? insightNetworkUrl(nid, env) : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
                       <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--ui-background-layer-layer-page)] cursor-pointer">
                         <Checkbox checked={optOutDevicesDone} onChange={(e: CheckboxChangeEvent) => setOptOutDevicesDone(e.target.checked)} className="mt-0.5" />

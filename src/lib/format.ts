@@ -4,13 +4,53 @@
  * being re-typed across components.
  */
 
+// ─── Environment-aware deep-links ─────────────────────────────────────────────
+// Beta testers live in PRODUCTION (insight.eero.com / admin.e2ro.com); dogfooders
+// live in STAGE. A device's target env is taken from its `environment` field when
+// set (shapeshift stamps it), else inferred from its cohort (program 'dogfood' →
+// stage, everything else → prod). Prod hosts are known/hardcoded; stage hosts come
+// from env vars so we never bake in a guessed hostname — until the eero platform
+// team confirms them and they're set, stage links resolve to '' (callers render
+// plain text instead of a broken link).
+export type EeroEnv = 'stage' | 'prod';
+
+const HOSTS: Record<EeroEnv, { admin: string; insight: string }> = {
+  prod: {
+    admin: 'https://admin.e2ro.com',
+    insight: 'https://insight.eero.com',
+  },
+  stage: {
+    // TODO(platform): confirm stage hostnames, then set these in the env.
+    admin: process.env.NEXT_PUBLIC_ADMIN_STAGE_URL || '',
+    insight: process.env.NEXT_PUBLIC_INSIGHT_STAGE_URL || '',
+  },
+};
+
+// Resolve the target env for a link: explicit device.environment wins; otherwise
+// infer from cohort (dogfood → stage, everything else → prod).
+export function resolveEnv(environment?: string, program?: string): EeroEnv {
+  if (environment === 'stage' || environment === 'prod') return environment;
+  return (program || '').toLowerCase().includes('dogfood') ? 'stage' : 'prod';
+}
+
 // eero admin keys users by their numeric UID; our stored IDs carry a "UID0…"
 // prefix, so strip it for the link.
 const stripUid = (uid: string) => uid.replace(/^UID0*/, '');
 
-export const adminUserUrl = (uid: string) => `https://admin.e2ro.com/users/${stripUid(uid)}`;
-export const insightNetworkUrl = (networkId: string) => `https://insight.eero.com/networks/${networkId}`;
-export const adminNetworkUrl = (networkId: string) => `https://admin.e2ro.com/networks/${networkId}`;
+// Each helper returns '' when the target env's host isn't configured (stage before
+// the platform hostnames are set), so callers can fall back to plain text.
+export const adminUserUrl = (uid: string, env: EeroEnv = 'prod') => {
+  const base = HOSTS[env].admin;
+  return base ? `${base}/users/${stripUid(uid)}` : '';
+};
+export const insightNetworkUrl = (networkId: string, env: EeroEnv = 'prod') => {
+  const base = HOSTS[env].insight;
+  return base ? `${base}/networks/${networkId}` : '';
+};
+export const adminNetworkUrl = (networkId: string, env: EeroEnv = 'prod') => {
+  const base = HOSTS[env].admin;
+  return base ? `${base}/networks/${networkId}` : '';
+};
 
 // Up to two uppercase initials from a name ("Aaron Rivera" → "AR").
 export const initials = (name?: string) =>

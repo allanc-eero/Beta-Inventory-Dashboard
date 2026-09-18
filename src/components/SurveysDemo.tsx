@@ -38,7 +38,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
-import { adminUserUrl, insightNetworkUrl, adminNetworkUrl } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, adminNetworkUrl, resolveEnv } from '@/lib/format';
 
 // ─── Types (inline — demo only) ──────────────────────────────────────────────
 type ProgramType = 'hardware' | 'feature';
@@ -1514,6 +1514,8 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   onNavigateToPerson?: (email: string) => void;
 }) {
   const model = betaModelFor(program);
+  // Deep-links for this program route to the right cloud (dogfood → stage, else prod).
+  const linkEnv = resolveEnv(undefined, programEnumFor(program));
   const { addDevice, updateDevice, deleteDevice, getDeviceBySerial } = useDeviceStore();
   const [roster, setRoster] = useState<DemoTester[]>(() => program.testers);
   const [assignments, setAssignments] = useState<Record<string, AssignedDevice[]>>(() => seedAssignments(program));
@@ -1748,13 +1750,19 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                             {d.networkId
                               ? <span className="text-xs" style={{ color: TEXT_SECONDARY }}>📍 {countryForSerial(d.serial).name}</span>
                               : <span className="text-xs" style={{ color: TEXT_TERTIARY }}>awaiting first connection</span>}
-                            {d.networkId && (
-                              <span className="flex items-center gap-2 text-xs">
-                                <a href={insightNetworkUrl(d.networkId)} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Insight network ↗</a>
-                                <span style={{ color: TEXT_TERTIARY }}>·</span>
-                                <a href={adminNetworkUrl(d.networkId)} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Admin ↗</a>
-                              </span>
-                            )}
+                            {d.networkId && (() => {
+                              const nurl = insightNetworkUrl(d.networkId!, linkEnv);
+                              const aurl = adminNetworkUrl(d.networkId!, linkEnv);
+                              return (nurl || aurl) ? (
+                                <span className="flex items-center gap-2 text-xs">
+                                  {nurl && <a href={nurl} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Insight network ↗</a>}
+                                  {nurl && aurl && <span style={{ color: TEXT_TERTIARY }}>·</span>}
+                                  {aurl && <a href={aurl} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Admin ↗</a>}
+                                </span>
+                              ) : (
+                                <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{linkEnv} links not configured</span>
+                              );
+                            })()}
                             <div className="ml-auto flex items-center gap-2">
                               <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel={`Unassign ${d.serial}`} onClick={() => removeDevice(t, d.serial)} />
                             </div>
