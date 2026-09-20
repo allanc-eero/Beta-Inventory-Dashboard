@@ -38,104 +38,13 @@ import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
 import { adminUserUrl, insightNetworkUrl, adminNetworkUrl, resolveEnv, EeroEnv } from '@/lib/format';
+import type {
+  ProgramType, SurveyStatus, QuestionType, TechnicalLevel, SurveyKind, Cadence, Phase,
+  DemoQuestion, SurveyWave, DemoSurvey, DemoTester, DemoProgram,
+  MatchState, RosterCandidate, RosterEntry, DeviceLiveStatus, AssignedDevice,
+} from './types';
 
-// ─── Types (inline — demo only) ──────────────────────────────────────────────
-type ProgramType = 'hardware' | 'feature';
-type SurveyStatus = 'published' | 'draft' | 'closed';
-type QuestionType = 'rating' | 'multiple_choice' | 'yes_no' | 'text';
-type TechnicalLevel = 'Beginner' | 'Intermediate' | 'Advanced';
-// A program is a long-lived container; it accumulates MANY surveys over its life.
-// Each survey has a kind (what it asks) and a cadence (recurring pulse vs one-off).
-// OOBE/Setup + Packaging = first-impression front-load; Performance = the longitudinal
-// experiential pulse (survey-based, NOT lab/benchmark perf); RTM = production-unit validation.
-// Recruiting is handled in Qualtrics upstream and is not charted here.
-type SurveyKind = 'oobe' | 'packaging' | 'performance' | 'rtm' | 'resetup' | 'final' | 'custom';
-type Cadence = 'recurring' | 'one_off';
-// Hardware programs run the full survey cycle once per phase (EVT → DVT → PVT).
-// Feature/software programs have no phase.
-type Phase = 'EVT' | 'DVT' | 'PVT';
-
-interface DemoQuestion {
-  id: string;
-  type: QuestionType;
-  title: string;
-  // rating: counts per 1..5 ; multiple_choice: label->count ; yes_no: [yes,no] ; text: strings
-  ratingCounts?: number[];
-  choiceCounts?: { label: string; count: number }[];
-  yesNo?: { yes: number; no: number };
-  textResponses?: { tester: string; text: string; sentiment: 'positive' | 'neutral' | 'negative' }[];
-}
-
-// A "wave" (a.k.a. run) is ONE collection cycle of a survey. Recurring surveys
-// (the weekly Performance pulse) accumulate many waves over a phase; a one-off
-// survey has a single wave. Nothing is ever deleted — the app just shows the
-// LATEST wave by default and keeps the history one click away. `resumedNote`
-// marks a wave that picked back up after the pulse was paused (e.g. for RTM),
-// so the gap in the timeline explains itself instead of looking like a bug.
-interface SurveyWave {
-  id: string;
-  label: string;        // "Wave 4"
-  date: string;         // ISO date the wave was sent, e.g. "2026-09-08"
-  responses: number;
-  recipients: number;
-  resumedNote?: string; // e.g. "Resumed after RTM testing"
-}
-
-interface DemoSurvey {
-  id: string;
-  title: string;
-  description: string;
-  status: SurveyStatus;
-  qualtricsId: string;
-  programId: string;
-  programName: string;
-  programType: ProgramType;
-  kind: SurveyKind;
-  cadence: Cadence;
-  phase?: Phase;                   // hardware only; undefined for feature/software
-  audienceFilter?: TechnicalLevel; // e.g. targeted only Advanced testers
-  recipients: number;
-  responses: number;               // = latest wave's responses (kept in sync for cards/stats)
-  avgCompletionMins: number;
-  ranOn?: string;                  // one-off surveys: the single date it ran (ISO)
-  waves?: SurveyWave[];            // recurring surveys: the wave history (newest last)
-  questions: DemoQuestion[];       // aggregated for the LATEST wave (demo simplification)
-}
-
-interface DemoTester {
-  id: string;
-  name: string;
-  email: string;
-  programName: string;
-  technicalLevel: TechnicalLevel;
-  reliability: number;        // 0-100 : % of surveys responded to
-  avgResponseDays: number;    // avg days sent -> completed
-  feedbackQuality: number;    // 1-5
-  deviceOnline: boolean | null; // null = feature program (no device)
-  missedSurveys: number;
-  noSeedDevice?: boolean;     // roster filler — never gets a seeded device (keeps device counts unchanged)
-}
-
-interface DemoProgram {
-  id: string;
-  name: string;
-  type: ProgramType;
-  status: 'active' | 'completed'; // 'completed' = the beta is over (closed, kept for the record)
-  closedAt?: string;          // when the program was closed (drives the archived-devices record)
-  currentPhase?: Phase;       // hardware only — the phase currently running
-  audienceSize: number;       // testers imported from Qualtrics — the survey audience for this program
-  devicesDeployed: number;    // 0 for feature programs
-  devicesOnline: number;
-  surveyResponseRate: number; // 0-100
-  avgFeedbackQuality: number; // 1-5
-  // The program's tester roster. For seed programs this is the sampled mock;
-  // for programs created from a live Qualtrics list it's the real contacts
-  // (names/emails from Qualtrics) with engagement metrics simulated until
-  // survey-response data is wired in. Drives the Engagement view.
-  testers: DemoTester[];
-}
-
-// Survey-kind metadata: label, default title + cadence. Drives the pickers and tags.
+// Types live in ./types. Survey-kind metadata below drives the pickers and tags.
 const SURVEY_KINDS: Record<SurveyKind, { label: string; defaultTitle: string; defaultCadence: Cadence }> = {
   oobe:        { label: 'OOBE / Setup',         defaultTitle: 'Setup Experience',   defaultCadence: 'one_off' },
   packaging:   { label: 'Packaging / Unboxing', defaultTitle: 'Packaging Feedback', defaultCadence: 'one_off' },
@@ -410,23 +319,6 @@ function contactToTester(
 //         → pick the beta unit (auto-filtered by model; select when ambiguous)
 // The result is exactly the "user + DSN per program" table you drill into from a
 // program card. `match` captures the three real-world outcomes of the email match.
-type MatchState = 'matched' | 'multiple' | 'unmatched';
-
-interface RosterCandidate {
-  serial: string; // the DSN
-  model: string;  // beta model — what the auto-filter narrows on
-  online: boolean;
-}
-
-interface RosterEntry {
-  id: string;
-  tester: string;
-  email: string;             // eero-account email — the match key
-  match: MatchState;
-  candidates: RosterCandidate[]; // beta-model eeros found on their network
-  selectedSerial?: string;       // the chosen DSN (set when matched)
-}
-
 const ROSTER_NAMES = [
   'Shakeel Ahmad', 'Mark D Jones', 'Christer Whitehorn', 'Abilio J Henrique',
   'Patrick Evans', 'Santosh Choudhary', 'Aun Iftikhar', 'Sarah McLennan',
@@ -1387,17 +1279,6 @@ function countryForSerial(serial: string): { name: string; code: string } {
 // /api/insight?serial= into a network + live status. Until eero auth is live the
 // route returns a deterministic seed, so this works today and flips to real data
 // with zero UI change.
-type DeviceLiveStatus = 'online' | 'offline' | 'pending'; // pending = assigned, not yet on a network in Insight
-
-interface AssignedDevice {
-  serial: string;
-  model: string;
-  networkId: string | null;   // Insight network the unit lives on (null until it activates)
-  status: DeviceLiveStatus;
-  firmware: string;
-  source: 'live' | 'seed';
-}
-
 // Enrich one serial through the /api/insight route (serial-anchored lookup).
 // env routes to the right cloud: beta program → prod, dogfood → stage.
 async function enrichSerial(serial: string, fallbackModel: string, env: EeroEnv = 'prod'): Promise<AssignedDevice> {
