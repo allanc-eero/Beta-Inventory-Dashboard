@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
 import { Layout, Sidebar } from '@amzn/eero-web-design-components';
 import { Search, Wifi } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
 import SearchModal from './SearchModal';
 import { useAuthStore } from '@/store/authStore';
 import { APP_NAME } from '@/constants';
@@ -30,6 +31,14 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
   const [searchOpen, setSearchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { currentUser, logout, canEdit, isBetaViewer } = useAuthStore();
+  const { data: ssoSession } = useSession();
+
+  // Clear the app session, and end the SSO session too when one exists — otherwise
+  // the SSO bridge would immediately re-log-in from the still-valid IdP session.
+  const handleSignOut = () => {
+    logout();
+    if (ssoSession) signOut({ callbackUrl: '/' });
+  };
 
   const visibleTabs = isBetaViewer()
     ? tabs.filter((t) => !['shipments', 'dogfood', 'program_signups'].includes(t.id))
@@ -96,7 +105,7 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
             )}
             <span className="text-xs text-[var(--ui-core-midnight-midnight-3)]">{currentUser.name}</span>
             <button
-              onClick={logout}
+              onClick={handleSignOut}
               className="text-xs text-[var(--ui-core-red-red-5)] hover:text-[var(--ui-core-red-red-4)] font-medium"
             >
               Sign out

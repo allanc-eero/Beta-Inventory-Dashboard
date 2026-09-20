@@ -2043,13 +2043,6 @@ export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { emb
 
   return (
     <div className={embedded ? '' : 'min-h-screen'} style={embedded ? undefined : { backgroundColor: 'var(--ui-background-bg-secondary, #f5f6f7)' }}>
-      {/* Demo seam banner — standalone route only; hidden when embedded in the app */}
-      {!embedded && (
-        <div className="w-full px-6 py-2 text-center text-xs" style={{ backgroundColor: 'var(--ui-core-periwinkle-periwinkle-1)', color: 'var(--ui-core-periwinkle-periwinkle-8)' }}>
-          DEMO PREVIEW · <b>/demo-surveys</b> · isolated from the live app · Qualtrics + Bedrock calls are simulated
-        </div>
-      )}
-
       <div className={`w-full ${embedded ? 'px-0 pt-0 pb-10' : 'px-6 pt-6 pb-10'}`}>
         <header className="mb-3">
           <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>Surveys &amp; Engagement</h1>

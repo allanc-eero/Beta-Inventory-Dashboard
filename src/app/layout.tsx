@@ -10,6 +10,7 @@ import '@amzn/eero-web-design-foundation/tokens/tw-styles/color-variables.css'
 import '@amzn/eero-web-design-foundation/tokens/tw-styles/light-variables.css'
 import '@amzn/eero-web-design-components/library/styles.css'
 import { APP_NAME } from '@/constants'
+import Providers from '@/components/Providers'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -25,7 +26,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className} data-theme="light" suppressHydrationWarning>{children}</body>
+      <body className={inter.className} data-theme="light" suppressHydrationWarning>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

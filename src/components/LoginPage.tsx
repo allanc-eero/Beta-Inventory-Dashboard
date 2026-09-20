@@ -1,10 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Input, Segmented, ProgressBar } from '@amzn/eero-web-design-components';
+import { getProviders, signIn, signOut, useSession } from 'next-auth/react';
 import { useAuthStore } from '@/store/authStore';
 import { APP_NAME } from '@/constants';
 import { Wifi } from 'lucide-react';
+
+// Must match SSO_PROVIDER_ID in src/lib/auth.ts (kept as a literal here so this
+// client component doesn't import the server-only auth config).
+const SSO_PROVIDER_ID = 'oidc';
 
 interface RegistrationData {
   firstName: string;
@@ -41,6 +46,14 @@ const INITIAL_DATA: RegistrationData = {
 
 export default function LoginPage() {
   const { login, register } = useAuthStore();
+  const { data: ssoSession, status: ssoStatus } = useSession();
+  // null = still checking which providers exist (avoids flashing the email form)
+  const [ssoAvailable, setSsoAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    getProviders()
+      .then((p) => setSsoAvailable(!!(p && (p as Record<string, unknown>)[SSO_PROVIDER_ID])))
+      .catch(() => setSsoAvailable(false));
+  }, []);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -125,7 +138,44 @@ export default function LoginPage() {
     </div>
   );
 
-  // ─── LOGIN VIEW ─────────────────────────────────────────────────────────────
+  // ─── SSO gate ───────────────────────────────────────────────────────────────
+  // While checking which providers exist, don't flash the email form.
+  if (ssoAvailable === null) {
+    return (
+      <div className="min-h-screen bg-[var(--ui-background-layer-background-page)] flex items-center justify-center">
+        <p className="text-sm text-[var(--ui-text-text-tertiary)]">Loading…</p>
+      </div>
+    );
+  }
+  // When an OIDC provider is configured, SSO is the sign-in path (no email form).
+  if (ssoAvailable) {
+    const notAuthorized = ssoStatus === 'authenticated' && !!ssoSession?.user?.email;
+    return (
+      <div className="min-h-screen bg-[var(--ui-background-layer-background-page)] flex items-center justify-center">
+        <div className="w-full max-w-sm">
+          <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-md border border-[var(--ui-background-layer-border-border-layer-page)] p-8 text-center">
+            <Wifi size={48} className="mx-auto text-[var(--ui-core-periwinkle-periwinkle-6)] mb-4" strokeWidth={1.5} />
+            <h1 className="text-2xl font-bold text-[var(--ui-text-text-primary)]">{APP_NAME}</h1>
+            {notAuthorized ? (
+              <>
+                <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-2 mb-4">
+                  Signed in as <b>{ssoSession!.user!.email}</b>, but this account isn’t authorized for {APP_NAME}. Ask an admin to add you.
+                </p>
+                <Button type="default" label="Sign out" fullWidth onClick={() => signOut()} />
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[var(--ui-text-text-tertiary)] mt-2 mb-6">Sign in with your eero SSO account</p>
+                <Button type="primary" label="Sign in with SSO" fullWidth onClick={() => signIn(SSO_PROVIDER_ID)} />
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── LOGIN VIEW (local/dev fallback when SSO is not configured) ──────────────
   if (mode === 'login') {
     return (
       <div className="min-h-screen bg-[var(--ui-background-layer-background-page)] flex items-center justify-center">

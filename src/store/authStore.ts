@@ -62,6 +62,7 @@ interface AuthStore {
   currentUser: User | null;
   users: User[];
   login: (email: string) => { success: boolean; error?: string };
+  loginFromSSO: (email: string, name?: string) => { success: boolean; error?: string };
   register: (email: string, name: string, profile?: DogfoderProfile) => { success: boolean; error?: string };
   logout: () => void;
   canEdit: () => boolean;
@@ -91,6 +92,19 @@ export const useAuthStore = create<AuthStore>()(
         // Check if they're in the roster
         const user = get().users.find((u) => u.email.toLowerCase() === e);
         if (!user) return { success: false, error: 'Account not found. If you\'re a dogfooder, click "Register" below to create your account.' };
+        if (user.status === 'disabled') return { success: false, error: 'Account disabled. Contact your admin.' };
+        set({ currentUser: user });
+        return { success: true };
+      },
+
+      // Called by the SSO bridge after OIDC verifies identity. Identity is already
+      // proven by the IdP; here we only apply AUTHORIZATION from the roster (role).
+      // A verified user who isn't on the roster is denied (allowlist preserved).
+      loginFromSSO: (email, _name) => {
+        const e = (email || '').toLowerCase().trim();
+        if (!e) return { success: false, error: 'SSO returned no email.' };
+        const user = get().users.find((u) => u.email.toLowerCase() === e);
+        if (!user) return { success: false, error: `${e} is not authorized for eero Fetch. Ask an admin to add you.` };
         if (user.status === 'disabled') return { success: false, error: 'Account disabled. Contact your admin.' };
         set({ currentUser: user });
         return { success: true };

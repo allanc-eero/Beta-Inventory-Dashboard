@@ -459,3 +459,55 @@ ships immediately.
 3. **Harmony server-side posture:** can a Harmony-hosted tenant run server-side code
    that holds secrets and makes outbound calls to both eero API planes? If Harmony is
    static/content-only, where should a small Next.js service live instead?
+
+---
+## Standalone hardening — dual-cloud API, SSO, backdoors, de-demo (2026-09-02)
+
+### Dual-cloud device API (LIVE-ready)
+`/api/insight` now spans BOTH clouds — beta → **prod**, dogfood → **stage** — each
+with its own base URL + token. `runDeviceSync` groups serials by cohort
+(`resolveEnv`) and syncs each cloud, then merges. Missing token for a cloud → that
+cloud uses seeded data. **To flip live** (no code change): set the env vars below +
+confirm the `TODO(verify)` eero API request shapes against a real session.
+
+### App-level OIDC SSO installed (NextAuth, behind a seam)
+- `next-auth@4.24.15` added. Config: `src/lib/auth.ts` (provider-agnostic OIDC via
+  `OIDC_ISSUER` discovery), handler at `src/app/api/auth/[...nextauth]/route.ts`,
+  `src/components/Providers.tsx` (SessionProvider + a bridge that maps the verified
+  SSO email → the authStore roster for role/permissions).
+- **Seam:** when `OIDC_ISSUER` is set → SSO sign-in is the only path (LoginPage shows
+  "Sign in with SSO"). When unset → the existing `@eero.com` email login remains for
+  local dev. The `@eero.com` roster stays the **authorization** layer (allowlist +
+  role); SSO only proves identity. A verified user not on the roster gets a clear
+  "not authorized" screen. Sign out ends the SSO session too.
+- **Verified:** with SSO off, `/api/auth/providers` = `{}` and the email login is
+  intact; tsc clean; home 200. The live OIDC redirect can only be tested with real
+  Okta creds + a public callback URL.
+
+### Backdoors removed / de-demo
+- Deleted `/preview` (auto-admin) and `/demo-dogfood` (auto-dogfooder) — both bypassed
+  auth. Removed the "DEMO PREVIEW · isolated from the live app" banner. Kept honest
+  per-feature "(simulated)" labels (accurate until creds land).
+
+### Env vars (see `.env.example` for the full template)
+| Purpose | Vars |
+|---|---|
+| Dual-cloud data | `EERO_USER_API_BASE_PROD`, `EERO_API_TOKEN_PROD`, `EERO_USER_API_BASE_STAGE`, `EERO_API_TOKEN_STAGE` |
+| Stage deep-links | `NEXT_PUBLIC_INSIGHT_STAGE_URL`, `NEXT_PUBLIC_ADMIN_STAGE_URL` |
+| SSO (OIDC) | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `AUTH_SECRET`, `NEXTAUTH_URL` |
+
+### ⚠️ OPEN ACTION ITEMS (reminders)
+1. **[USER] Confirm how Harmony authenticates** — **Midway at the edge** (app receives
+   an already-verified identity; the NextAuth OIDC flow may be unnecessary) **vs.
+   app-level Okta OIDC** (use the NextAuth seam built here with Okta issuer/client
+   creds). This decides whether the OIDC seam is the final answer or a thin
+   Midway-identity adapter replaces it. **Blocking SSO go-live.**
+2. **[USER] Obtain eero API session tokens** for prod + stage (`EERO_API_TOKEN_PROD`
+   / `_STAGE`) and confirm the `TODO(verify)` request paths/field names against a live
+   session. **Blocking live device/network data.**
+3. **[USER] Get stage hostnames** for `NEXT_PUBLIC_INSIGHT_STAGE_URL` /
+   `_ADMIN_STAGE_URL` (+ the stage API base) from the eero platform team.
+4. **[FUTURE] Roster → backend.** The `@eero.com` allowlist is hardcoded in
+   `authStore`. For a real standalone, source authorized users/roles from a group or
+   backend rather than a code constant.
+5. **[FUTURE] Persistence + weekly scheduler** once hosted (today localStorage).
