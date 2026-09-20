@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
 import { allSeedDevices, seedPeople } from '@/data/seedData';
-import { ROSTER_SEED, FILLER_EMAILS } from '@/components/programs/ProgramsView';
+import { ROSTER_SEED, FILLER_EMAILS } from '@/components/programs/data';
 
 export default function SeedDataProvider({ children }: { children: React.ReactNode }) {
   const { devices, addDevices, people, addPerson, getPersonByEmail, removePerson, testerProfiles, upsertTesterProfile } = useDeviceStore();
