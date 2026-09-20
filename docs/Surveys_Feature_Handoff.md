@@ -19,11 +19,19 @@ Local branch is in sync with `origin/surveys-engagement-demo`. **Not committed:*
 
 ## 1. The goal
 
+> **DIRECTION CHANGE (2026-09-01): eero Fetch is a STANDALONE app, not an Insight feature.**
+> Embedding in Insight was ruled out because the two cohorts live in different clouds —
+> **beta devices/testers in production Insight, dogfood in stage Insight** — and a single
+> embedded surface can't span both. As a standalone, Fetch owns its own data access and
+> **links out** to the correct environment per device (see "Environment-aware deep-links").
+> The EDS-native build still means a future Insight port would be cheap if that ever changes,
+> but it is no longer the goal.
+
 Mine features from a separate production app (`eero-beta-app-prod`, now cloned read-only at `.reference/eero-beta-app-prod`) and rebuild the valuable ones into **eero Fetch** (this app) — WITHOUT copying code. Everything must be:
 - **Functional but explicitly understandable, so someone can demo it** (mock/seed data + visible "simulated" seams).
-- **Insight-ready** — the end goal is to land this as a feature inside **eero Insight**, so device/network telemetry can be joined from Insight later. Built with EDS components + tokens + Insight page patterns so the eventual port is a config swap, not a rewrite.
+- **Standalone-first** — Fetch is its own product. It reaches **both** eero clouds itself (prod for beta, stage for dogfood) rather than being joined from Insight. Built with EDS components + tokens so it looks like eero and a future embed stays cheap, but shipping standalone is the plan.
 
-**No database.** Stays localStorage/Zustand like the rest of eero Fetch. Backend-dependent features are simulated behind the same `setTimeout` seam the app already uses.
+**No database yet.** Currently localStorage/Zustand. A real multi-user standalone deployment will need server-side persistence + auth + a host — tracked as standalone workstreams below. Backend-dependent features are simulated behind the same `setTimeout` seam the app already uses until then.
 
 ---
 
@@ -38,13 +46,13 @@ Mine features from a separate production app (`eero-beta-app-prod`, now cloned r
 
 1. **Flagship = Surveys (Qualtrics-backed).** One feature done well. Second = Engagement view. Third = AI response summary.
 2. **AI summary = survey feedback summary only** (themes/sentiment/issues/requests/actions). Rules engine computes facts; AI only narrates language. Not an engagement summary.
-3. **Surveys come from Qualtrics, NOT Insight.** Insight is the eventual *home* (supplies device/network telemetry for the join), not the survey data source.
+3. **Surveys come from Qualtrics.** Device/network telemetry comes from the **eero API directly** (prod + stage), fetched by Fetch's own server routes — NOT joined from an Insight embed. (Superseded the earlier "Insight is the eventual home" plan — see Direction Change above.)
 4. **Data-model merge:** don't import their `beta_testers` table — eero Fetch already has People/`TesterProfile`. Only add ~5 fields to `TesterProfile`: `reliability`, `avgResponseDays`, `feedbackQuality` (engagement), `technicalLevel`, `industryKnowledge` (targeting). Engagement scores are *derived from survey activity* and must show how they're computed.
 5. **Cohort = a Program's testers.** Do NOT add a separate "cohort" concept. A survey targets a Program (or a saved segment). Keeps it one app.
 6. **Feature testing:** programs have a **type: Hardware | Feature**. Feature programs ship no devices — participation + surveys are the whole interaction. Surveys span both types.
 7. **Join key = email** (optionally a stable `testerId` as Qualtrics embedded data). Qualtrics responses/contacts join back to People by email.
 8. **Say NO to** badges and discussions (vitamin, not painkiller; no tester-facing surface here).
-9. **Robustness additions worth building (ranked):** (a) **At-Risk view** — intersection of device-offline + survey-unresponsive + low reliability (the reason to merge into Insight); (b) **closed loop** — survey response → JIRA ticket; (c) **program-health report** for leadership.
+9. **Robustness additions worth building (ranked):** (a) **At-Risk view** — intersection of device-offline + survey-unresponsive + low reliability (the flagship cross-signal, now owned by Fetch itself rather than Insight); (b) **closed loop** — survey response → JIRA ticket; (c) **program-health report** for leadership.
 
 ---
 
