@@ -587,3 +587,19 @@ internally consistent and the most likely dogfood env.
 (plain `stage` vs `ci.stage` vs `dev.stage`) with the eero team, then set
 `EERO_ADMIN_API_BASE_STAGE` (+ user base + Insight/Admin link hosts) to match. Shapes
 are identical regardless — only the base URL changes.
+
+---
+## Stage dogfood links wired (2026-09-02)
+
+Confirmed from a real dogfood device link (`https://stage.insight.e2ro.com/eeros/44413868`):
+the dogfood env is **plain "stage"**, and the Insight UI host is **`stage.insight.e2ro.com`**
+(NOT `insight.stage.e2ro.com` as earlier assumed). Baked the confirmed stage hosts into
+`src/lib/format.ts` as defaults (env vars still override):
+- Insight (stage): `https://stage.insight.e2ro.com`
+- Admin (stage):  `https://admin.stage.e2ro.com`
+
+So every dogfood device (cohort → stage) now links to stage Insight/Admin automatically.
+The app links to the network view `/networks/{networkId}` (consistent with prod); the
+`/eeros/{eeroId}` form in the sample link is an alternate Insight route — switch to it later
+if the team prefers per-eero deep-links. Matching API bases for data (when tokens land):
+`api-admin.stage.e2ro.com` / `api-user.stage.e2ro.com`.

@@ -9,9 +9,9 @@
 // live in STAGE. A device's target env is taken from its `environment` field when
 // set (shapeshift stamps it), else inferred from its cohort (program 'dogfood' →
 // stage, everything else → prod). Prod hosts are known/hardcoded; stage hosts come
-// from env vars so we never bake in a guessed hostname — until the eero platform
-// team confirms them and they're set, stage links resolve to '' (callers render
-// plain text instead of a broken link).
+// confirmed for the dogfood/stage env (admin.stage.e2ro.com / stage.insight.e2ro.com)
+// and baked in as defaults; env vars override if the stage flavor ever changes. If a
+// host is ever blank the helper returns '' and callers render plain text (no broken link).
 export type EeroEnv = 'stage' | 'prod';
 
 const HOSTS: Record<EeroEnv, { admin: string; insight: string }> = {
@@ -20,9 +20,9 @@ const HOSTS: Record<EeroEnv, { admin: string; insight: string }> = {
     insight: 'https://insight.eero.com',
   },
   stage: {
-    // TODO(platform): confirm stage hostnames, then set these in the env.
-    admin: process.env.NEXT_PUBLIC_ADMIN_STAGE_URL || '',
-    insight: process.env.NEXT_PUBLIC_INSIGHT_STAGE_URL || '',
+    // Confirmed dogfood/stage hosts (env vars override if the flavor ever changes).
+    admin: process.env.NEXT_PUBLIC_ADMIN_STAGE_URL || 'https://admin.stage.e2ro.com',
+    insight: process.env.NEXT_PUBLIC_INSIGHT_STAGE_URL || 'https://stage.insight.e2ro.com',
   },
 };
 
