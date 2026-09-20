@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
 import { Layout, Sidebar } from '@amzn/eero-web-design-components';
-import { Search } from 'lucide-react';
+import { Search, Wifi } from 'lucide-react';
 import SearchModal from './SearchModal';
 import { useAuthStore } from '@/store/authStore';
+import { APP_NAME } from '@/constants';
 
 interface NavbarProps {
   activeTab: TabType;
@@ -67,6 +68,10 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
 
   const headerElement = (
     <div className="flex w-full items-center gap-3 px-4 py-2">
+      <span className="flex shrink-0 items-center gap-1.5 font-semibold text-[var(--ui-text-text-primary)]" title={APP_NAME}>
+        <Wifi size={16} className="text-[var(--ui-core-periwinkle-periwinkle-6)]" strokeWidth={2} />
+        {APP_NAME}
+      </span>
       <button
         onClick={() => setSearchOpen(true)}
         className="flex w-full max-w-md items-center gap-2 rounded-lg bg-[var(--ui-core-midnight-midnight-8)] px-3 py-2 text-sm text-[var(--ui-core-midnight-midnight-6)] transition-all hover:bg-[var(--ui-core-midnight-midnight-7)]"

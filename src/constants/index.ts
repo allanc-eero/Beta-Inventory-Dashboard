@@ -49,6 +49,10 @@ export const RETURN_EPIC_MAP: Record<string, string> = {
 export const JIRA_EPIC_KEY = 'BPM-1886';
 export const JIRA_BASE_URL = 'https://eeroinc.atlassian.net';
 
+// Product name — single source of truth for the brand shown across the app
+// (browser title, login/register headers, sidebar). Change here to rebrand.
+export const APP_NAME = 'eero Fetch';
+
 // ─── Shared Helpers ───────────────────────────────────────────────────────────
 
 // Build a carrier tracking URL from a carrier name + tracking number.

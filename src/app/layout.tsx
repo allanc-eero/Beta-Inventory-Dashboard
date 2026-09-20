@@ -9,11 +9,12 @@ import './globals.css'
 import '@amzn/eero-web-design-foundation/tokens/tw-styles/color-variables.css'
 import '@amzn/eero-web-design-foundation/tokens/tw-styles/light-variables.css'
 import '@amzn/eero-web-design-components/library/styles.css'
+import { APP_NAME } from '@/constants'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Insight Beta',
+  title: APP_NAME,
   description: 'Track and manage beta and dogfood test devices across programs',
 }
 

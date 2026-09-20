@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_NAME } from '@/constants';
 
 const JIRA_BASE_URL = process.env.JIRA_BASE_URL!;
 const JIRA_USER_EMAIL = process.env.JIRA_USER_EMAIL!;
@@ -174,7 +175,7 @@ async function createDogReport(body: any) {
     `Category: ${category || 'feedback'}`,
     deviceSerial ? `Device: ${deviceSerial}` : null,
     attachmentNames && attachmentNames.length ? `Attachments: ${attachmentNames.join(', ')}` : null,
-    `Submitted via: Insight Beta Dogfooder Portal`,
+    `Submitted via: ${APP_NAME} Dogfooder Portal`,
   ].filter(Boolean) as string[];
 
   const payload: any = {
