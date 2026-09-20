@@ -11,11 +11,13 @@ import BulkReturnPanel from './BulkReturnPanel';
 import AgentChat from './AgentChat';
 import { getStatusBadge } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
+import { useUiStore, matchesCohort, cohortOf } from '@/store/uiStore';
 import { insightNetworkUrl, adminNetworkUrl, resolveEnv } from '@/lib/format';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
   const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
   const { canEdit } = useAuthStore();
+  const { cohort } = useUiStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'all'>('all');
   const [programFilter, setProgramFilter] = useState<Program | 'all'>('all');
@@ -37,9 +39,9 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
       const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
       const matchesProgram = programFilter === 'all' || d.program === programFilter;
 
-      return matchesSearch && matchesStatus && matchesProgram;
+      return matchesSearch && matchesStatus && matchesProgram && matchesCohort(d, cohort);
     });
-  }, [devices, search, statusFilter, programFilter]);
+  }, [devices, search, statusFilter, programFilter, cohort]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedDevices);
@@ -239,6 +241,11 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
     <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden mb-4">
       <div className="px-4 py-4 bg-[var(--ui-background-layer-layer-page-hover)] border-b border-[var(--ui-background-layer-border-border-layer-page)] flex items-center gap-3">
         <Tag color={prog === 'unassigned' ? 'red' : 'periwinkle'} size="regular">{label}</Tag>
+        {prog !== 'unassigned' && (
+          <Tag color={cohortOf(rows[0]) === 'dogfood' ? 'purple' : 'navy'} size="regular">
+            {cohortOf(rows[0]) === 'dogfood' ? 'Dogfood · stage' : 'Beta · prod'}
+          </Tag>
+        )}
         <span className="text-xs text-[var(--ui-text-text-placeholder)]">{rows.length} device(s)</span>
       </div>
       <div className="overflow-x-auto">

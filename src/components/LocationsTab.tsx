@@ -8,6 +8,7 @@ import { scaleLinear } from 'd3-scale';
 import { geoCentroid } from 'd3-geo';
 import { Select, Tag, Pagination, Button } from '@amzn/eero-web-design-components';
 import { downloadCSV } from '@/constants';
+import { useUiStore, matchesCohort } from '@/store/uiStore';
 import DeviceDetailPanel from './DeviceDetailPanel';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
@@ -81,6 +82,7 @@ function StatTile({ label, value, accent }: { label: string; value: string | num
 
 export default function LocationsTab() {
   const { devices, syncMetadata } = useDeviceStore();
+  const { cohort } = useUiStore();
   const [filter, setFilter] = useState<FilterMode>('all');
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [programFilter, setProgramFilter] = useState<string>('all');
@@ -106,9 +108,10 @@ export default function LocationsTab() {
       if (filter === 'offline' && d.status !== 'not_online') return false;
       if (filter === 'deactivated' && d.status !== 'deactivated') return false;
       if (programFilter !== 'all' && d.program !== programFilter) return false;
+      if (!matchesCohort(d, cohort)) return false;
       return true;
     });
-  }, [devices, filter, programFilter]);
+  }, [devices, filter, programFilter, cohort]);
 
   // Group by country
   const countryData = useMemo(() => {

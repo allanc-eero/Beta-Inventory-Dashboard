@@ -34,6 +34,7 @@ import {
 // here, so the same devices surface in the Devices / People / Locations menus.
 // (This is the "shared model" wiring; see the handoff doc's simulation note.)
 import { useDeviceStore } from '@/store/deviceStore';
+import { useUiStore } from '@/store/uiStore';
 import DeviceDetailPanel from './DeviceDetailPanel';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
@@ -1975,6 +1976,19 @@ export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { emb
   const { openToast } = useToast();
   const showToast = (msg: string) => openToast({ type: ToastType.success, description: msg });
   const { devices, updateDevice } = useDeviceStore();
+  const { cohort } = useUiStore();
+
+  // Cohort lens: dogfood → dogfood programs, beta → everything else. Applied to the
+  // displayed lists; full `programs`/`surveys` stay intact for create/delete + pickers.
+  const visiblePrograms = useMemo(
+    () => (cohort === 'all' ? programs : programs.filter((p) => programEnumFor(p) === cohort)),
+    [programs, cohort],
+  );
+  const visibleProgramIds = useMemo(() => new Set(visiblePrograms.map((p) => p.id)), [visiblePrograms]);
+  const visibleSurveys = useMemo(
+    () => (cohort === 'all' ? surveys : surveys.filter((s) => visibleProgramIds.has(s.programId))),
+    [surveys, cohort, visibleProgramIds],
+  );
 
   // Launch ONE survey INTO an existing program — the repeatable everyday path
   // (OOBE, weekly Performance, RTM, Re-setup…), each started individually when ready.
@@ -2063,13 +2077,13 @@ export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { emb
           ? (selected.status === 'draft'
               ? <DraftPanel survey={selected} onBack={() => setSelected(null)} onDelete={() => handleDeleteSurvey(selected)} />
               : <SurveyResults survey={selected} onBack={() => setSelected(null)} onToast={showToast} onDelete={() => handleDeleteSurvey(selected)} />)
-          : <SurveyList surveys={surveys} onSelect={setSelected} onNewSurvey={() => setNewSurvey({ open: true })} onDelete={handleDeleteSurvey} />)}
-        {view === 'engagement' && <EngagementView programs={programs} onToast={showToast} />}
+          : <SurveyList surveys={visibleSurveys} onSelect={setSelected} onNewSurvey={() => setNewSurvey({ open: true })} onDelete={handleDeleteSurvey} />)}
+        {view === 'engagement' && <EngagementView programs={visiblePrograms} onToast={showToast} />}
         {view === 'health' && (openProgram
           ? <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} onNavigateToPerson={onNavigateToPerson} />
           : <ProgramHealthView
-              programs={programs}
-              surveys={surveys}
+              programs={visiblePrograms}
+              surveys={visibleSurveys}
               onToast={showToast}
               onNewProgram={() => setNewProgramOpen(true)}
               onNewSurvey={(programId) => setNewSurvey({ open: true, programId })}

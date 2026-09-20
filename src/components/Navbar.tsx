@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
-import { Layout, Sidebar } from '@amzn/eero-web-design-components';
+import { Layout, Sidebar, Segmented } from '@amzn/eero-web-design-components';
 import { Search, Wifi } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import SearchModal from './SearchModal';
 import { useAuthStore } from '@/store/authStore';
+import { useUiStore } from '@/store/uiStore';
 import { APP_NAME } from '@/constants';
 
 interface NavbarProps {
@@ -31,6 +32,7 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
   const [searchOpen, setSearchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { currentUser, logout, canEdit, isBetaViewer } = useAuthStore();
+  const { cohort, setCohort } = useUiStore();
   const { data: ssoSession } = useSession();
 
   // Clear the app session, and end the SSO session too when one exists — otherwise
@@ -78,11 +80,23 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
   const headerElement = (
     <div className="flex w-full items-center gap-3 px-4 py-2">
       {/* Left zone: brand (flex-1 so the center search stays truly centered) */}
-      <div className="flex flex-1 items-center gap-1.5 min-w-0">
+      <div className="flex flex-1 items-center gap-3 min-w-0">
         <span className="flex shrink-0 items-center gap-1.5 font-semibold text-[var(--ui-core-midnight-midnight-1)]" title={APP_NAME}>
           <Wifi size={16} className="text-[var(--ui-core-periwinkle-periwinkle-4)]" strokeWidth={2} />
           {APP_NAME}
         </span>
+        {/* Cohort/environment lens — filters every menu to Beta (prod), Dogfood (stage), or All */}
+        <div className="shrink-0" title="Filter the whole app by cohort">
+          <Segmented
+            value={cohort}
+            onChange={(v) => setCohort(v as typeof cohort)}
+            items={[
+              { label: 'All', value: 'all' },
+              { label: 'Beta', value: 'beta' },
+              { label: 'Dogfood', value: 'dogfood' },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Center zone: search — its own equal-width third so it's truly centered */}

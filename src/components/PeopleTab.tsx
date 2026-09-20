@@ -11,6 +11,7 @@ import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
 import { adminUserUrl, insightNetworkUrl, initials, resolveEnv, EeroEnv } from '@/lib/format';
+import { useUiStore, cohortOf } from '@/store/uiStore';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
   { value: 'no_longer_interested', label: 'No longer interested in testing' },
@@ -23,6 +24,7 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
   const { devices, people, testerProfiles, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
   const { canEdit, currentUser } = useAuthStore();
+  const { cohort } = useUiStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<string | null>(initialSelectedPerson || null);
@@ -113,12 +115,15 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
   }, [devices, people, testerProfiles, getTesterProfile]);
 
   const filteredPeople = useMemo(() => {
-    if (!search) return derivedPeople;
     const q = search.toLowerCase();
-    return derivedPeople.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
-    );
-  }, [derivedPeople, search]);
+    return derivedPeople.filter((p) => {
+      // Cohort lens: keep a person if any of their devices is in the selected cohort.
+      // People with no devices yet (roster-only) stay visible unless a cohort is picked.
+      if (cohort !== 'all' && !(p.devices || []).some((d) => cohortOf(d) === cohort)) return false;
+      if (!search) return true;
+      return p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+    });
+  }, [derivedPeople, search, cohort]);
 
   const selectedPersonDevices = useMemo(() => {
     if (!selectedPerson) return [];
