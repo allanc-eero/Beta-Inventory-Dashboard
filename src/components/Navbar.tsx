@@ -68,32 +68,42 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
 
   const headerElement = (
     <div className="flex w-full items-center gap-3 px-4 py-2">
-      <span className="flex shrink-0 items-center gap-1.5 font-semibold text-[var(--ui-text-text-primary)]" title={APP_NAME}>
-        <Wifi size={16} className="text-[var(--ui-core-periwinkle-periwinkle-6)]" strokeWidth={2} />
-        {APP_NAME}
-      </span>
-      <button
-        onClick={() => setSearchOpen(true)}
-        className="flex w-full max-w-md items-center gap-2 rounded-lg bg-[var(--ui-core-midnight-midnight-8)] px-3 py-2 text-sm text-[var(--ui-core-midnight-midnight-6)] transition-all hover:bg-[var(--ui-core-midnight-midnight-7)]"
-      >
-        <Search size={16} className="shrink-0" />
-        <span className="flex-1 truncate text-left">Search devices, testers, programs, locations…</span>
-      </button>
+      {/* Left zone: brand (flex-1 so the center search stays truly centered) */}
+      <div className="flex flex-1 items-center gap-1.5 min-w-0">
+        <span className="flex shrink-0 items-center gap-1.5 font-semibold text-[var(--ui-core-midnight-midnight-1)]" title={APP_NAME}>
+          <Wifi size={16} className="text-[var(--ui-core-periwinkle-periwinkle-4)]" strokeWidth={2} />
+          {APP_NAME}
+        </span>
+      </div>
 
-      {currentUser && (
-        <div className="ml-auto flex items-center gap-2">
-          {!canEdit() && (
-            <span className="text-xs px-1.5 py-0.5 bg-[var(--ui-core-orange-orange-2)] text-[var(--ui-core-orange-orange-7)] rounded font-medium">VIEW ONLY</span>
-          )}
-          <span className="text-xs text-[var(--ui-text-text-tertiary)]">{currentUser.name}</span>
-          <button
-            onClick={logout}
-            className="text-xs text-[var(--ui-core-red-red-6)] hover:text-[var(--ui-core-red-red-7)] font-medium"
-          >
-            Sign out
-          </button>
-        </div>
-      )}
+      {/* Center zone: search — its own equal-width third so it's truly centered */}
+      <div className="flex flex-1 justify-center">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="flex w-full max-w-md items-center gap-2 rounded-lg bg-[var(--ui-core-midnight-midnight-8)] px-3 py-2 text-sm text-[var(--ui-core-midnight-midnight-6)] transition-all hover:bg-[var(--ui-core-midnight-midnight-7)]"
+        >
+          <Search size={16} className="shrink-0" />
+          <span className="flex-1 truncate text-left">Search devices, testers, programs, locations…</span>
+        </button>
+      </div>
+
+      {/* Right zone: user (flex-1, right-aligned) */}
+      <div className="flex flex-1 items-center justify-end gap-2">
+        {currentUser && (
+          <>
+            {!canEdit() && (
+              <span className="text-xs px-1.5 py-0.5 bg-[var(--ui-core-orange-orange-2)] text-[var(--ui-core-orange-orange-7)] rounded font-medium">VIEW ONLY</span>
+            )}
+            <span className="text-xs text-[var(--ui-core-midnight-midnight-3)]">{currentUser.name}</span>
+            <button
+              onClick={logout}
+              className="text-xs text-[var(--ui-core-red-red-5)] hover:text-[var(--ui-core-red-red-4)] font-medium"
+            >
+              Sign out
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 
