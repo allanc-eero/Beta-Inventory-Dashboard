@@ -17,7 +17,7 @@ import DogfooderPortal from '@/components/DogfooderPortal';
 import DogfoodOnboarding from '@/components/DogfoodOnboarding';
 import ProgramSignupsTab from '@/components/ProgramSignupsTab';
 import { ToastProvider } from '@amzn/eero-web-design-components';
-import { DemoSurveysInner } from '@/components/SurveysDemo';
+import { ProgramsView } from '@/components/programs/ProgramsView';
 import { useAuthStore } from '@/store/authStore';
 
 export default function Home() {
@@ -99,7 +99,7 @@ export default function Home() {
           {activeTab === 'program_signups' && <ProgramSignupsTab />}
           {activeTab === 'locations' && <LocationsTab />}
           {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
-          {activeTab === 'surveys' && <ToastProvider><DemoSurveysInner embedded onNavigateToPerson={handleNavigateToPerson} /></ToastProvider>}
+          {activeTab === 'surveys' && <ToastProvider><ProgramsView embedded onNavigateToPerson={handleNavigateToPerson} /></ToastProvider>}
           {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
         </div>
       </Navbar>

@@ -2,32 +2,30 @@
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * DEMO: Surveys + Engagement + Program Health  (flagship preview)
+ * Programs — Surveys, Engagement & Program Health
  * ─────────────────────────────────────────────────────────────────────────────
- * Preview route at /demo-surveys. Types, mock data, and view components live in
- * this one file. EXCEPTION: the Programs device roster now writes assigned serials
- * into the shared deviceStore (useDeviceStore) so the same devices surface in the
- * Devices / People / Locations menus — see ProgramDevicesView's shared-store bridge
- * and the SIMULATION NOTE in docs/Surveys_Feature_Handoff.md. Once approved, the
- * remaining pieces get promoted into src/types, src/store, and src/components.
- *
- * What it shows (the flagship loop we scoped):
- *   1. Surveys      — list + results (charts + AI feedback summary + closed-loop
- *                     "create JIRA ticket" from a response). Qualtrics-backed seam.
- *   2. Engagement   — reliability / response-time / feedback-quality on testers,
- *                     plus an At-Risk view (rules engine + AI narration).
+ * The in-app "Programs" tab (and the standalone /programs route). Renders four
+ * views:
+ *   1. Surveys        — list + results (charts + AI feedback summary + closed-loop
+ *                       "create JIRA ticket" from a response). Qualtrics-backed.
+ *   2. Engagement     — reliability / response-time / feedback-quality per tester,
+ *                       plus an At-Risk view (rules engine + AI narration).
  *   3. Program Health — the leadership report: deployed, % online, response rate,
- *                     feedback quality per program (Hardware AND Feature programs).
+ *                       feedback quality per program (Hardware AND Feature programs).
+ *   4. Device roster  — per-program serial↔tester assignment; writes into the shared
+ *                       deviceStore so the same devices surface in Devices / People /
+ *                       Locations (see ProgramDevicesView's shared-store bridge).
  *
- * Everything marked "simulated" is the same demo seam pattern the app already uses
- * (setTimeout instead of a live API). Real Qualtrics/Bedrock swap in behind these.
+ * Integration seams (Qualtrics / Bedrock / eero API) are env-gated: live when their
+ * env vars are set, else a deterministic seed so the app always works. Items still
+ * labelled "simulated" are awaiting those creds — see docs/Surveys_Feature_Handoff.md.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import {
   Card, Button, Tag, Segmented, Select, ProgressBar, Input, Modal,
-  Icon, ICONS, TableV2, ToastProvider, useToast, ToastType,
+  Icon, ICONS, TableV2, useToast, ToastType,
   Pagination,
 } from '@amzn/eero-web-design-components';
 // Shared device store — assigning serials in a Program writes real Device rows
@@ -35,7 +33,7 @@ import {
 // (This is the "shared model" wiring; see the handoff doc's simulation note.)
 import { useDeviceStore } from '@/store/deviceStore';
 import { useUiStore } from '@/store/uiStore';
-import DeviceDetailPanel from './DeviceDetailPanel';
+import DeviceDetailPanel from '../DeviceDetailPanel';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
@@ -1955,14 +1953,10 @@ const TABS = [
   { value: 'engagement', label: 'Engagement', description: 'Per-tester reliability and feedback quality, plus the At-Risk rules that flag testers to re-engage or reclaim.' },
 ] as const;
 
-// ─── Page shell ──────────────────────────────────────────────────────────────
-// ToastProvider must wrap the tree that calls useToast — so the page is a thin
-// provider shell around the real content.
-export default function DemoSurveysPage() {
-  return <ToastProvider><DemoSurveysInner /></ToastProvider>;
-}
-
-export function DemoSurveysInner({ embedded = false, onNavigateToPerson }: { embedded?: boolean; onNavigateToPerson?: (email: string) => void } = {}) {
+// ─── Programs feature root ───────────────────────────────────────────────────
+// Renders the Programs / Surveys / Engagement / Program Health tabs. Callers wrap
+// this in an EDS <ToastProvider> (the in-app tab and the /programs route both do).
+export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedded?: boolean; onNavigateToPerson?: (email: string) => void } = {}) {
   const [view, setView] = useState<string | number>('health');
   const [selected, setSelected] = useState<DemoSurvey | null>(null);
   // Programs & surveys are now stateful so a newly-created program/survey shows up live.
