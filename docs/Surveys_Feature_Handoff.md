@@ -511,3 +511,52 @@ confirm the `TODO(verify)` eero API request shapes against a real session.
    `authStore`. For a real standalone, source authorized users/roles from a group or
    backend rather than a code constant.
 5. **[FUTURE] Persistence + weekly scheduler** once hosted (today localStorage).
+
+---
+## eero API shapes — VERIFIED LIVE against prod (2026-09-02)
+
+Authenticated the eero CLI (`eero api user --prod auth --sso`, superuser, on VPN) and
+hit the real prod API. Findings that **correct the route's `TODO(verify)` guesses**:
+
+**The by-serial lookup is an ADMIN API call, not User API.**
+- ❌ App's current guess: `GET {user}/2.2/eeros/{serial}` → **400** ("cannot parse id")
+  — that endpoint takes a numeric eero **id**, and the User API only resolves serials
+  within the caller's own networks (account-scoped). A superuser with no networks 404s.
+- ✅ Correct: **`GET https://api-admin.e2ro.com/eeros/serial/{serial}`** → 200.
+  Stage: `https://api-admin.stage.e2ro.com/eeros/serial/{serial}`.
+
+**Response envelope:** `{ meta: {code, server_time}, data: {...} }` (parse `data`).
+
+**by-serial `data` fields:** `serial`, `model` (e.g. "Merci"), `mac`, `country`,
+`unit_id` (→ our `unitId`/adminId), `deactivated` (bool), `location` (eero placement,
+e.g. "Kitchen"), `network: { url: "/networks/{id}", ssid, group, group_locked }`,
+`session: { url: "/nodes/{id}", entity }`, `session_history`, `sku`, `part_number`,
+`organization`.
+- **networkId** = last path segment of `network.url`.
+- **`network.group`** (e.g. "Kunka") — a network-group name; candidate cohort/beta
+  discriminator worth exploring.
+- Online status + firmware are **NOT** in the by-serial payload.
+
+**Online + firmware come from the node/session** (`GET {admin}{session.url}`, i.e.
+`/nodes/{id}`), `data` fields include: **`status: "green"`** (green = online — the
+app's `status === 'green'` check is correct), **`firmware`** (e.g.
+"v7.17.2-…prod.merci"), `heartbeat_ok`, `last_heartbeat`, `mesh_quality_bars`,
+`network`, `location`, `gateway`, `wired`, `thermals`, `deactivated`.
+
+**So the correct live flow per serial (2 calls):**
+1. `GET {admin}/eeros/serial/{serial}` → model, mac, unit_id, deactivated, country,
+   network.url→networkId, network.group, session.url→nodeId.
+2. `GET {admin}/nodes/{nodeId}` → status (green=online), firmware.
+
+**Auth:** one `eero api user auth --sso` also authorized the Admin API (shared SSO
+session as `allanc@eero.com`, role `eero-internal-cx`). The account's SSO shows
+`auth.provider_id: 3`, Okta `service_id: 0oa9zh37wdozlkh4g356` (Okta app id) — useful
+context for the OIDC/SSO work. NOTE: the eero **MCP** tools use a *separate* session
+that's still expired; only the CLI session was refreshed.
+
+**Implication for the route (`/api/insight`):** switch `fetchEeroBySerial` to the
+**Admin API** two-hop above; add `EERO_ADMIN_API_BASE_PROD/STAGE` +
+`EERO_ADMIN_API_TOKEN_PROD/STAGE`. Tradeoff to weigh: **2 admin calls per serial** →
+for a weekly bulk sync of hundreds of devices, prefer a per-network listing
+(`get-network-eeros`) or admin batch endpoint over N×2 by-serial calls. Stage subset
+(`--ci.stage` vs `--dev.stage`) for dogfood still to confirm.
