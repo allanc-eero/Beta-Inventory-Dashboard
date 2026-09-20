@@ -38,7 +38,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, Tone, Severity, Priority, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
-import { adminUserUrl, insightNetworkUrl, adminNetworkUrl, resolveEnv } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, adminNetworkUrl, resolveEnv, EeroEnv } from '@/lib/format';
 
 // ─── Types (inline — demo only) ──────────────────────────────────────────────
 type ProgramType = 'hardware' | 'feature';
@@ -1400,10 +1400,11 @@ interface AssignedDevice {
 }
 
 // Enrich one serial through the /api/insight route (serial-anchored lookup).
-async function enrichSerial(serial: string, fallbackModel: string): Promise<AssignedDevice> {
+// env routes to the right cloud: beta program → prod, dogfood → stage.
+async function enrichSerial(serial: string, fallbackModel: string, env: EeroEnv = 'prod'): Promise<AssignedDevice> {
   const clean = serial.trim().toUpperCase();
   try {
-    const res = await fetch(`/api/insight?serial=${encodeURIComponent(clean)}`);
+    const res = await fetch(`/api/insight?serial=${encodeURIComponent(clean)}&env=${env}`);
     const d = await res.json();
     if (d.match === 'matched' && d.device) {
       return {
@@ -1573,7 +1574,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const testersWithDevice = roster.filter((t) => (assignments[t.id] || []).length > 0).length;
   const unassigned = roster.length - testersWithDevice;
 
-  const enrichAll = async (devs: AssignedDevice[]) => Promise.all(devs.map((d) => enrichSerial(d.serial, model)));
+  const enrichAll = async (devs: AssignedDevice[]) => Promise.all(devs.map((d) => enrichSerial(d.serial, model, linkEnv)));
 
   const assignSerial = async (tester: DemoTester) => {
     const raw = (serialInput[tester.id] || '').trim();

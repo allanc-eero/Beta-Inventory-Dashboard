@@ -1,4 +1,5 @@
 import { useDeviceStore } from '@/store/deviceStore';
+import { resolveEnv, EeroEnv } from '@/lib/format';
 
 /**
  * Reusable device sync — pulls live online status + tester info and applies it
@@ -60,27 +61,48 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
 
   store.updateSyncMetadata({ syncInProgress: true });
   try {
-    const res = await fetch(SYNC_ENDPOINT[DEVICE_SYNC_SOURCE], {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'sync', serials: list }),
-    });
-    const data = await res.json();
-    if (!data.success) {
+    // Group serials by cloud so BETA hits prod and DOGFOOD hits stage (insight
+    // source only; databricks is a single warehouse). One POST per env; merge.
+    let statuses: { serial: string; online: boolean }[] = [];
+    let testers: any[] = [];
+    let onlineCount = 0;
+    let notFoundCount = 0;
+
+    const postSync = async (serials: string[], env?: EeroEnv) => {
+      const res = await fetch(SYNC_ENDPOINT[DEVICE_SYNC_SOURCE], {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'sync', serials, ...(env ? { env } : {}) }),
+      });
+      const data = await res.json();
       // Never apply a failed lookup — it would wrongly mark everything offline.
-      store.updateSyncMetadata({ syncInProgress: false });
-      return { ...ZERO, success: false, error: data.error || 'Device sync failed' };
+      if (!data.success) throw new Error(data.error || 'Device sync failed');
+      statuses = statuses.concat(data.statuses || []);
+      testers = testers.concat(data.testers || []);
+      onlineCount += data.onlineCount ?? (data.statuses || []).filter((s: any) => s.online).length;
+      notFoundCount += (data.notFound || []).length;
+    };
+
+    if (DEVICE_SYNC_SOURCE === 'insight') {
+      const bySerial = new Map(store.devices.map((d) => [d.serialNumber, d]));
+      const groups: Record<EeroEnv, string[]> = { prod: [], stage: [] };
+      list.forEach((s) => { const d = bySerial.get(s); groups[resolveEnv(d?.environment, d?.program)].push(s); });
+      for (const env of ['prod', 'stage'] as EeroEnv[]) {
+        if (groups[env].length) await postSync(groups[env], env);
+      }
+    } else {
+      await postSync(list);
     }
 
     // 1) Online/offline status (authoritative). syncNetworkStatus also stamps
     //    lastFullSync and clears syncInProgress.
-    const onlineSerials = (data.statuses || []).filter((s: any) => s.online).map((s: any) => s.serial);
+    const onlineSerials = statuses.filter((s) => s.online).map((s) => s.serial);
     const statusChanges = store.syncNetworkStatus(onlineSerials);
 
     // 2) Tester info for matched devices (name/email/network/location — whatever
     //    the source provides; Insight gives network, Databricks gives more).
     let testerUpdates = 0;
-    (data.testers || []).forEach((t: any) => {
+    testers.forEach((t: any) => {
       if (!t.serial) return;
       const device = store.getDeviceBySerial(t.serial);
       if (!device) return;
@@ -99,8 +121,8 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       checked: list.length,
       statusChanges,
       testerUpdates,
-      online: data.onlineCount ?? onlineSerials.length,
-      notFound: (data.notFound || []).length,
+      online: onlineCount,
+      notFound: notFoundCount,
     };
   } catch (e: any) {
     store.updateSyncMetadata({ syncInProgress: false });
