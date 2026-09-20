@@ -115,7 +115,9 @@ src/
 │   ├── DevicesTab.tsx             # device list, grouped into per-program containers (cohort-tagged)
 │   ├── PeopleTab.tsx              # tester directory, profiles, opt-out/offboarding
 │   ├── LocationsTab.tsx           # world map + regional stats (env-aware, centroid markers)
-│   ├── SurveysDemo.tsx            # Programs / Surveys / Engagement / Program Health (in-app "Programs" tab)
+│   ├── programs/                  # Programs / Surveys / Engagement / Program Health (in-app "Programs" tab + /programs)
+│   │   ├── ProgramsView.tsx       #   feature root (views, charts, panels, modals)
+│   │   └── types.ts               #   shared types (DemoSurvey, DemoProgram, …)
 │   ├── DeviceDetailPanel.tsx      # shared editable device panel (used across every menu)
 │   ├── ShipmentsTab.tsx           # ingestion (CSV upload) + Archived returns
 │   ├── LoginPage.tsx              # SSO sign-in when configured, else @eero.com email (dev)
