@@ -68,11 +68,11 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
     let onlineCount = 0;
     let notFoundCount = 0;
 
-    const postSync = async (serials: string[], env?: EeroEnv) => {
+    const postSync = async (payload: Record<string, unknown>) => {
       const res = await fetch(SYNC_ENDPOINT[DEVICE_SYNC_SOURCE], {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'sync', serials, ...(env ? { env } : {}) }),
+        body: JSON.stringify({ op: 'sync', ...payload }),
       });
       const data = await res.json();
       // Never apply a failed lookup — it would wrongly mark everything offline.
@@ -84,14 +84,20 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
     };
 
     if (DEVICE_SYNC_SOURCE === 'insight') {
+      // Group by cloud (beta→prod, dogfood→stage) and pass each device's KNOWN
+      // networkId so the route can fetch each network once (option B) instead of
+      // resolving every serial individually.
       const bySerial = new Map(store.devices.map((d) => [d.serialNumber, d]));
-      const groups: Record<EeroEnv, string[]> = { prod: [], stage: [] };
-      list.forEach((s) => { const d = bySerial.get(s); groups[resolveEnv(d?.environment, d?.program)].push(s); });
+      const groups: Record<EeroEnv, { serial: string; network: string | null }[]> = { prod: [], stage: [] };
+      list.forEach((s) => {
+        const d = bySerial.get(s);
+        groups[resolveEnv(d?.environment, d?.program)].push({ serial: s, network: d?.network || null });
+      });
       for (const env of ['prod', 'stage'] as EeroEnv[]) {
-        if (groups[env].length) await postSync(groups[env], env);
+        if (groups[env].length) await postSync({ env, items: groups[env] });
       }
     } else {
-      await postSync(list);
+      await postSync({ serials: list });
     }
 
     // 1) Online/offline status (authoritative). syncNetworkStatus also stamps
@@ -110,6 +116,7 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       if (t.name && t.name !== device.assignedTo) updates.assignedTo = t.name;
       if (t.email && t.email !== device.assignedEmail) updates.assignedEmail = t.email;
       if (t.network && t.network !== device.network) updates.network = t.network;
+      if (t.firmware && t.firmware !== device.firmwareVersion) updates.firmwareVersion = t.firmware;
       if (t.location && t.location !== device.location) updates.location = t.location;
       // Country: uploaded CSV is source of truth — only fill when empty.
       if (t.country && !device.country) updates.country = t.country;
