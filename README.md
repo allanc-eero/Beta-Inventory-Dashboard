@@ -71,7 +71,7 @@ The app runs at `http://localhost:3000`.
 
 - **Node.js** 18.x or higher
 - **npm** 9.x or higher
-- No database required — all data persists in browser localStorage via Zustand
+- No database required to run locally — all data persists in browser localStorage via Zustand. (A shared production deployment will need server-side persistence + SSO — see `docs/Surveys_Feature_Handoff.md`.)
 
 ## Tech Stack
 
@@ -79,50 +79,62 @@ The app runs at `http://localhost:3000`.
 |-------|-----------|
 | Framework | Next.js 14 (App Router) |
 | Language | TypeScript 5.4 |
-| State Management | Zustand 4.5 (with persist middleware) |
-| Styling | Tailwind CSS 3.4 |
-| Icons | Lucide React |
-| CSV Parsing | PapaParse 5.4 |
-| Maps | react-simple-maps 3.0 |
+| State management | Zustand 4.5 (persist middleware) |
+| Design system | EDS — `@amzn/eero-web-design-components` + `-foundation` (tokens) |
+| Styling | Tailwind CSS 3.4 (mapped to EDS tokens) |
+| Auth (SSO) | NextAuth 4 — provider-agnostic OIDC (e.g. Okta), behind a seam |
+| Maps | react-simple-maps 3 + d3-geo (centroids) |
+| AI summaries | AWS Bedrock (`@aws-sdk/client-bedrock-runtime`) |
+| Integrations | Qualtrics (surveys), JIRA (tickets), eero User/Admin API, Databricks (optional) |
+| Icons / CSV | Lucide React / PapaParse |
+
+## Architecture at a glance
+
+- **Standalone Next.js app** (not embedded in Insight). Client UI + server-side API routes under `src/app/api/*` that talk to real integrations (or fall back to seeded data when creds are absent).
+- **Dual-cloud, cohort-routed.** Beta → production eero cloud, dogfood → stage. A device's cohort (from `program`) decides which cloud its data sync and deep-links target. See `src/lib/format.ts` (`resolveEnv`) and `src/app/api/insight/route.ts`.
+- **One shared model.** All tabs read/write a single device store, so a change shows up everywhere (Devices, People, Locations, Programs).
+- **Everything is env-gated.** Each integration is live when its env vars are set, else it runs on a deterministic seed so the app always works. Prove readiness with `curl -s localhost:3000/api/health | jq`. See `.env.example`.
 
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── globals.css          # Tailwind + custom status badge styles
-│   ├── layout.tsx           # Root layout
-│   └── page.tsx             # Main page (tab router)
-├── components/
-│   ├── AddDeviceModal.tsx   # Manual device entry with profile auto-fill
-│   ├── AttachmentsPanel.tsx # File attachments per device
-│   ├── BulkReturnPanel.tsx  # Bulk device return workflow
-│   ├── CheckoutTab.tsx      # Device checkout management
-│   ├── DashboardStats.tsx   # Top-level stat cards (memoized)
-│   ├── DeactivateDeviceModal.tsx # Return-to-eero workflow
-│   ├── DeviceDetailPanel.tsx     # Full device info (data-driven fields)
-│   ├── DeviceTimeline.tsx   # Device history timeline
-│   ├── DevicesTab.tsx       # Main device list with search/filter
-│   ├── FirmwarePanel.tsx    # Firmware version tracking
-│   ├── HealthPanel.tsx      # Network health / speed tests
-│   ├── ImportTab.tsx        # CSV import with upsert + tester profiles
-│   ├── JiraPanel.tsx        # JIRA ticket integration
-│   ├── LocationsTab.tsx     # Geographic device map
-│   ├── Navbar.tsx           # Top navigation
-│   ├── NetworkSyncButton.tsx # eero Partner API sync trigger
-│   ├── OverdueAlertsBanner.tsx # Overdue device alerts
-│   ├── PeopleTab.tsx        # Tester directory + opt-out tracking
-│   ├── ProgramsTab.tsx      # Program lifecycle (active/close/archive)
-│   ├── SearchModal.tsx      # Global search
-│   ├── SeedDataProvider.tsx # Initial data seeding + profile creation
-│   ├── ShipmentsTab.tsx     # Shipment tracking (Leg 1 & 2)
-│   └── TestbedsTab.tsx      # Testbed management
-├── data/
-│   └── seedData.ts          # Seed data (AUS testers, devices)
+│   ├── layout.tsx                 # Root layout (wraps app in <Providers> for SSO)
+│   ├── page.tsx                   # Auth gate + tab router (Devices/People/Locations/Programs/Ingestion)
+│   ├── globals.css                # Tailwind + fonts + status badge styles
+│   └── api/                       # Server routes (live integrations, seeded fallback)
+│       ├── insight/               # eero dual-cloud device/network lookup + sync (prod/stage)
+│       ├── auth/[...nextauth]/    # NextAuth OIDC handler (SSO)
+│       ├── qualtrics/             # survey lists + completedResponse webhook
+│       ├── summarize/ engagement/ # Bedrock AI summary / engagement feed
+│       ├── jira/ jira-webhook/    # ticket creation + status webhook
+│       └── databricks/ shapeshift/ breadboard/ health/ …
+├── components/                    # 34 UI components (EDS-based). Key ones:
+│   ├── Navbar.tsx                 # top bar: brand + Beta/Dogfood/All cohort switch + search
+│   ├── DevicesTab.tsx             # device list, grouped into per-program containers (cohort-tagged)
+│   ├── PeopleTab.tsx              # tester directory, profiles, opt-out/offboarding
+│   ├── LocationsTab.tsx           # world map + regional stats (env-aware, centroid markers)
+│   ├── SurveysDemo.tsx            # Programs / Surveys / Engagement / Program Health (in-app "Programs" tab)
+│   ├── DeviceDetailPanel.tsx      # shared editable device panel (used across every menu)
+│   ├── ShipmentsTab.tsx           # ingestion (CSV upload) + Archived returns
+│   ├── LoginPage.tsx              # SSO sign-in when configured, else @eero.com email (dev)
+│   ├── Providers.tsx              # SessionProvider + SSO→roster bridge
+│   └── … (modals, panels, banners, AgentChat, SearchModal, SeedDataProvider)
+├── lib/
+│   ├── format.ts                  # env-aware deep-links (resolveEnv) + name/date helpers
+│   ├── networkSync.ts             # runDeviceSync — dual-cloud, groups serials by network
+│   ├── auth.ts                    # NextAuth OIDC config (gated on OIDC_ISSUER)
+│   ├── engagement.ts / summarize.ts / bedrock.ts  # live-vs-seed seams for engagement + AI
+│   └── dogfoodInventory.ts
 ├── store/
-│   └── deviceStore.ts       # Zustand store (all state + actions)
-└── types/
-    └── index.ts             # TypeScript interfaces
+│   ├── deviceStore.ts             # devices, profiles, sync metadata, lifecycle actions
+│   ├── authStore.ts               # roster + roles (authorization layer)
+│   ├── uiStore.ts                 # global cohort lens (Beta/Dogfood/All) + cohortOf/matchesCohort
+│   └── programsStore.ts
+├── data/seedData.ts               # seed testers/devices (deterministic demo data)
+├── constants/index.ts             # shared constants incl. APP_NAME, status config, CSV helper
+└── types/index.ts                 # TypeScript interfaces (Device, Program, TesterProfile, …)
 ```
 
 ## Key Features
@@ -163,10 +175,19 @@ src/
 - Record opt-outs with reason tracking
 - Tester profiles carry data across programs
 
-### Network Sync
-- Polls eero Partner API to detect which devices have come online
-- Updates device status from `not_online` → `online` based on network presence
-- Stale indicator when sync hasn't run recently
+### Cohort lens (Beta / Dogfood / All)
+- A global switch in the top bar filters the **whole app** to one cohort — Beta (prod), Dogfood (stage), or All (default)
+- Applies across Devices, People, Locations, and Programs; device containers are tagged **Beta · prod** / **Dogfood · stage**
+- Backed by `src/store/uiStore.ts` (`cohortOf` / `matchesCohort`); cohort derives from `Device.program`
+
+### Device sync (dual-cloud)
+- Resolves live online status + network per device from the eero **Admin API**, routed by cohort (beta → prod, dogfood → stage)
+- Efficient: groups serials by known network and reads each network once (`nodes[]` → `status`/`firmware`); by-serial discovery only for unknown networks
+- Runs after CSV upload and on a weekly cadence; falls back to seeded data with no creds
+
+### Authentication (SSO)
+- App-level **OIDC via NextAuth** — set `OIDC_ISSUER` (+ client id/secret) to enable SSO sign-in
+- With SSO off (local dev), an `@eero.com` email login is used instead; the roster in `authStore` is the authorization layer (role/permissions)
 
 ## Data Model
 
@@ -177,22 +198,19 @@ src/
 - `DeviceStatus` — online, not_online, in_repair, in_testing, deactivated
 
 ### Persistence
-All state is stored in browser localStorage under the key `device-tracker-storage`. To reset:
-1. Go to Import tab → "Clear All Data", or
-2. Browser DevTools → Application → Local Storage → delete `device-tracker-storage`
-
-Fresh seed data loads automatically when the store is empty.
+All state is stored in browser localStorage under the key `device-tracker-storage` (auth session under `auth-storage`). To reset, open Browser DevTools → Application → Local Storage → delete `device-tracker-storage`. Fresh seed data loads automatically when the store is empty.
 
 ## External Integrations
 
 | Service | URL Pattern | Purpose |
 |---------|------------|---------|
-| eero Admin (prod) | `https://admin.e2ro.com/{users\|networks}/{id}` | Device/network admin panel (beta) |
-| eero Insight (prod) | `https://insight.eero.com/networks/{networkId}` | Network dashboard (beta) |
-| eero Admin/Insight (stage) | `NEXT_PUBLIC_ADMIN_STAGE_URL` / `NEXT_PUBLIC_INSIGHT_STAGE_URL` | Dogfood (stage) — env-configured, unset until platform confirms |
-| eero User API | `https://api-user.e2ro.com/2.2/` (`EERO_USER_API_BASE`) | Device online-status sync (Insight-native) |
-| Qualtrics | directory/surveys/responses | Survey audience import + response webhook |
+| eero Insight/Admin (prod, beta) | `insight.eero.com` / `admin.e2ro.com` `/networks/{id}` | Network + admin deep-links for beta |
+| eero Insight/Admin (stage, dogfood) | `stage.insight.e2ro.com` / `admin.stage.e2ro.com` | Deep-links for dogfood (baked defaults; env-overridable) |
+| eero Admin API (data) | `api-admin[.stage].e2ro.com` — `/eeros/serial/{s}`, `/networks/{id}` | Live device online status + network + firmware (dual-cloud) |
+| Qualtrics | directory / surveys / responses webhook | Survey audience import + response ingestion |
 | AWS Bedrock | Converse API | AI feedback summaries |
+
+> **Deep-links and data are environment-aware.** Cohort decides the cloud — beta → prod, dogfood → stage — for both the UI links (`src/lib/format.ts` → `resolveEnv`) and the Admin-API data sync (`src/app/api/insight/route.ts`). Links need no credentials; the data sync needs one Admin API token per environment. Verified request shapes and go-live steps are in `docs/Surveys_Feature_Handoff.md`.
 
 > **Deep-links are environment-aware.** Each link is routed to prod or stage by the device's `environment`/cohort (`src/lib/format.ts` → `resolveEnv`). Deep-links need no credentials; the live-status sync does (one credential per environment).
 
@@ -221,19 +239,17 @@ The import system uses a declarative `COLUMN_MAP` array in `ImportTab.tsx`. Each
 | `npm start` | Serve production build |
 | `npm run lint` | Run ESLint |
 
-## Known Limitations
+## Known Limitations & go-live checklist
 
-- Data is browser-local (localStorage). No server-side persistence or multi-user sync yet (a real deployment needs a server-side store + scheduler — see the handoff doc).
-- eero API sync runs on a deterministic **seeded fallback** until `EERO_API_TOKEN` (+ env base) is set; the live REST paths are marked `TODO(verify)`.
-- **Stage deep-links are inert until configured** — set `NEXT_PUBLIC_INSIGHT_STAGE_URL` / `NEXT_PUBLIC_ADMIN_STAGE_URL` once the platform team confirms the stage hostnames.
-- `react-simple-maps` ships no TypeScript types (local shim in `src/types/react-simple-maps.d.ts`); `d3-geo` uses the real `@types/d3-geo`.
+- **Persistence:** data is browser-local (localStorage) — single-user. A shared deployment needs a server-side store + a weekly sync scheduler.
+- **Live device data:** the Admin-API sync runs on a deterministic **seeded fallback** until `EERO_ADMIN_API_TOKEN_PROD` / `_STAGE` are set. The request shapes are **verified against prod + stage** (see the handoff doc); hosts default to `api-admin[.stage].e2ro.com`.
+- **SSO:** OIDC is wired but dormant until `OIDC_ISSUER` (+ client id/secret + `AUTH_SECRET`) are set; local dev uses the `@eero.com` email login. Which IdP flow to use (Okta app-level vs Midway-at-edge) depends on the deployment host — see the handoff doc.
+- **Types:** `react-simple-maps` ships no TypeScript types (local shim in `src/types/react-simple-maps.d.ts`); `d3-geo` uses the real `@types/d3-geo`.
 
-## Backup Strategy
+## Version control
 
-The project uses local git for version control. To create a backup:
-```bash
-git add -A && git commit -m "Backup: description of changes"
-```
+Tracked in git and pushed to two GitHub remotes:
+- `origin` → the working repo (branch `surveys-engagement-demo`)
+- `standalone` → **[allanc-eero/eero-fetch](https://github.com/allanc-eero/eero-fetch)** (private; `main`) — the shareable standalone repo
 
-A copy of the project exists at:
-`/Users/chavalln/Documents/Kiro/Beta Inventory Dashboard Copy 1`
+Full engineering history, decisions, verified API shapes, and remaining go-live steps live in **`docs/Surveys_Feature_Handoff.md`**.
