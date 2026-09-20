@@ -560,3 +560,30 @@ that's still expired; only the CLI session was refreshed.
 for a weekly bulk sync of hundreds of devices, prefer a per-network listing
 (`get-network-eeros`) or admin batch endpoint over N×2 by-serial calls. Stage subset
 (`--ci.stage` vs `--dev.stage`) for dogfood still to confirm.
+
+---
+## Stage shapes verified + multiple stage flavors (2026-09-02)
+
+Authed `eero api user --ci.stage auth --sso` and verified the **Admin API shapes on
+stage are identical to prod** (only the base URL differs — the route needs no
+per-env shape handling):
+- `GET {admin}/networks/{id}` → `data.nodes[]` each `{serial, model, status, firmware}`
+  (`status: "green"` = online; sample stage build `…stage.jupiter`).
+- `GET {admin}/eeros/serial/{serial}` → `{serial, model, network.url, session}`.
+
+**IMPORTANT — there are multiple "stage" flavors, on different hosts:**
+| CLI flag | User API base | Admin API base |
+|---|---|---|
+| `--ci.stage` | `api-user-ci.stage.e2ro.com` | `api-admin-ci.stage.e2ro.com` |
+| plain "stage" (creds.ini + Insight config) | `api-user.stage.e2ro.com` | `api-admin.stage.e2ro.com` |
+| `--dev.stage` | `api-user-dev.stage.e2ro.com` (by pattern) | `api-admin-dev.stage.e2ro.com` |
+
+`--ci.stage` is where the test account's network lived, so that's what I verified.
+The `.env.example` default for dogfood is **plain "stage"** (`api-admin.stage.e2ro.com`),
+which matches the confirmed stage **Insight** UI host (`insight.stage.e2ro.com`) — i.e.
+internally consistent and the most likely dogfood env.
+
+**⚠️ OPEN ACTION [USER]: confirm which stage flavor the DOGFOOD networks live on**
+(plain `stage` vs `ci.stage` vs `dev.stage`) with the eero team, then set
+`EERO_ADMIN_API_BASE_STAGE` (+ user base + Insight/Admin link hosts) to match. Shapes
+are identical regardless — only the base URL changes.
