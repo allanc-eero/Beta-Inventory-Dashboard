@@ -313,6 +313,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             location: row.address || '',
             adminLocation: '',
             network: row.networkId || '',
+            networkGroup: '',
             program: program as Device['program'],
             product: productName,
             assetTag: '',

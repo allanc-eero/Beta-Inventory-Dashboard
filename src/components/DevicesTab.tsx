@@ -262,6 +262,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
               <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Internal Name</th>
               <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Phase</th>
               <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Firmware</th>
+              <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Group</th>
               <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Assigned To</th>
               <th className="px-4 py-2 text-left font-semibold text-[var(--ui-text-text-tertiary)] uppercase text-xs">Status</th>
             </tr>
@@ -292,6 +293,11 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
                 <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.internalName}</td>
                 <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.program?.toUpperCase() || '—'}</td>
                 <td className="px-4 py-4 font-mono text-xs">{device.firmwareVersion || '—'}</td>
+                <td className="px-4 py-4">
+                  {device.networkGroup
+                    ? <span className="inline-block rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--ui-support-fill-support-info)] text-[var(--ui-support-text-icon-support-info)]">{device.networkGroup}</span>
+                    : <span className="text-xs text-[var(--ui-core-orange-orange-6)]" title="No OS-update group assigned on this device's network">unassigned</span>}
+                </td>
                 <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.assignedTo || device.checkedOutTo || '—'}</td>
                 <td className="px-4 py-4"><StatusBadge status={device.status} /></td>
               </tr>

@@ -53,6 +53,7 @@ export interface Device {
   location: string;
   adminLocation: string;
   network: string;
+  networkGroup: string; // eero OS-update group / release channel on the network (e.g. "QA2"), from Admin API
   program: Program;
   product: string; // free text — e.g., "Foghorn", "Merci"
   // Logistics

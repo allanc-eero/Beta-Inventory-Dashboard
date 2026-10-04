@@ -64,6 +64,7 @@ function buildDevice(t: RawTester, index: number): Device {
     location: t.location,
     adminLocation: '',
     network: t.netId,
+    networkGroup: t.networkGroup || '',
     program: 'beta',
     product: 'Merci',
     assetTag: '',

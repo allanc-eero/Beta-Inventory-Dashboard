@@ -212,6 +212,7 @@ export function toStoreDevice(tester: DemoTester, d: AssignedDevice, program: De
     location: country,
     adminLocation: '',
     network: d.networkId || '',
+    networkGroup: '',
     program: programEnumFor(program),
     product: betaModelFor(program),
     assetTag: '', poExpensify: '', accountingId: '', cost: '', purchaseDate: '',

@@ -117,6 +117,7 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       if (t.email && t.email !== device.assignedEmail) updates.assignedEmail = t.email;
       if (t.network && t.network !== device.network) updates.network = t.network;
       if (t.firmware && t.firmware !== device.firmwareVersion) updates.firmwareVersion = t.firmware;
+      if (t.group && t.group !== device.networkGroup) updates.networkGroup = t.group;
       if (t.location && t.location !== device.location) updates.location = t.location;
       // Country: uploaded CSV is source of truth — only fill when empty.
       if (t.country && !device.country) updates.country = t.country;

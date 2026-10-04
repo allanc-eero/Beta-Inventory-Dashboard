@@ -79,7 +79,7 @@ function idFromUrl(url: unknown): string | null {
 
 type MatchState = 'matched' | 'multiple' | 'unmatched';
 interface InsightEero { serial: string; model: string; firmware: string; online: boolean }
-interface ResolvedDevice { serial: string; online: boolean; networkId: string | null; firmware: string; model: string; found: boolean }
+interface ResolvedDevice { serial: string; online: boolean; networkId: string | null; firmware: string; model: string; found: boolean; group: string }
 interface SerialInput { serial: string; network?: string | null }
 
 // ── Batch resolver (Admin API, option B) ───────────────────────────────────────
@@ -105,17 +105,22 @@ async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<s
       const e = await apiGet(base, token, `/eeros/serial/${encodeURIComponent(serial)}`);
       const nid = idFromUrl(e?.network?.url);
       if (nid) { networkOf.set(serial, nid); networks.add(nid); }
-      else out.set(serial, { serial, online: false, networkId: null, firmware: '', model: e?.model || '', found: false });
+      else out.set(serial, { serial, online: false, networkId: null, firmware: '', model: e?.model || '', found: false, group: '' });
     } catch {
-      out.set(serial, { serial, online: false, networkId: null, firmware: '', model: '', found: false });
+      out.set(serial, { serial, online: false, networkId: null, firmware: '', model: '', found: false, group: '' });
     }
   }));
 
-  // Step 2: fetch each unique network once → map every node by serial.
-  const nodeBySerial = new Map<string, { online: boolean; firmware: string; model: string; networkId: string }>();
+  // Step 2: fetch each unique network once → map every node by serial. The
+  // network's `group` (eero OS-update channel, e.g. "QA2") is a network-level
+  // field on this same response — captured here and applied to every node on it.
+  const nodeBySerial = new Map<string, { online: boolean; firmware: string; model: string; networkId: string; group: string }>();
+  const groupOf = new Map<string, string>(); // networkId → group
   await Promise.all(Array.from(networks).map(async (nid) => {
     try {
       const net = await apiGet(base, token, `/networks/${encodeURIComponent(nid)}`);
+      const group = net?.group || '';
+      groupOf.set(nid, group);
       (net?.nodes || []).forEach((n: any) => {
         const s = (n.serial || '').toUpperCase();
         if (!s) return;
@@ -124,6 +129,7 @@ async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<s
           firmware: n.firmware || n.os || '',
           model: n.model || '',
           networkId: nid,
+          group,
         });
       });
     } catch { /* network fetch failed — its serials fall through to not-found */ }
@@ -135,9 +141,10 @@ async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<s
     if (out.has(serial)) continue; // already marked not-found in step 1
     const node = nodeBySerial.get(serial);
     if (node) {
-      out.set(serial, { serial, online: node.online, networkId: node.networkId, firmware: node.firmware, model: node.model, found: true });
+      out.set(serial, { serial, online: node.online, networkId: node.networkId, firmware: node.firmware, model: node.model, found: true, group: node.group });
     } else {
-      out.set(serial, { serial, online: false, networkId: networkOf.get(serial) || null, firmware: '', model: '', found: false });
+      const nid = networkOf.get(serial) || null;
+      out.set(serial, { serial, online: false, networkId: nid, firmware: '', model: '', found: false, group: nid ? (groupOf.get(nid) || '') : '' });
     }
   }
   return out;
@@ -290,7 +297,7 @@ export async function POST(request: NextRequest) {
   }
 
   const statuses: { serial: string; online: boolean }[] = [];
-  const testers: { serial: string; network: string; firmware?: string }[] = [];
+  const testers: { serial: string; network: string; firmware?: string; group?: string }[] = [];
   const notFound: string[] = [];
 
   if (!adminLive(env)) {
@@ -308,7 +315,7 @@ export async function POST(request: NextRequest) {
         const r = map.get(it.serial.trim().toUpperCase());
         if (!r || !r.found) { notFound.push(it.serial); statuses.push({ serial: it.serial, online: false }); return; }
         statuses.push({ serial: it.serial, online: r.online });
-        if (r.networkId) testers.push({ serial: it.serial, network: r.networkId, firmware: r.firmware });
+        if (r.networkId) testers.push({ serial: it.serial, network: r.networkId, firmware: r.firmware, group: r.group });
       });
     } catch (e: any) {
       return NextResponse.json({ success: false, error: e?.message || 'sync failed' }, { status: 502 });
