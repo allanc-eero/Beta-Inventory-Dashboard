@@ -34,6 +34,7 @@ import {
 import { useDeviceStore } from '@/store/deviceStore';
 import { useUiStore } from '@/store/uiStore';
 import DeviceDetailPanel from '../DeviceDetailPanel';
+import SurveysEngagementReport from '@/components/surveysEngagement/SurveysEngagementReport';
 import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
 import { AISummary, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
@@ -1393,11 +1394,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
           />
         </div>
 
-        {view === 'surveys' && (selected
-          ? (selected.status === 'draft'
-              ? <DraftPanel survey={selected} onBack={() => setSelected(null)} onDelete={() => handleDeleteSurvey(selected)} />
-              : <SurveyResults survey={selected} onBack={() => setSelected(null)} onToast={showToast} onDelete={() => handleDeleteSurvey(selected)} />)
-          : <SurveyList surveys={visibleSurveys} onSelect={setSelected} onNewSurvey={() => setNewSurvey({ open: true })} onDelete={handleDeleteSurvey} />)}
+        {view === 'surveys' && <SurveysEngagementReport embedded />}
         {view === 'engagement' && <EngagementView programs={visiblePrograms} onToast={showToast} />}
         {view === 'health' && (openProgram
           ? <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} onNavigateToPerson={onNavigateToPerson} />
