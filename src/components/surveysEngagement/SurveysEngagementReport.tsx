@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Input, Select, Tag, Card, Modal, Checkbox, Divider } from '@amzn/eero-web-design-components';
-import { Layers, ChevronLeft, Plus, Sparkles, AlertTriangle, CheckCircle2, Wrench, Link2, MessageSquare } from 'lucide-react';
+import { Button, Input, Select, Tag, Card, Modal, Checkbox, Divider, ICONS } from '@amzn/eero-web-design-components';
+import { ChevronLeft, Sparkles, AlertTriangle, CheckCircle2, Wrench, Link2, MessageSquare } from 'lucide-react';
 import {
   DemoProgram, BoundSurvey, MilestoneType, Phase, MILESTONE_LABEL, PHASES,
   LiveSurveyListItem, LiveReport,
@@ -68,24 +68,27 @@ export default function SurveysEngagementReport({ embedded = false }: { embedded
 }
 
 // ─── Screen 1: programs ───────────────────────────────────────────────────────
+// Row layout mirrors the Program Health view: blue name link · label/value metric
+// columns · status tag on the right.
 function ProgramsScreen({ programs, onOpen }: { programs: DemoProgram[]; onOpen: (id: string) => void }) {
   return (
-    <div className="space-y-4">
-      <p className="text-sm" style={{ color: TEXT_TERTIARY }}>Pick a program to review its surveys and generate a live report from Qualtrics.</p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className="flex flex-col gap-4">
+      <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{programs.length} program{programs.length === 1 ? '' : 's'}</p>
+      <div className="flex flex-col gap-3">
         {programs.map((p) => {
           const phases = Array.from(new Set(p.surveys.map((s) => s.phase)));
           return (
-            <button key={p.id} onClick={() => onOpen(p.id)} className="text-left">
-              <Card size={4}>
-                <Layers size={22} color={ACCENT} />
-                <h3 className="mt-3 text-lg font-semibold" style={{ color: TEXT_PRIMARY }}>{p.name}</h3>
-                <p className="mt-1 text-sm" style={{ color: TEXT_TERTIARY }}>{p.surveys.length} survey{p.surveys.length === 1 ? '' : 's'}</p>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {phases.map((ph) => <Tag key={ph} color="ocean" size="regular">{ph}</Tag>)}
+            <Card key={p.id} size={3}>
+              <div className="flex items-start gap-x-4 py-1">
+                <div className="min-w-0 flex-[2] leading-tight">
+                  <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpen(p.id)}>{p.name}</button>
+                  <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>Beta program</p>
                 </div>
-              </Card>
-            </button>
+                <div className="flex-1"><Metric label="Surveys">{p.surveys.length}</Metric></div>
+                <div className="flex-1"><Metric label="Phases">{phases.join(', ') || '—'}</Metric></div>
+                <div className="flex flex-1 justify-end"><Tag color="green" size="regular">Active</Tag></div>
+              </div>
+            </Card>
           );
         })}
       </div>
@@ -101,35 +104,41 @@ function ProgramScreen({ program, onBack, onOpenSurvey, onSaveSurvey }: {
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       <BackLink label="Programs" onClick={onBack} />
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: TEXT_PRIMARY }}>{program.name}</h1>
-        <Button type="primary" onClick={() => setAdding(true)} ariaLabel="Add survey" label={<span className="flex items-center gap-1"><Plus size={16} /> Add survey</span>} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="leading-tight">
+          <h2 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>{program.name}</h2>
+          <p className="mt-0.5 text-xs" style={{ color: TEXT_TERTIARY }}>{program.surveys.length} survey{program.surveys.length === 1 ? '' : 's'}</p>
+        </div>
+        <Button type="primary" leftIcon={ICONS.FUNCTIONAL_ADD} label="Add survey" onClick={() => setAdding(true)} />
       </div>
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         {program.surveys.map((s) => {
           const bound = Boolean(s.qualtricsId);
           return (
             <Card key={s.localId} size={3}>
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>{s.name}</p>
-                    {bound ? <Tag color="green" size="regular">Linked</Tag> : <Tag color="purple" size="regular">Unbound</Tag>}
-                    <Tag color="navy" size="regular">{MILESTONE_LABEL[s.milestone]}</Tag>
-                    <Tag color="ocean" size="regular">{s.phase}</Tag>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start gap-x-4 py-1">
+                  <div className="min-w-0 flex-[2] leading-tight">
+                    {bound
+                      ? <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpenSurvey(s.localId)}>{s.name}</button>
+                      : <span className="block max-w-full truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{s.name}</span>}
+                    <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>{bound ? s.qualtricsId : 'not linked to Qualtrics'}</p>
                   </div>
-                  <p className="mt-1 flex items-center gap-1 text-xs" style={{ color: PLACEHOLDER }}>
-                    <Link2 size={12} /> {bound ? s.qualtricsId : 'not linked to Qualtrics'}
-                  </p>
+                  <div className="flex-1"><Metric label="Milestone">{MILESTONE_LABEL[s.milestone]}</Metric></div>
+                  <div className="flex-1"><Metric label="Phase">{s.phase}</Metric></div>
+                  <div className="flex flex-1 justify-end">
+                    {bound ? <Tag color="green" size="regular">Linked</Tag> : <Tag color="periwinkle" size="regular">Unbound</Tag>}
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button type="text" onClick={() => setEditing(s)} label="Edit" />
+
+                <div className="flex flex-wrap items-center gap-1">
                   {bound
-                    ? <Button type="default" onClick={() => onOpenSurvey(s.localId)} label="Open report" />
-                    : <Button type="primary" onClick={() => setEditing(s)} label="Bind" />}
+                    ? <Button type="text" label="Open report" onClick={() => onOpenSurvey(s.localId)} />
+                    : <Button type="text" label="Bind" onClick={() => setEditing(s)} />}
+                  <Button type="text" label="Edit" onClick={() => setEditing(s)} />
                 </div>
               </div>
             </Card>
@@ -253,11 +262,11 @@ function SurveyReportScreen({ program, survey, onBack }: {
 
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold" style={{ color: TEXT_PRIMARY }}>{survey.name}</h1>
+          <h2 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>{survey.name}</h2>
           <Tag color="navy" size="regular">{MILESTONE_LABEL[survey.milestone]}</Tag>
           <Tag color="ocean" size="regular">{survey.phase}</Tag>
         </div>
-        <p className="mt-1 flex items-center gap-1 text-sm" style={{ color: TEXT_TERTIARY }}>
+        <p className="mt-1 flex items-center gap-1 text-xs" style={{ color: TEXT_TERTIARY }}>
           <Link2 size={13} /> {survey.qualtricsId}
         </p>
       </div>
@@ -471,6 +480,17 @@ function FactualReport({ report }: { report: LiveReport }) {
 }
 
 // ─── Shared bits ──────────────────────────────────────────────────────────────
+// Metric column — bold label over a muted value. Matches the Program Health
+// view's HealthMetric so rows read identically across the section.
+function Metric({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 leading-snug">
+      <p className="truncate text-xs font-semibold" style={{ color: TEXT_PRIMARY }}>{label}</p>
+      <div className="mt-1 truncate text-sm" style={{ color: TEXT_SECONDARY }}>{children}</div>
+    </div>
+  );
+}
+
 function BackLink({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex items-center gap-1 text-sm" style={{ color: TEXT_TERTIARY }}>
