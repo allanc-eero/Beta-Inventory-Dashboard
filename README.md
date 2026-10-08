@@ -4,6 +4,42 @@ A single control tower for eero's **beta and dogfood** hardware programs: track 
 
 ---
 
+## 👀 Just want to look around?
+
+Three commands, no account needed:
+
+```bash
+npm install
+npm run dev
+```
+
+Open **http://localhost:3000**. You'll land straight in the app — **there is no
+sign-in screen and nothing to configure.** You're automatically signed in as a
+demo admin, so every tab and button is live.
+
+### What you're looking at is sample data
+
+Running it locally gives you **seeded (fake) data**, not live production data.
+Real credentials live in `.env.local`, which is intentionally kept out of git, so
+a fresh clone has none. Concretely:
+
+| Area | What you'll see locally |
+|---|---|
+| **Surveys & Engagement** | 3 seeded Merci surveys instead of the full live Qualtrics list. Generating a report returns sample results with a *"showing sample data"* notice at the top. |
+| **Devices** | Simulated serials generated from each tester's email. Network IDs, firmware, and online/offline status are all fabricated. |
+| **Testers / People** | Seeded roster, including filler names added to make the list look realistically sized. |
+| **Deep links** | Insight/Admin links render but point at generated network IDs, so they won't resolve. |
+
+Nothing crashes and nothing is missing — every integration is env-gated and falls
+back to seed data so the app always works. Check what's wired up on your machine
+with `curl -s localhost:3000/api/health | jq`.
+
+**So this is great for feedback on layout, flow, wording, and whether the
+workflow matches how you actually run programs — but don't read the numbers as
+real.** Only a run with credentials configured shows live Qualtrics results.
+
+---
+
 ## What this is
 
 A web app for the team that runs eero's pre-release hardware testing. It answers the questions that are otherwise scattered across spreadsheets, Insight, Admin, Qualtrics, and email:
@@ -40,7 +76,11 @@ Current recommendation: **ship standalone (Harmony)**, because only a standalone
 
 ## Status
 
-Fully functional as a **demo/preview** with seeded data behind clearly-marked "simulated" seams. The UI, counts, links, and workflows are real and derive from one shared store; what's left to go fully live is the eero API sign-in + confirming data shapes + bulk device ingestion (tracked in the handoff doc). Nothing is merged into another product yet.
+Fully functional as a **demo/preview**. The UI, counts, links, and workflows are real and derive from one shared store.
+
+**Surveys & Engagement now runs on live Qualtrics data** when credentials are configured: it lists your real surveys, pulls the actual response export for a chosen date range, and summarizes it generically by question type (ratings → averages/distributions, multiple choice → breakdowns, free text → verbatims), with an AI narrative on top of the deterministic report. Device data is still seeded behind clearly-marked "simulated" seams.
+
+What's left to go fully live: eero API sign-in, confirming device data shapes, and bulk device ingestion (tracked in the handoff doc). Nothing is merged into another product yet.
 
 ## Docs for engineers & partner teams
 
@@ -67,11 +107,15 @@ npm start
 
 The app runs at `http://localhost:3000`.
 
-**No sign-in needed.** `npm run dev` drops you straight into the app as a demo
-admin, so you can click through everything and give feedback without being added
-to any roster. Live Qualtrics reports need credentials in `.env.local` (see
-`.env.example`); without them the app falls back to seeded data and still works.
-Production builds (`npm run build && npm start`) keep the real sign-in screen.
+**No sign-in needed in dev.** The dev server signs you in automatically as a demo
+admin, so you can click through everything without being added to any roster —
+see [Just want to look around?](#-just-want-to-look-around) for what the seeded
+data does and doesn't show.
+
+Production builds (`npm run build && npm start`) keep the real sign-in screen and
+the `@eero.com` allowlist, so a deployed instance is never left open by accident.
+To run against live data, copy `.env.example` to `.env.local` and fill in the
+Qualtrics/Insight credentials.
 
 ## Requirements
 
