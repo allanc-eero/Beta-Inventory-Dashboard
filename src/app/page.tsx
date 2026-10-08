@@ -18,16 +18,23 @@ import DogfoodOnboarding from '@/components/DogfoodOnboarding';
 import ProgramSignupsTab from '@/components/ProgramSignupsTab';
 import { ToastProvider } from '@amzn/eero-web-design-components';
 import { ProgramsView } from '@/components/programs/ProgramsView';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore, DEMO_OPEN_ACCESS } from '@/store/authStore';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('devices');
   const [resetKey, setResetKey] = useState(0);
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { isLoggedIn, currentUser, canEdit, isBetaViewer, isDogfoofer } = useAuthStore();
+  const { isLoggedIn, currentUser, canEdit, isBetaViewer, isDogfoofer, loginAsGuest } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Open-access prototype: anyone running this locally is signed in automatically
+  // so they can look around and give feedback without being on the roster.
+  // Production builds keep the real sign-in screen (see DEMO_OPEN_ACCESS).
+  useEffect(() => {
+    if (mounted && DEMO_OPEN_ACCESS && !currentUser) loginAsGuest();
+  }, [mounted, currentUser, loginAsGuest]);
 
   // Reset to Devices tab (now the default landing, with Overview merged in) on user change
   useEffect(() => {
@@ -49,8 +56,10 @@ export default function Home() {
     setActiveTab('people');
   };
 
-  // Prevent hydration mismatch — don't render data-dependent content until client is ready
-  if (!mounted) {
+  // Prevent hydration mismatch — don't render data-dependent content until client
+  // is ready. In open-access mode also hold the skeleton for the one tick it takes
+  // the guest sign-in effect to run, so the login page never flashes.
+  if (!mounted || (DEMO_OPEN_ACCESS && !currentUser)) {
     return (
       <div className="min-h-screen bg-[var(--ui-background-layer-background-page)]">
         <div className="max-w-7xl mx-auto px-6 py-6 mt-12">

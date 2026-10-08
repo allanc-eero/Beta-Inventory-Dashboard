@@ -67,6 +67,12 @@ npm start
 
 The app runs at `http://localhost:3000`.
 
+**No sign-in needed.** `npm run dev` drops you straight into the app as a demo
+admin, so you can click through everything and give feedback without being added
+to any roster. Live Qualtrics reports need credentials in `.env.local` (see
+`.env.example`); without them the app falls back to seeded data and still works.
+Production builds (`npm run build && npm start`) keep the real sign-in screen.
+
 ## Requirements
 
 - **Node.js** 18.x or higher

@@ -37,6 +37,24 @@ export interface User {
   profile?: DogfoderProfile;
 }
 
+// ─── Open-access prototype mode ───────────────────────────────────────────────
+// This is a prototype people clone from GitHub and run locally to give feedback.
+// In any NON-production build the sign-in gate is skipped and the visitor lands
+// straight in the app as a demo admin — no roster entry, no setup. Anyone who can
+// clone the repo can already read this file, so the gate protected nothing from
+// them; it was only friction.
+//
+// A production build (`next build && next start`) keeps the real allowlist and
+// sign-in screen, so a deployed instance is never left open by accident.
+export const DEMO_OPEN_ACCESS = process.env.NODE_ENV !== 'production';
+
+export const GUEST_USER: User = {
+  email: 'guest@eero.com',
+  role: 'admin',          // full operational app, minus user management
+  name: 'Guest (demo)',
+  status: 'active',
+};
+
 // ─── User Roster ──────────────────────────────────────────────────────────────
 const USER_ROSTER: User[] = [
   { email: 'allanc@eero.com', role: 'super_admin', name: 'Allan C', status: 'active' },
@@ -63,6 +81,7 @@ interface AuthStore {
   users: User[];
   login: (email: string) => { success: boolean; error?: string };
   loginFromSSO: (email: string, name?: string) => { success: boolean; error?: string };
+  loginAsGuest: () => void;
   register: (email: string, name: string, profile?: DogfoderProfile) => { success: boolean; error?: string };
   logout: () => void;
   canEdit: () => boolean;
@@ -131,6 +150,9 @@ export const useAuthStore = create<AuthStore>()(
         }));
         return { success: true };
       },
+
+      // Open-access prototype sign-in — no credentials, no roster lookup.
+      loginAsGuest: () => set({ currentUser: GUEST_USER }),
 
       logout: () => set({ currentUser: null }),
 
