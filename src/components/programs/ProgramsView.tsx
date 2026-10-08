@@ -827,10 +827,23 @@ async function enrichSerial(serial: string, fallbackModel: string, env: EeroEnv 
   }
 }
 
+// Per-DEVICE status. Severity ramp: green (healthy) → orange (assigned, never
+// connected) → red (was connected, now isn't). Grey is reserved for "no device
+// assigned at all" so the two situations never look alike.
 function deviceStatusTag(status: DeviceLiveStatus) {
   if (status === 'online') return <Tag color="green" size="regular">online</Tag>;
-  if (status === 'offline') return <Tag color="orange" size="regular">not online</Tag>;
-  return <Tag color="grey" size="regular">pending activation</Tag>;
+  if (status === 'offline') return <Tag color="red" size="regular">not online</Tag>;
+  return <Tag color="orange" size="regular">pending activation</Tag>;
+}
+
+// Per-TESTER status, so the roster is scannable without reading device rows.
+// "Awaiting device" = they came in on the audience upload and no unit has been
+// assigned yet — distinct from a unit that's assigned but hasn't connected.
+function testerStatusTag(devs: AssignedDevice[]) {
+  if (devs.length === 0) return <Tag color="grey" size="regular">Awaiting device</Tag>;
+  if (devs.some((d) => d.status === 'online')) return <Tag color="green" size="regular">Online</Tag>;
+  if (devs.some((d) => d.status === 'offline')) return <Tag color="red" size="regular">Not online</Tag>;
+  return <Tag color="orange" size="regular">Pending activation</Tag>;
 }
 
 // ─── Program → device roster: assign serials, enrich via Insight, link back ────
@@ -897,6 +910,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const total = allDevices.length;
   const onlineCount = allDevices.filter((d) => d.status === 'online').length;
   const pendingCount = allDevices.filter((d) => d.status === 'pending').length;
+  const offlineCount = allDevices.filter((d) => d.status === 'offline').length;
   const testersWithDevice = roster.filter((t) => (assignments[t.id] || []).length > 0).length;
   const unassigned = roster.length - testersWithDevice;
 
@@ -1018,9 +1032,10 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Tag color="green" size="regular">{onlineCount}/{total} online</Tag>
+            <Tag color="green" size="regular">{onlineCount}/{total} devices online</Tag>
             {pendingCount > 0 && <Tag color="orange" size="regular">{pendingCount} pending activation</Tag>}
-            {unassigned > 0 && <Tag color="grey" size="regular">{unassigned} unassigned</Tag>}
+            {offlineCount > 0 && <Tag color="red" size="regular">{offlineCount} not online</Tag>}
+            {unassigned > 0 && <Tag color="grey" size="regular">{unassigned} awaiting device</Tag>}
             <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {total} device{total !== 1 ? 's' : ''} across {roster.length} tester{roster.length !== 1 ? 's' : ''}</span>
             <div className="ml-auto">
               <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="Add tester" onClick={() => setAddOpen((v) => !v)} />
@@ -1047,18 +1062,21 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        {onNavigateToPerson && devs.length > 0 ? (
-                          <button
-                            className="block max-w-full truncate text-left text-sm font-medium hover:underline"
-                            style={{ color: ACCENT }}
-                            onClick={() => onNavigateToPerson(t.email)}
-                            title="Open this tester in People"
-                          >
-                            {t.name}
-                          </button>
-                        ) : (
-                          <p className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</p>
-                        )}
+                        <div className="flex min-w-0 items-center gap-2">
+                          {onNavigateToPerson && devs.length > 0 ? (
+                            <button
+                              className="block max-w-full truncate text-left text-sm font-medium hover:underline"
+                              style={{ color: ACCENT }}
+                              onClick={() => onNavigateToPerson(t.email)}
+                              title="Open this tester in People"
+                            >
+                              {t.name}
+                            </button>
+                          ) : (
+                            <p className="truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</p>
+                          )}
+                          {testerStatusTag(devs)}
+                        </div>
                         <p className="truncate text-xs" style={{ color: TEXT_TERTIARY }}>{t.email}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1097,7 +1115,9 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs" style={{ color: TEXT_TERTIARY }}>No devices assigned yet.</p>
+                      <div className="rounded-lg px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--ui-background-layer-layer-page-hover)', color: TEXT_SECONDARY }}>
+                        <b style={{ color: TEXT_PRIMARY }}>No unit shipped yet.</b> On the roster from the Qualtrics audience — nothing to report online until a serial is assigned below.
+                      </div>
                     )}
 
                     <div className="flex flex-wrap items-end gap-2">
