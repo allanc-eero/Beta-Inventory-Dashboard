@@ -32,6 +32,8 @@ import {
 // (This is the "shared model" wiring; see the handoff doc's simulation note.)
 import { useDeviceStore } from '@/store/deviceStore';
 import { useUiStore } from '@/store/uiStore';
+import { useBetaProgramsStore } from '@/store/betaProgramsStore';
+import { deviceInProgram } from '@/lib/programs';
 import DeviceDetailPanel from '../DeviceDetailPanel';
 import SurveysEngagementReport from '@/components/surveysEngagement/SurveysEngagementReport';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
@@ -45,11 +47,11 @@ import {
   OK_GREEN, WARN_ORANGE, BAD_RED, ACCENT,
 } from './theme';
 import {
-  SURVEY_KINDS, PHASES, INITIAL_SURVEYS, INITIAL_PROGRAMS,
+  SURVEY_KINDS, PHASES, INITIAL_SURVEYS,
 } from './data';
 import {
   engagementLevel, simulate, betaModelFor, programEnumFor,
-  countryForSerial, seedAssignments, toStoreDevice, slugify, contactToTester,
+  countryForSerial, seedAssignments, assignmentsFromStore, toStoreDevice, slugify, contactToTester,
 } from './helpers';
 
 // Types live in ./types. Survey-kind metadata below drives the pickers and tags.
@@ -274,9 +276,23 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const model = betaModelFor(program);
   // Deep-links for this program route to the right cloud (dogfood → stage, else prod).
   const linkEnv = resolveEnv(undefined, programEnumFor(program));
-  const { addDevice, updateDevice, deleteDevice, getDeviceBySerial } = useDeviceStore();
+  const { devices: storeDevices, addDevice, updateDevice, deleteDevice, getDeviceBySerial, addPerson, getPersonByEmail, upsertTesterProfile } = useDeviceStore();
+  const { setPrograms } = useBetaProgramsStore();
   const [roster, setRoster] = useState<DemoTester[]>(() => program.testers);
-  const [assignments, setAssignments] = useState<Record<string, AssignedDevice[]>>(() => seedAssignments(program));
+  // Each tester's devices come from the shared store first (uploaded, assigned
+  // here, or synced on a previous open). Only seeded demo testers with nothing in
+  // the store yet get the deterministic simulated set.
+  const [assignments, setAssignments] = useState<Record<string, AssignedDevice[]>>(() => {
+    const fromStore = assignmentsFromStore(program, storeDevices);
+    if (program.source === 'upload') return fromStore;
+    const seeded = seedAssignments(program);
+    return Object.fromEntries(program.testers.map((t) => [t.id, fromStore[t.id]?.length ? fromStore[t.id] : seeded[t.id] || []]));
+  });
+  // Roster edits are saved on the program itself, so they stick until removed here.
+  const saveRoster = (update: (testers: DemoTester[]) => DemoTester[], audienceDelta: number) =>
+    setPrograms((prev) => prev.map((p) => (p.id === program.id
+      ? { ...p, testers: update(p.testers), audienceSize: Math.max(0, p.audienceSize + audienceDelta) }
+      : p)));
   const [serialInput, setSerialInput] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null); // testerId being enriched, or 'sync'
   const [open, setOpen] = useState<{ tester: DemoTester; device: AssignedDevice } | null>(null);
@@ -304,7 +320,8 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
         assignedTo: tester.name,
         assignedEmail: tester.email,
         program: programEnumFor(program),
-        product: betaModelFor(program),
+        programName: program.name,
+        product: existing.programName === program.name ? existing.product : betaModelFor(program),
         country: region || existing.country,
         location: region || existing.location,
       });
@@ -319,7 +336,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
 
   // Sync the seeded roster into the store once when the program opens.
   useEffect(() => {
-    if (program.type === 'feature') return;
+    if (program.type === 'feature' || program.source === 'upload') return;
     roster.forEach((t) => (assignments[t.id] || []).forEach((d) => syncToStore(t, d)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -378,6 +395,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const removeTester = (tester: DemoTester) => {
     (assignments[tester.id] || []).forEach((d) => removeFromStore(d.serial));
     setRoster((prev) => prev.filter((t) => t.id !== tester.id));
+    saveRoster((testers) => testers.filter((t) => t.id !== tester.id), -1);
     setAssignments((prev) => { const n = { ...prev }; delete n[tester.id]; return n; });
     onToast(`Removed ${tester.name} from program`);
   };
@@ -395,8 +413,12 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
       feedbackQuality: 0,
       deviceOnline: null,
       missedSurveys: 0,
+      noSeedDevice: true, // real tester — devices come from assignment, never simulated
     };
     setRoster((prev) => [t, ...prev]);
+    saveRoster((testers) => [t, ...testers], 1);
+    if (!getPersonByEmail(t.email)) addPerson({ id: crypto.randomUUID(), name: t.name, email: t.email, team: '', devices: [] });
+    upsertTesterProfile({ email: t.email, name: t.name, programs: [program.name] });
     setAssignments((prev) => ({ ...prev, [t.id]: [] }));
     onToast(`Added ${t.name} — assign their serial(s) below`);
     setNewName(''); setNewEmail(''); setAddOpen(false);
@@ -627,9 +649,9 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
         {pageItems.map((p) => {
           const surveyCount = surveys.filter((s) => s.programId === p.id).length;
           const noSurveys = p.status === 'active' && surveyCount === 0;
-          // Match the DevicesTab container exactly: all devices grouped under this
-          // program's enum key. Online = those reporting online right now.
-          const progDevices = p.type === 'feature' ? [] : devices.filter((d) => d.program === programEnumFor(p));
+          // Match the DevicesTab container exactly: devices grouped under this
+          // program's name. Online = those reporting online right now.
+          const progDevices = p.type === 'feature' ? [] : devices.filter((d) => deviceInProgram(d, p.name));
           const deployed = progDevices.length;
           const online = progDevices.filter((d) => d.status === 'online').length;
           // This program's devices in the archive lifecycle (linked by name), for the
@@ -725,7 +747,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
   const [view, setView] = useState<string | number>('health');
   // Programs & surveys are now stateful so a newly-created program/survey shows up live.
   const [openProgram, setOpenProgram] = useState<DemoProgram | null>(null);
-  const [programs, setPrograms] = useState<DemoProgram[]>(INITIAL_PROGRAMS);
+  const { programs, setPrograms } = useBetaProgramsStore();
   const [surveys, setSurveys] = useState<DemoSurvey[]>(INITIAL_SURVEYS);
   const [newProgramOpen, setNewProgramOpen] = useState(false);
   // New Survey modal — optionally preselected to a program.

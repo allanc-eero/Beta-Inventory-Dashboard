@@ -9,6 +9,7 @@ import type {
   ProgramType, TechnicalLevel, DemoTester, DemoProgram, RosterEntry, AssignedDevice,
 } from './types';
 import { Device, Program } from '@/types';
+import { deviceInProgram } from '@/lib/programs';
 
 // ─── Seeding / math primitives ───────────────────────────────────────────────
 
@@ -54,8 +55,9 @@ export function betaModelFor(program: DemoProgram): string {
 // that DevicesTab groups containers by. Seed devices are all 'beta', so a beta
 // program's assigned devices must also be 'beta' to land in the same "Merci BETA"
 // container the Devices menu shows. Phase (DVT/EVT/PVT) is separate metadata (a
-// tag), NOT the container key.
+// tag), NOT the container key — the program's name is (see deviceProgramName).
 export function programEnumFor(program: DemoProgram): Program {
+  if (program.cohort) return program.cohort;
   return program.name.toLowerCase().includes('dogfood') ? 'dogfood' : 'beta';
 }
 
@@ -167,6 +169,25 @@ export function seedAssignments(program: DemoProgram): Record<string, AssignedDe
   return map;
 }
 
+// An uploaded program's roster assignments, read back from its real device rows.
+export function assignmentsFromStore(program: DemoProgram, devices: Device[]): Record<string, AssignedDevice[]> {
+  const mine = devices.filter((d) => deviceInProgram(d, program.name));
+  const map: Record<string, AssignedDevice[]> = {};
+  program.testers.forEach((t) => {
+    map[t.id] = mine
+      .filter((d) => d.assignedEmail.toLowerCase() === t.email.toLowerCase())
+      .map((d) => ({
+        serial: d.serialNumber,
+        model: d.product,
+        networkId: d.network || null,
+        status: d.status === 'online' ? 'online' : d.network ? 'offline' : 'pending',
+        firmware: d.firmwareVersion,
+        source: 'live',
+      }));
+  });
+  return map;
+}
+
 // Shape an assigned device into a full deviceStore Device so it appears in the
 // Devices menu (grouped by program) and flows to People (assignedEmail) and
 // Locations (country). Deterministic id keeps re-syncs idempotent.
@@ -205,6 +226,7 @@ export function toStoreDevice(tester: DemoTester, d: AssignedDevice, program: De
     fcLocation: '', leg1Carrier: '', leg1Tracking: '', leg1Date: '',
     leg2Carrier: '', leg2Tracking: '', leg2Date: '',
     testbedId: '', testbedName: program.name,
+    programName: program.name,
     createdAt: now, updatedAt: now,
   };
 }

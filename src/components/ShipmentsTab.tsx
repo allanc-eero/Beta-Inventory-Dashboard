@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { useAuthStore } from '@/store/authStore';
 import { runDeviceSync } from '@/lib/networkSync';
 import JiraToast from './JiraToast';
+import UploadProgramSheetModal from './programs/UploadProgramSheetModal';
 import { createJiraIssue } from '@/services/jiraService';
 import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
 import { Button, Select, Input, Tag, Card, Segmented } from '@amzn/eero-web-design-components';
@@ -96,6 +97,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
   const [productName, setProductName] = useState('');
   const [fileName, setFileName] = useState('');
   const [shipDirection, setShipDirection] = useState<'outgoing' | 'incoming'>('outgoing');
+  const [programSheetOpen, setProgramSheetOpen] = useState(false);
+  const [programSheetMsg, setProgramSheetMsg] = useState('');
   const [jiraToast, setJiraToast] = useState<{ ticketKey: string; summary: string; epicKey: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -488,6 +491,26 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           ]}
         />
       </div>
+
+      {activeView === 'upload' && canEdit() && (
+        <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Upload Program Sheet</span>}>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="flex-1 text-xs text-[var(--ui-text-text-tertiary)]">
+              Create a program — or add testers to an existing one — from a tester/device sheet. Each Program in the sheet gets a
+              card on the Programs page and a container on the Devices page. Rows already in the program are flagged and skipped.
+            </p>
+            <Button type="primary" label="Upload program sheet" onClick={() => setProgramSheetOpen(true)} />
+          </div>
+          {programSheetMsg && <p className="mt-3 text-xs text-[var(--ui-core-green-green-6)]">✓ {programSheetMsg}</p>}
+        </Card>
+      )}
+
+      {programSheetOpen && (
+        <UploadProgramSheetModal
+          onClose={() => setProgramSheetOpen(false)}
+          onCreated={(msg) => { setProgramSheetOpen(false); setProgramSheetMsg(msg); }}
+        />
+      )}
 
       {activeView === 'upload' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

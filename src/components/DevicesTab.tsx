@@ -13,6 +13,7 @@ import { getStatusBadge } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
 import { useUiStore, matchesCohort, cohortOf } from '@/store/uiStore';
 import { insightNetworkUrl, adminNetworkUrl, resolveEnv } from '@/lib/format';
+import { deviceProgramName, programKey } from '@/lib/programs';
 
 export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
   const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
@@ -149,16 +150,17 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
         </div>
       )}
 
-      {/* Table — grouped by program */}
+      {/* Table — one container per named program (e.g. "Merci Beta") */}
       {(() => {
         const grouped: Record<string, typeof filteredDevices> = {};
         filteredDevices.forEach((d) => {
-          const prog = d.program || 'unassigned';
+          const name = deviceProgramName(d);
+          const prog = name ? programKey(name) : 'unassigned';
           if (!grouped[prog]) grouped[prog] = [];
           grouped[prog].push(d);
         });
-        const programOrder = ['beta', 'dogfood', 'prq', 'pvt', 'evt', 'dvt', 'other', 'unassigned'];
-        const programs = programOrder.filter((p) => grouped[p]);
+        const programs = Object.keys(grouped).filter((p) => p !== 'unassigned').sort();
+        if (grouped['unassigned']) programs.push('unassigned');
         const missingProgram = grouped['unassigned'] || [];
 
         return (
@@ -235,7 +237,9 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, totalPages);
   const paged = rows.slice((current - 1) * pageSize, (current - 1) * pageSize + pageSize);
-  const label = prog === 'unassigned' ? '⚠️ No Program' : `${rows[0]?.product ? rows[0].product + ' ' : ''}${prog.toUpperCase()}`;
+  // Prefer an explicit program name from any row in the group; older rows only
+  // carry product + cohort.
+  const label = prog === 'unassigned' ? '⚠️ No Program' : (rows.find((d) => d.programName)?.programName || deviceProgramName(rows[0]));
 
   return (
     <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] overflow-hidden mb-4">
@@ -291,7 +295,7 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
                   )}
                 </td>
                 <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.internalName}</td>
-                <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.program?.toUpperCase() || '—'}</td>
+                <td className="px-4 py-4 text-[var(--ui-text-text-secondary)]">{device.phase || device.program?.toUpperCase() || '—'}</td>
                 <td className="px-4 py-4 font-mono text-xs">{device.firmwareVersion || '—'}</td>
                 <td className="px-4 py-4">
                   {device.networkGroup

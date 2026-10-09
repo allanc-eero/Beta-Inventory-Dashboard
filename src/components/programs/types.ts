@@ -87,6 +87,8 @@ export interface DemoProgram {
   surveyResponseRate: number; // 0-100
   avgFeedbackQuality: number; // 1-5
   testers: DemoTester[];
+  cohort?: 'beta' | 'dogfood'; // explicit cohort (sheet uploads); else inferred from the name
+  source?: 'seed' | 'upload';  // 'upload' = created from a device sheet — its devices live in deviceStore
 }
 
 // ── Identity-match roster (email → network → beta-model DSN) ──────────────────

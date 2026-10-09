@@ -55,6 +55,11 @@ export interface Device {
   network: string;
   networkGroup: string; // eero OS-update group / release channel on the network (e.g. "QA2"), from Admin API
   program: Program;
+  // The named program this unit belongs to (e.g. "Merci Beta"). Set by sheet
+  // uploads and program assignment; drives the per-program containers and counts.
+  // Older/seed rows leave it unset and fall back to product + cohort.
+  programName?: string;
+  phase?: string; // build phase (EVT / DVT / PVT) — separate from the cohort in `program`
   product: string; // free text — e.g., "Foghorn", "Merci"
   // Logistics
   assetTag: string;
