@@ -229,10 +229,12 @@ export function applyProgramSheet(plans: PlannedProgram[], programs: DemoProgram
         added.push(t);
       }
     });
+    const testers = [...base.testers, ...added];
     const program: DemoProgram = {
       ...base,
-      testers: [...base.testers, ...added],
-      audienceSize: base.audienceSize + added.length,
+      testers,
+      // Not displayed (cards/Dashboard count from testers + deviceStore) — kept in step with the roster.
+      audienceSize: testers.length,
       devicesDeployed: base.devicesDeployed + plan.deviceCount,
     };
     (plan.existingProgramId ? updated : created).push(program);

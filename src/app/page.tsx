@@ -19,6 +19,7 @@ import ProgramSignupsTab from '@/components/ProgramSignupsTab';
 import { ToastProvider } from '@amzn/eero-web-design-components';
 import { ProgramsView } from '@/components/programs/ProgramsView';
 import { useAuthStore, DEMO_OPEN_ACCESS } from '@/store/authStore';
+import { AutoSync } from '@/lib/useAutoSync';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('devices');
@@ -85,6 +86,8 @@ export default function Home() {
 
   return (
     <SeedDataProvider>
+      {/* Weekly stale-check device sync — runs on every tab, for every role. */}
+      <AutoSync />
       <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab}>
         <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
         {activeTab !== 'devices' && activeTab !== 'surveys' && activeTab !== 'people' && (

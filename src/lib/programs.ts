@@ -7,7 +7,7 @@ import type { Device } from '@/types';
 type ProgramFields = Pick<Device, 'programName' | 'product' | 'program'> & Partial<Pick<Device, 'id' | 'testbedName'>>;
 
 export function deviceProgramName(d: ProgramFields): string {
-  if (d.programName) return d.programName;
+  if (d.programName !== undefined) return d.programName; // '' = explicitly detached (program deleted)
   if (d.id?.startsWith('prog-') && d.testbedName) return d.testbedName;
   if (!d.program) return '';
   return d.product ? `${d.product} ${d.program}` : d.program;
@@ -21,4 +21,10 @@ export function programKey(name: string): string {
 export function deviceInProgram(d: ProgramFields, programName: string): boolean {
   const name = deviceProgramName(d);
   return !!name && programKey(name) === programKey(programName);
+}
+
+// A program's devices that still count toward it (not archived/returned). Shared by
+// the Programs cards, the program roster, and the Dashboard so they always agree.
+export function liveProgramDevices<T extends ProgramFields & Pick<Device, 'status'>>(devices: T[], programName: string): T[] {
+  return devices.filter((d) => d.status !== 'deactivated' && d.status !== 'pending_return' && deviceInProgram(d, programName));
 }

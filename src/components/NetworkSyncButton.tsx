@@ -12,8 +12,9 @@ import { timeAgo } from '@/constants';
 //   • status  → online if alive in Databricks, else not_online
 //   • tester  → assignedTo / assignedEmail / network / location (network owner)
 // Lifecycle states (deactivated/in_repair/in_testing/pending_return) are left
-// untouched. Auto-runs weekly (when last sync >7d and the dashboard is opened)
-// and right after a serial-sheet upload. Core sync logic lives in lib/networkSync.
+// untouched. Auto-runs weekly (when last sync >7d and the dashboard is opened —
+// see lib/useAutoSync) and right after a serial-sheet upload. Core sync logic
+// lives in lib/networkSync.
 
 interface SyncResult {
   checked: number;
@@ -30,7 +31,6 @@ export default function NetworkSyncButton() {
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [error, setError] = useState('');
-  const [autoTriggered, setAutoTriggered] = useState(false);
 
   // Databricks connection status (for the badge + disabling the button).
   const [ready, setReady] = useState<boolean | null>(null);
@@ -68,13 +68,8 @@ export default function NetworkSyncButton() {
     setSyncing(false);
   }, []);
 
-  // Auto-sync once per page load if stale (>24h). Runs daily.
-  useEffect(() => {
-    if (stale && !autoTriggered && ready && checkableDevices.length > 0) {
-      setAutoTriggered(true);
-      handleSync();
-    }
-  }, [stale, autoTriggered, ready, checkableDevices.length, handleSync]);
+  // The stale-check auto-sync (weekly, see isSyncStale) lives in lib/useAutoSync,
+  // mounted once at the app root so it runs on every tab and for every role.
 
   return (
     <div className="bg-[var(--ui-background-layer-layer-page)] rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)] p-4">

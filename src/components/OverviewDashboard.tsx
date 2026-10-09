@@ -5,7 +5,7 @@ import { Card } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
-function DonutChart({ title, items, total, size, strokeWidth, centerLabel, centerValue }: {
+export function DonutChart({ title, items, total, size, strokeWidth, centerLabel, centerValue }: {
   title: string; items: { name: string; count: number; color: string }[]; total: number; size: number; strokeWidth: number; centerLabel: string; centerValue?: string | number;
 }) {
   const radius = (size - strokeWidth) / 2;

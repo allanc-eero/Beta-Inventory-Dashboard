@@ -9,7 +9,7 @@ import type {
   ProgramType, TechnicalLevel, DemoTester, DemoProgram, RosterEntry, AssignedDevice,
 } from './types';
 import { Device, Program } from '@/types';
-import { deviceInProgram } from '@/lib/programs';
+import { liveProgramDevices } from '@/lib/programs';
 
 // ─── Seeding / math primitives ───────────────────────────────────────────────
 
@@ -169,13 +169,16 @@ export function seedAssignments(program: DemoProgram): Record<string, AssignedDe
   return map;
 }
 
-// An uploaded program's roster assignments, read back from its real device rows.
+// A program's roster assignments, read back from its real device rows — the
+// deviceStore is the only source of a program's devices. Archived / returning
+// units (deactivated, pending_return) no longer count toward the program.
 export function assignmentsFromStore(program: DemoProgram, devices: Device[]): Record<string, AssignedDevice[]> {
-  const mine = devices.filter((d) => deviceInProgram(d, program.name));
+  const mine = liveProgramDevices(devices, program.name);
   const map: Record<string, AssignedDevice[]> = {};
   program.testers.forEach((t) => {
+    const email = t.email.trim().toLowerCase();
     map[t.id] = mine
-      .filter((d) => d.assignedEmail.toLowerCase() === t.email.toLowerCase())
+      .filter((d) => (d.assignedEmail || '').trim().toLowerCase() === email)
       .map((d) => ({
         serial: d.serialNumber,
         model: d.product,

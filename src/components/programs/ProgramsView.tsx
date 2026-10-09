@@ -33,7 +33,8 @@ import {
 import { useDeviceStore } from '@/store/deviceStore';
 import { useUiStore } from '@/store/uiStore';
 import { useBetaProgramsStore } from '@/store/betaProgramsStore';
-import { deviceInProgram } from '@/lib/programs';
+import { deviceInProgram, liveProgramDevices } from '@/lib/programs';
+import { runDeviceSync } from '@/lib/networkSync';
 import DeviceDetailPanel from '../DeviceDetailPanel';
 import SurveysEngagementReport from '@/components/surveysEngagement/SurveysEngagementReport';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
@@ -51,7 +52,7 @@ import {
 } from './data';
 import {
   engagementLevel, simulate, betaModelFor, programEnumFor,
-  countryForSerial, seedAssignments, assignmentsFromStore, toStoreDevice, slugify, contactToTester,
+  countryForSerial, assignmentsFromStore, toStoreDevice, slugify, contactToTester,
 } from './helpers';
 
 // Types live in ./types. Survey-kind metadata below drives the pickers and tags.
@@ -60,7 +61,7 @@ import {
 
 // Pure helpers (contactToTester, rosterForProgram, betaModelFor, mkSerial, hashSeed,
 // rate, fmtDate, latestWave, engagementLevel, simulate, countryForSerial,
-// programEnumFor, seedAssignments, toStoreDevice, slugify) live in ./helpers.
+// programEnumFor, assignmentsFromStore, toStoreDevice, slugify) live in ./helpers.
 
 // ─── Shared JSX tag renderers ─────────────────────────────────────────────────
 function programTag(type: ProgramType, name: string) {
@@ -95,13 +96,25 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
     return () => { cancelled = true; };
   }, []);
 
-  const effectivePrograms = useMemo(() => programs.map((p) => ({
-    ...p,
-    testers: p.testers.map((t) => {
-      const e = liveEngagement[t.email.toLowerCase()];
-      return e ? { ...t, reliability: e.reliability, avgResponseDays: e.avgResponseDays, feedbackQuality: e.feedbackQuality, missedSurveys: e.missedSurveys } : t;
-    }),
-  })), [programs, liveEngagement]);
+  // Device online is derived per tester from the shared deviceStore (the same rows
+  // the global online check updates), not the tester's static seed flag. null = n/a
+  // (feature program, or no live unit assigned yet).
+  const { devices } = useDeviceStore();
+  const effectivePrograms = useMemo(() => programs.map((p) => {
+    const progDevices = p.type === 'feature' ? [] : liveProgramDevices(devices, p.name);
+    return {
+      ...p,
+      testers: p.testers.map((t) => {
+        const email = t.email.trim().toLowerCase();
+        const mine = progDevices.filter((d) => (d.assignedEmail || '').trim().toLowerCase() === email);
+        const deviceOnline = mine.length ? mine.some((d) => d.status === 'online') : null;
+        const e = liveEngagement[email];
+        return e
+          ? { ...t, deviceOnline, reliability: e.reliability, avgResponseDays: e.avgResponseDays, feedbackQuality: e.feedbackQuality, missedSurveys: e.missedSurveys }
+          : { ...t, deviceOnline };
+      }),
+    };
+  }), [programs, devices, liveEngagement]);
 
   // Rules engine — deterministic, explainable. AI only narrates the output.
   const isAtRisk = (t: DemoTester) => {
@@ -276,23 +289,18 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const model = betaModelFor(program);
   // Deep-links for this program route to the right cloud (dogfood → stage, else prod).
   const linkEnv = resolveEnv(undefined, programEnumFor(program));
-  const { devices: storeDevices, addDevice, updateDevice, deleteDevice, getDeviceBySerial, addPerson, getPersonByEmail, upsertTesterProfile } = useDeviceStore();
-  const { setPrograms } = useBetaProgramsStore();
-  const [roster, setRoster] = useState<DemoTester[]>(() => program.testers);
-  // Each tester's devices come from the shared store first (uploaded, assigned
-  // here, or synced on a previous open). Only seeded demo testers with nothing in
-  // the store yet get the deterministic simulated set.
-  const [assignments, setAssignments] = useState<Record<string, AssignedDevice[]>>(() => {
-    const fromStore = assignmentsFromStore(program, storeDevices);
-    if (program.source === 'upload') return fromStore;
-    const seeded = seedAssignments(program);
-    return Object.fromEntries(program.testers.map((t) => [t.id, fromStore[t.id]?.length ? fromStore[t.id] : seeded[t.id] || []]));
-  });
+  const { devices: storeDevices, addDevice, updateDevice, deleteDevice, getDeviceBySerial, addPerson, getPersonByEmail, upsertTesterProfile, removeProgramFromProfile } = useDeviceStore();
+  const { programs, setPrograms } = useBetaProgramsStore();
+  // Roster + assignments are DERIVED, never snapshotted: the roster is the live
+  // program in betaProgramsStore and each tester's devices are read from the shared
+  // deviceStore, so syncs, deletes and edits made elsewhere show up immediately.
+  const liveProgram = programs.find((p) => p.id === program.id) ?? program;
+  const roster = liveProgram.testers;
+  const assignments = useMemo(() => assignmentsFromStore(liveProgram, storeDevices), [liveProgram, storeDevices]);
   // Roster edits are saved on the program itself, so they stick until removed here.
-  const saveRoster = (update: (testers: DemoTester[]) => DemoTester[], audienceDelta: number) =>
-    setPrograms((prev) => prev.map((p) => (p.id === program.id
-      ? { ...p, testers: update(p.testers), audienceSize: Math.max(0, p.audienceSize + audienceDelta) }
-      : p)));
+  // Audience is derived from testers.length, so there's no count to maintain.
+  const saveRoster = (update: (testers: DemoTester[]) => DemoTester[]) =>
+    setPrograms((prev) => prev.map((p) => (p.id === program.id ? { ...p, testers: update(p.testers) } : p)));
   const [serialInput, setSerialInput] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null); // testerId being enriched, or 'sync'
   const [open, setOpen] = useState<{ tester: DemoTester; device: AssignedDevice } | null>(null);
@@ -305,25 +313,28 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const [rosterPageSize, setRosterPageSize] = useState(10);
 
   // ── Shared-store bridge ──────────────────────────────────────────────────────
-  // Every assigned device is upserted into the real deviceStore (idempotent by
-  // serial), so it shows up in Devices/People/Locations. SIMULATION NOTE: in
-  // production the write happens once at assignment time; here we also re-sync the
-  // seeded roster on open so the demo isn't blank. See the handoff doc.
+  // A newly assigned serial is upserted into the real deviceStore (idempotent by
+  // serial), so it shows up in Devices/People/Locations. Only called at assignment
+  // time — seeded demo devices are written once by SeedDataProvider. Updating an
+  // existing row never clobbers lifecycle status, known country/location, or
+  // firmware/network with blanks.
   const syncToStore = (tester: DemoTester, d: AssignedDevice) => {
     const existing = getDeviceBySerial(d.serial);
     const region = d.networkId ? countryForSerial(d.serial).name : '';
     if (existing) {
+      const lifecycleLocked = !!existing.archivedAt
+        || ['deactivated', 'pending_return', 'in_repair', 'in_testing'].includes(existing.status);
       updateDevice(existing.id, {
-        status: d.status === 'online' ? 'online' : 'not_online',
-        network: d.networkId || '',
-        firmwareVersion: d.firmware,
+        ...(lifecycleLocked ? {} : { status: d.status === 'online' ? 'online' : 'not_online' }),
+        ...(d.networkId ? { network: d.networkId } : {}),
+        ...(d.firmware ? { firmwareVersion: d.firmware } : {}),
         assignedTo: tester.name,
         assignedEmail: tester.email,
         program: programEnumFor(program),
         programName: program.name,
         product: existing.programName === program.name ? existing.product : betaModelFor(program),
-        country: region || existing.country,
-        location: region || existing.location,
+        ...(region && !existing.country ? { country: region } : {}),
+        ...(region && !existing.location ? { location: region } : {}),
       });
     } else {
       addDevice(toStoreDevice(tester, d, program));
@@ -334,13 +345,6 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
     if (existing) deleteDevice(existing.id);
   };
 
-  // Sync the seeded roster into the store once when the program opens.
-  useEffect(() => {
-    if (program.type === 'feature' || program.source === 'upload') return;
-    roster.forEach((t) => (assignments[t.id] || []).forEach((d) => syncToStore(t, d)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const allDevices = roster.flatMap((t) => assignments[t.id] || []);
   const total = allDevices.length;
   const onlineCount = allDevices.filter((d) => d.status === 'online').length;
@@ -349,54 +353,50 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
   const testersWithDevice = roster.filter((t) => (assignments[t.id] || []).length > 0).length;
   const unassigned = roster.length - testersWithDevice;
 
-  const enrichAll = async (devs: AssignedDevice[]) => Promise.all(devs.map((d) => enrichSerial(d.serial, model, linkEnv)));
-
   const assignSerial = async (tester: DemoTester) => {
     const raw = (serialInput[tester.id] || '').trim();
     if (!raw) return;
-    const serials = raw.split(/[\s,]+/).filter(Boolean);
+    const serials = raw.split(/[\s,]+/).filter(Boolean).map((s) => s.toUpperCase());
     const existing = new Set((assignments[tester.id] || []).map((d) => d.serial));
+    const fresh = serials.filter((s) => !existing.has(s));
     setBusy(tester.id);
-    const enriched = await enrichAll(serials.map((s) => ({ serial: s } as AssignedDevice)));
-    const toAdd = enriched.filter((d) => !existing.has(d.serial));
-    setAssignments((prev) => ({ ...prev, [tester.id]: [...(prev[tester.id] || []), ...toAdd] }));
+    // Resolve each NEW serial once to seed its row, then run the same sync the
+    // global online check uses so status/network/firmware + syncMetadata agree.
+    const toAdd = await Promise.all(fresh.map((s) => enrichSerial(s, model, linkEnv)));
     toAdd.forEach((d) => syncToStore(tester, d));
+    if (toAdd.length) await runDeviceSync(toAdd.map((d) => d.serial));
     setSerialInput((prev) => ({ ...prev, [tester.id]: '' }));
     setBusy(null);
     onToast(toAdd.length ? `Assigned ${toAdd.length} device${toAdd.length !== 1 ? 's' : ''} to ${tester.name} — now in the Devices menu too` : 'Those serials are already assigned');
   };
 
-  const recheckTester = async (tester: DemoTester) => {
-    const devs = assignments[tester.id] || [];
-    if (!devs.length) return;
-    setBusy(tester.id);
-    const next = await enrichAll(devs);
-    setAssignments((prev) => ({ ...prev, [tester.id]: next }));
-    next.forEach((d) => syncToStore(tester, d));
+  // Refresh / Sync go through runDeviceSync — the same path as the global online
+  // check — so every view reads the same updated rows and syncMetadata is stamped.
+  const syncSerials = async (serials: string[], key: string, done: string) => {
+    if (!serials.length) return;
+    setBusy(key);
+    const outcome = await runDeviceSync(serials);
     setBusy(null);
-    onToast(`Refreshed ${tester.name}'s device${devs.length > 1 ? 's' : ''} info from Insight`);
+    onToast(outcome.success ? done : `Sync failed: ${outcome.error || 'unknown error'}`);
   };
 
-  const syncAll = async () => {
-    setBusy('sync');
-    const entries = await Promise.all(roster.map(async (t) => [t.id, await enrichAll(assignments[t.id] || [])] as const));
-    setAssignments(Object.fromEntries(entries));
-    entries.forEach(([tid, devs]) => { const t = roster.find((x) => x.id === tid); if (t) devs.forEach((d) => syncToStore(t, d)); });
-    setBusy(null);
-    onToast('Synced all assigned devices from Insight');
+  const recheckTester = (tester: DemoTester) => {
+    const devs = assignments[tester.id] || [];
+    return syncSerials(devs.map((d) => d.serial), tester.id, `Refreshed ${tester.name}'s device${devs.length > 1 ? 's' : ''} info from Insight`);
   };
+
+  const syncAll = () =>
+    syncSerials(roster.flatMap((t) => (assignments[t.id] || []).map((d) => d.serial)), 'sync', 'Synced all assigned devices from Insight');
 
   const removeDevice = (tester: DemoTester, serial: string) => {
-    setAssignments((prev) => ({ ...prev, [tester.id]: (prev[tester.id] || []).filter((d) => d.serial !== serial) }));
     removeFromStore(serial);
     onToast(`Unassigned ${serial} from ${tester.name} — also removed from the Devices menu`);
   };
 
   const removeTester = (tester: DemoTester) => {
     (assignments[tester.id] || []).forEach((d) => removeFromStore(d.serial));
-    setRoster((prev) => prev.filter((t) => t.id !== tester.id));
-    saveRoster((testers) => testers.filter((t) => t.id !== tester.id), -1);
-    setAssignments((prev) => { const n = { ...prev }; delete n[tester.id]; return n; });
+    removeProgramFromProfile(tester.email, program.name);
+    saveRoster((testers) => testers.filter((t) => t.id !== tester.id));
     onToast(`Removed ${tester.name} from program`);
   };
 
@@ -415,20 +415,17 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
       missedSurveys: 0,
       noSeedDevice: true, // real tester — devices come from assignment, never simulated
     };
-    setRoster((prev) => [t, ...prev]);
-    saveRoster((testers) => [t, ...testers], 1);
+    saveRoster((testers) => [t, ...testers]);
     if (!getPersonByEmail(t.email)) addPerson({ id: crypto.randomUUID(), name: t.name, email: t.email, team: '', devices: [] });
     upsertTesterProfile({ email: t.email, name: t.name, programs: [program.name] });
-    setAssignments((prev) => ({ ...prev, [t.id]: [] }));
     onToast(`Added ${t.name} — assign their serial(s) below`);
     setNewName(''); setNewEmail(''); setAddOpen(false);
   };
 
   if (open) {
     // Reuse the real, fully-editable DeviceDetailPanel (same one used in the
-    // Devices / People / Search menus). The device was synced into the store on
-    // click, so edits persist to the shared record; fall back to a synthesized
-    // Device if it's somehow not present yet.
+    // Devices / People / Search menus) on the STORED record, so edits persist to the
+    // shared row; fall back to a synthesized Device if it's somehow not present.
     const stored = getDeviceBySerial(open.device.serial) || toStoreDevice(open.tester, open.device, program);
     return (
       <DeviceDetailPanel
@@ -529,7 +526,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                       <div className="flex flex-col divide-y" style={{ borderColor: TRACK }}>
                         {devs.map((d) => (
                           <div key={d.serial} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                            <button className="font-mono text-sm hover:underline" style={{ color: ACCENT }} onClick={() => { syncToStore(t, d); setOpen({ tester: t, device: d }); }}>{d.serial}</button>
+                            <button className="font-mono text-sm hover:underline" style={{ color: ACCENT }} onClick={() => setOpen({ tester: t, device: d })}>{d.serial}</button>
                             <Tag color="grey" size="regular">{d.model}</Tag>
                             {deviceStatusTag(d.status)}
                             {d.networkId
@@ -651,12 +648,13 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
           const noSurveys = p.status === 'active' && surveyCount === 0;
           // Match the DevicesTab container exactly: devices grouped under this
           // program's name. Online = those reporting online right now.
-          const progDevices = p.type === 'feature' ? [] : devices.filter((d) => deviceInProgram(d, p.name));
+          // Archived / returning units don't count toward the live program.
+          const progDevices = p.type === 'feature' ? [] : liveProgramDevices(devices, p.name);
           const deployed = progDevices.length;
           const online = progDevices.filter((d) => d.status === 'online').length;
           // This program's devices in the archive lifecycle (linked by name), for the
           // closed-program record shown on completed cards.
-          const archivedForProgram = p.type === 'feature' ? [] : devices.filter((d) => d.testbedName === p.name && (d.status === 'pending_return' || (d.status === 'deactivated' && d.archivedAt)));
+          const archivedForProgram = p.type === 'feature' ? [] : devices.filter((d) => deviceInProgram(d, p.name) && (d.status === 'pending_return' || (d.status === 'deactivated' && d.archivedAt)));
           return (
             <Card key={p.id} size={3}>
               <div className="flex flex-col gap-4">
@@ -669,7 +667,7 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
                       : <span className="block max-w-full truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>}
                     <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>{p.type === 'feature' ? 'Feature' : `Hardware${p.currentPhase ? ` · ${p.currentPhase}` : ''}`}</p>
                   </div>
-                  <div className="flex-1"><HealthMetric label="Audience">{p.audienceSize} testers</HealthMetric></div>
+                  <div className="flex-1"><HealthMetric label="Audience">{p.testers.length} testers</HealthMetric></div>
                   <div className="flex-1"><HealthMetric label="Response rate">{p.surveyResponseRate}%</HealthMetric></div>
                   <div className="flex-1">
                     <HealthMetric label="Devices online" onClick={p.type === 'hardware' ? () => onOpenDevices(p) : undefined}>
@@ -755,7 +753,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
 
   const { openToast } = useToast();
   const showToast = (msg: string) => openToast({ type: ToastType.success, description: msg });
-  const { devices, updateDevice } = useDeviceStore();
+  const { devices, updateDevice, detachProgram } = useDeviceStore();
   const { cohort } = useUiStore();
 
   // Cohort lens: dogfood → dogfood programs, beta → everything else. Applied to the
@@ -792,7 +790,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
     setPrograms((prev) => [...prev, program]);
     setSurveys((prev) => [firstSurvey, ...prev]);
     setView('surveys');
-    showToast(`Created ${program.name} (${program.audienceSize} testers) + first survey “${firstSurvey.title}”`);
+    showToast(`Created ${program.name} (${program.testers.length} testers) + first survey “${firstSurvey.title}”`);
     setNewProgramOpen(false);
   };
 
@@ -802,7 +800,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
     if (program.status === 'active') {
       // Closing: push this program's still-active devices to Archived so each
       // return can be tracked individually (Device Ingestion & Returns → Archived).
-      const progDevices = devices.filter((d) => d.testbedName === program.name && d.status !== 'deactivated' && d.status !== 'pending_return');
+      const progDevices = liveProgramDevices(devices, program.name);
       const ok = window.confirm(
         `Close “${program.name}”?\n\n${progDevices.length} device(s) will be moved to Archived. Track each device's return individually there and mark it Archived once handled.`
       );
@@ -817,12 +815,15 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
     }
   };
 
-  // Deleting a program cascades to its surveys (a program is the container for them).
+  // Deleting a program cascades to its surveys (a program is the container for them)
+// and detaches its devices + tester-profile memberships.
   const handleDeleteProgram = (program: DemoProgram) => {
     const owned = surveys.filter((s) => s.programId === program.id).length;
     if (!window.confirm(`Delete “${program.name}”${owned ? ` and its ${owned} survey${owned === 1 ? '' : 's'}` : ''}? This can’t be undone.`)) return;
     setPrograms((prev) => prev.filter((p) => p.id !== program.id));
     setSurveys((prev) => prev.filter((s) => s.programId !== program.id));
+    // Its devices stay in inventory as "No program"; tester profiles drop it too.
+    detachProgram(program.name);
     showToast(`Deleted ${program.name}${owned ? ` + ${owned} survey${owned === 1 ? '' : 's'}` : ''}`);
   };
 
@@ -1236,7 +1237,7 @@ function NewSurveyModal({
     setCadence(SURVEY_KINDS[k].defaultCadence);
   };
 
-  const recipients = program?.audienceSize ?? 0; // the program's imported Qualtrics audience
+  const recipients = program?.testers.length ?? 0; // the program's current tester roster
   const ph = isHardware ? phase : undefined;
   // A same program + kind + phase survey already exists → likely an accidental repeat.
   const isDuplicate = !!program && existingKeys.includes(`${program.id}|${kind}|${ph ?? 'none'}`);

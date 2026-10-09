@@ -118,7 +118,9 @@ interface DeviceStore {
   getAllShipments: () => Shipment[];
 
   // ─── Network Sync ─────────────────────────────────────────────────────
-  syncNetworkStatus: (onlineSerials: string[]) => number;
+  // checkedSerials scopes the sync to the serials the source actually reported on
+  // (partial syncs must not flip the rest of the fleet offline). Omit = full fleet.
+  syncNetworkStatus: (onlineSerials: string[], checkedSerials?: string[], sourceLabel?: string) => number;
   updateSyncMetadata: (updates: Partial<SyncMetadata>) => void;
   isSyncStale: () => boolean;
   isRateLimited: () => boolean;
@@ -143,6 +145,9 @@ interface DeviceStore {
   // ─── Tester Profiles ──────────────────────────────────────────────────
   testerProfiles: TesterProfile[];
   upsertTesterProfile: (profile: Partial<TesterProfile> & { email: string }) => void;
+  // Removal cascades — keep People / Devices / Dashboard in step with the program cards.
+  removeProgramFromProfile: (email: string, programName: string) => void;
+  detachProgram: (programName: string) => void; // program deleted → its devices become "No program"
   getTesterProfile: (email: string) => TesterProfile | undefined;
   getAllTesterProfiles: () => TesterProfile[];
   findDuplicateProfiles: (name: string, email: string) => TesterProfile[];
@@ -685,8 +690,10 @@ export const useDeviceStore = create<DeviceStore>()(
         get().shipments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
 
       // ─── Network Sync ───────────────────────────────────────────────────────
-      syncNetworkStatus: (onlineSerials) => {
+      syncNetworkStatus: (onlineSerials, checkedSerials, sourceLabel) => {
         const onlineSet = new Set(onlineSerials.map((s) => s.toUpperCase()));
+        const checkedSet = checkedSerials ? new Set(checkedSerials.map((s) => s.toUpperCase())) : null;
+        const via = sourceLabel ? ` (${sourceLabel})` : ' (network check)';
         // Statuses that represent a lifecycle stage, not network presence — these
         // are NOT overridden by a network sync (a device in repair/return stays so).
         const PRESERVED = new Set(['deactivated', 'in_repair', 'in_testing', 'pending_return']);
@@ -696,6 +703,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
         get().devices.forEach((device) => {
           if (device.deactivated || PRESERVED.has(device.status)) return;
+          if (checkedSet && !checkedSet.has(device.serialNumber.toUpperCase())) return; // not checked this run
 
           const isOnline = onlineSet.has(device.serialNumber.toUpperCase());
           const newStatus: DeviceStatus = isOnline ? 'online' : 'not_online';
@@ -714,7 +722,7 @@ export const useDeviceStore = create<DeviceStore>()(
             ),
           }));
           historyEntries.push(makeHistory(device.id, isOnline ? 'came_online' : 'went_offline',
-            isOnline ? 'Device detected online (Databricks)' : 'Device not online (Databricks)',
+            isOnline ? `Device detected online${via}` : `Device not online${via}`,
             { user: 'Network Sync', field: 'status', oldValue: device.status, newValue: newStatus }));
           updated++;
         });
@@ -839,6 +847,31 @@ export const useDeviceStore = create<DeviceStore>()(
         })),
 
       // ─── Tester Profiles ──────────────────────────────────────────────────
+      removeProgramFromProfile: (email, programName) => {
+        const e = email.toLowerCase().trim();
+        const key = programName.trim().toLowerCase();
+        set((state) => ({
+          testerProfiles: state.testerProfiles.map((p) =>
+            p.email.toLowerCase() === e || (p.additionalEmails || []).some((a) => a.toLowerCase() === e)
+              ? { ...p, programs: p.programs.filter((x) => x.trim().toLowerCase() !== key), updatedAt: new Date().toISOString() }
+              : p),
+        }));
+      },
+
+      detachProgram: (programName) => {
+        const key = programName.trim().toLowerCase();
+        const now = new Date().toISOString();
+        set((state) => ({
+          // '' (not undefined) marks "explicitly no program" so the legacy
+          // product+cohort fallback in deviceProgramName doesn't re-attach it.
+          devices: state.devices.map((d) => {
+            const mine = (d.programName || (d.id.startsWith('prog-') ? d.testbedName : '') || '').trim().toLowerCase() === key;
+            return mine ? { ...d, programName: '', testbedName: d.testbedName.trim().toLowerCase() === key ? '' : d.testbedName, updatedAt: now } : d;
+          }),
+          testerProfiles: state.testerProfiles.map((p) => ({ ...p, programs: p.programs.filter((x) => x.trim().toLowerCase() !== key) })),
+        }));
+      },
+
       upsertTesterProfile: (profileData) => {
         const email = profileData.email.toLowerCase().trim();
         // Search by primary email OR any additional email
@@ -980,6 +1013,13 @@ export const useDeviceStore = create<DeviceStore>()(
     }),
     {
       name: 'device-tracker-storage',
+      // A reload mid-sync would persist syncInProgress=true and block every later
+      // sync ("already in progress") — always come back up idle.
+      onRehydrateStorage: () => (state) => {
+        if (state?.syncMetadata?.syncInProgress) {
+          state.updateSyncMetadata({ syncInProgress: false });
+        }
+      },
     }
   )
 );

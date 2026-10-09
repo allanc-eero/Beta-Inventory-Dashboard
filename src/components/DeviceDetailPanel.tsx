@@ -98,7 +98,20 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  const handleSave = () => { updateDevice(device.id, editData); setIsEditing(false); };
+  // Enter edit mode from the CURRENT store copy (a sync may have changed it since
+  // the panel opened), and on save send only the fields the user actually edited
+  // (vs. that snapshot) so we never roll back status/firmware/network written by
+  // a background sync — even one that lands while the form is open.
+  const [editBase, setEditBase] = useState(device);
+  const startEditing = () => { setEditData(device); setEditBase(device); setIsEditing(true); };
+  const handleSave = () => {
+    const changes: Partial<Device> = {};
+    (Object.keys(editData) as (keyof Device)[]).forEach((k) => {
+      if (editData[k] !== editBase[k]) (changes as any)[k] = editData[k];
+    });
+    if (Object.keys(changes).length > 0) updateDevice(device.id, changes);
+    setIsEditing(false);
+  };
   const statusInfo = STATUS_CONFIG[device.status] || { color: 'grey' as const, label: device.status };
 
   const renderFields = (fields: FieldDef[], editable = true) =>
@@ -135,7 +148,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
           <div className="flex items-center gap-2">
             <Button type="default" label={<span className="flex items-center gap-1.5"><Download size={14} /> Export</span>} ariaLabel="Export device CSV" onClick={() => exportDeviceCSV(device)} />
             {canEdit() && (
-              <Button type="primary" label="Edit details" onClick={() => setIsEditing(!isEditing)} />
+              <Button type="primary" label="Edit details" onClick={() => (isEditing ? setIsEditing(false) : startEditing())} />
             )}
             {canEdit() && device.status !== 'deactivated' && (
               <Button type="primary" danger label="Return to eero" onClick={() => setShowDeactivateModal(true)} />

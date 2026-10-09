@@ -14,6 +14,9 @@ interface NavbarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   children: React.ReactNode;
+  // Extra sidebar items shown above the standard ones (e.g. the Dashboard preview
+  // at /demo-dashboard). The main app passes none.
+  leadingTabs?: { id: TabType; label: string; key: string }[];
 }
 
 const tabs: { id: TabType; label: string; key: string }[] = [
@@ -28,7 +31,7 @@ const tabs: { id: TabType; label: string; key: string }[] = [
   // { id: 'program_signups', label: 'Program Sign-ups', key: 'program_signups' },
 ];
 
-export default function Navbar({ activeTab, setActiveTab, children }: NavbarProps) {
+export default function Navbar({ activeTab, setActiveTab, children, leadingTabs = [] }: NavbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { currentUser, logout, canEdit, isBetaViewer } = useAuthStore();
@@ -42,9 +45,9 @@ export default function Navbar({ activeTab, setActiveTab, children }: NavbarProp
     if (ssoSession) signOut({ callbackUrl: '/' });
   };
 
-  const visibleTabs = isBetaViewer()
+  const visibleTabs = [...leadingTabs, ...(isBetaViewer()
     ? tabs.filter((t) => !['shipments', 'dogfood', 'program_signups'].includes(t.id))
-    : tabs;
+    : tabs)];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

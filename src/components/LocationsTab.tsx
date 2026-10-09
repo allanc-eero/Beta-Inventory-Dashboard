@@ -10,6 +10,7 @@ import { Select, Tag, Pagination, Button } from '@amzn/eero-web-design-component
 import { downloadCSV } from '@/constants';
 import { useUiStore, matchesCohort } from '@/store/uiStore';
 import DeviceDetailPanel from './DeviceDetailPanel';
+import { deviceProgramName } from '@/lib/programs';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 
@@ -98,7 +99,7 @@ export default function LocationsTab() {
   const [centroids, setCentroids] = useState<Record<string, [number, number]>>({});
 
   const programs = useMemo(() => {
-    return Array.from(new Set(devices.map((d) => d.program).filter(Boolean)));
+    return Array.from(new Set(devices.map((d) => deviceProgramName(d)).filter(Boolean)));
   }, [devices]);
 
   // Filter devices
@@ -107,7 +108,7 @@ export default function LocationsTab() {
       if (filter === 'online' && d.status !== 'online') return false;
       if (filter === 'offline' && d.status !== 'not_online') return false;
       if (filter === 'deactivated' && d.status !== 'deactivated') return false;
-      if (programFilter !== 'all' && d.program !== programFilter) return false;
+      if (programFilter !== 'all' && deviceProgramName(d) !== programFilter) return false;
       if (!matchesCohort(d, cohort)) return false;
       return true;
     });
@@ -203,7 +204,7 @@ export default function LocationsTab() {
     if (!selectedCountry) return;
     const rows: (string | number)[][] = [['Serial', 'Model', 'Assigned To', 'Email', 'Program', 'Status', 'Country']];
     detailDevices.forEach((d) => rows.push([
-      d.serialNumber, d.model, d.assignedTo || '', d.assignedEmail || '', d.program, d.status.replace(/_/g, ' '), d.country || '',
+      d.serialNumber, d.model, d.assignedTo || '', d.assignedEmail || '', deviceProgramName(d), d.status.replace(/_/g, ' '), d.country || '',
     ]));
     downloadCSV(`${selectedCountry.replace(/\s+/g, '_')}_devices.csv`, rows);
   };
@@ -463,7 +464,7 @@ export default function LocationsTab() {
                   <td className="px-4 py-2 font-mono text-xs text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</td>
                   <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.model}</td>
                   <td className="px-4 py-2 text-[var(--ui-text-text-tertiary)]">{d.assignedTo || d.assignedEmail || '—'}</td>
-                  <td className="px-4 py-2"><Tag color="periwinkle" size="regular">{d.program}</Tag></td>
+                  <td className="px-4 py-2"><Tag color="periwinkle" size="regular">{deviceProgramName(d) || 'No program'}</Tag></td>
                   <td className="px-4 py-2">
                     <Tag color={d.status === 'online' ? 'green' : d.status === 'deactivated' ? 'grey' : 'orange'} size="regular">
                       {d.status.replace(/_/g, ' ')}

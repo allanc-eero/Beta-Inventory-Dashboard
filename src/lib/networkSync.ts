@@ -63,10 +63,13 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
   try {
     // Group serials by cloud so BETA hits prod and DOGFOOD hits stage (insight
     // source only; databricks is a single warehouse). One POST per env; merge.
-    let statuses: { serial: string; online: boolean }[] = [];
+    let statuses: { serial: string; online: boolean; state?: string }[] = [];
     let testers: any[] = [];
     let onlineCount = 0;
     let notFoundCount = 0;
+    // Serials the source could not resolve (Insight: device lookup failed). Their
+    // `online:false` is "unknown", not "offline", so they must not be flipped.
+    const unresolved = new Set<string>();
 
     const postSync = async (payload: Record<string, unknown>) => {
       const res = await fetch(SYNC_ENDPOINT[DEVICE_SYNC_SOURCE], {
@@ -81,6 +84,11 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       testers = testers.concat(data.testers || []);
       onlineCount += data.onlineCount ?? (data.statuses || []).filter((s: any) => s.online).length;
       notFoundCount += (data.notFound || []).length;
+      // Databricks' notFound means "no tester match" (status is still known), so
+      // only Insight's notFound marks a serial as unresolved.
+      if (DEVICE_SYNC_SOURCE === 'insight') {
+        (data.notFound || []).forEach((s: string) => unresolved.add(String(s).toUpperCase()));
+      }
     };
 
     if (DEVICE_SYNC_SOURCE === 'insight') {
@@ -100,10 +108,15 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       await postSync({ serials: list });
     }
 
-    // 1) Online/offline status (authoritative). syncNetworkStatus also stamps
-    //    lastFullSync and clears syncInProgress.
-    const onlineSerials = statuses.filter((s) => s.online).map((s) => s.serial);
-    const statusChanges = store.syncNetworkStatus(onlineSerials);
+    // 1) Online/offline status (authoritative). Only serials the source actually
+    //    reported on are touched — devices outside this run (partial sync) and
+    //    serials it couldn't resolve (Insight notFound / Databricks never_online,
+    //    i.e. no node record) keep their current status. syncNetworkStatus also
+    //    stamps lastFullSync and clears syncInProgress.
+    const answered = statuses.filter((s) => s.state !== 'never_online' && !unresolved.has(String(s.serial).toUpperCase()));
+    const onlineSerials = answered.filter((s) => s.online).map((s) => s.serial);
+    const sourceLabel = DEVICE_SYNC_SOURCE === 'insight' ? 'Insight' : 'Databricks';
+    const statusChanges = store.syncNetworkStatus(onlineSerials, answered.map((s) => s.serial), sourceLabel);
 
     // 2) Tester info for matched devices (name/email/network/location — whatever
     //    the source provides; Insight gives network, Databricks gives more).
@@ -133,7 +146,11 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       notFound: notFoundCount,
     };
   } catch (e: any) {
-    store.updateSyncMetadata({ syncInProgress: false });
     return { ...ZERO, success: false, error: e?.message || 'Sync failed' };
+  } finally {
+    // Never leave the lock held — a stuck flag blocks every later sync.
+    if (useDeviceStore.getState().syncMetadata.syncInProgress) {
+      store.updateSyncMetadata({ syncInProgress: false });
+    }
   }
 }

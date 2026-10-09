@@ -12,6 +12,8 @@ import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
 import { adminUserUrl, insightNetworkUrl, initials, resolveEnv, EeroEnv } from '@/lib/format';
 import { useUiStore, cohortOf } from '@/store/uiStore';
+import { useBetaProgramsStore } from '@/store/betaProgramsStore';
+import { deviceProgramName } from '@/lib/programs';
 
 const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
   { value: 'no_longer_interested', label: 'No longer interested in testing' },
@@ -22,7 +24,8 @@ const OPT_OUT_REASONS: { value: OptOutReason; label: string }[] = [
 ];
 
 export default function PeopleTab({ initialSelectedPerson, onClearSelection }: { initialSelectedPerson?: string | null; onClearSelection?: () => void }) {
-  const { devices, people, testerProfiles, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile } = useDeviceStore();
+  const { devices, people, testerProfiles, addPerson, addOptOut, getOptOuts, removeOptOut, getTesterProfile, findDuplicateProfiles, mergeProfiles, upsertTesterProfile, removePerson, removeProgramFromProfile, checkinDevice } = useDeviceStore();
+  const { removeTesterByEmail } = useBetaProgramsStore();
   const { canEdit, currentUser } = useAuthStore();
   const { cohort } = useUiStore();
   const [search, setSearch] = useState('');
@@ -257,6 +260,32 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
     setShowAdd(false);
   };
 
+  // Roster/profile cascade shared by Opt Out and Remove person: drop the person
+  // (under every known email) from every program roster and from their profile's
+  // program list, so Programs / Dashboard tester counts no longer include them.
+  const detachFromPrograms = (email: string) => {
+    const prof = getTesterProfile(email);
+    const emails = [email, prof?.email || '', ...(prof?.additionalEmails || [])].filter(Boolean);
+    emails.forEach((e) => removeTesterByEmail(e));
+    (prof?.programs || []).forEach((name) => removeProgramFromProfile(email, name));
+  };
+
+  // Remove person: roster/profile cascade, unassign their devices (checkinDevice
+  // clears assignedTo/assignedEmail/checkedOutTo — the device itself is kept), then
+  // drop them from People. Derived People then has nothing left to show for them.
+  const handleRemovePerson = () => {
+    const person = derivedPeople.find(
+      (p) => p.email.toLowerCase() === selectedPerson?.toLowerCase() || p.name.toLowerCase() === selectedPerson?.toLowerCase()
+    );
+    if (!person) return;
+    const n = selectedPersonDevices.length;
+    if (!window.confirm(`Remove ${person.name || person.email}? They'll be dropped from every program roster${n ? ` and their ${n} device${n === 1 ? '' : 's'} will be unassigned` : ''}. This can’t be undone.`)) return;
+    if (person.email) detachFromPrograms(person.email);
+    selectedPersonDevices.forEach((d) => checkinDevice(d.id));
+    if (person.email) removePerson(person.email);
+    setSelectedPerson(null);
+  };
+
   const handleOptOut = () => {
     const person = derivedPeople.find(
       (p) => p.email.toLowerCase() === selectedPerson?.toLowerCase() || p.name.toLowerCase() === selectedPerson?.toLowerCase()
@@ -274,6 +303,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
       program: selectedPersonDevices[0]?.program || 'unknown',
       devicesAtOptOut: selectedPersonDevices.map((d) => d.serialNumber),
     });
+    if (person.email) detachFromPrograms(person.email);
 
     setShowOptOut(false);
     setOptOutReason('no_longer_interested');
@@ -518,7 +548,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
             {(() => {
               const profile = getTesterProfile(selectedPerson || '');
               const personName = profile?.name || selectedPersonDevices[0]?.assignedTo || selectedPerson;
-              const activePrograms = [...new Set(selectedPersonDevices.filter((d) => d.status !== 'deactivated').map((d) => d.program))];
+              const activePrograms = [...new Set(selectedPersonDevices.filter((d) => d.status !== 'deactivated').map((d) => deviceProgramName(d)).filter(Boolean))];
               // Route this person's Insight/Admin links to the right cloud: if any of
               // their devices is dogfood/stage, use stage; otherwise prod.
               const dfDevice = selectedPersonDevices.find((d) => d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood'));
@@ -560,6 +590,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                             <>
                               <Button type="default" label="Edit profile" onClick={startEditProfile} />
                               <Button type="default" label="Record Opt-Out" onClick={() => setShowOptOut(true)} />
+                              <Button type="default" label="Remove person" onClick={handleRemovePerson} />
                             </>
                           )}
                         </div>
@@ -809,7 +840,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                       <td className="px-4 py-2 font-mono text-xs text-[var(--ui-core-periwinkle-periwinkle-6)]">{d.serialNumber}</td>
                       <td className="px-4 py-2 text-[var(--ui-text-text-secondary)]">{d.model}</td>
                       <td className="px-4 py-2">
-                        <Tag color="periwinkle" size="regular">{d.program}</Tag>
+                        <Tag color="periwinkle" size="regular">{deviceProgramLabel(d)}</Tag>
                       </td>
                       <td className="px-4 py-2">
                         <Tag color={getStatusTagColor(d.status)} size="regular">{d.status.replace(/_/g, ' ')}</Tag>
@@ -892,19 +923,16 @@ function EditableRow({ label, field, value, onChange }: {
 
 const normalizeProgramKey = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 
-// The program NAME a device belongs to. Survey-flow devices (id "prog-…") carry
-// the real program name in testbedName; for others testbedName is a network
-// group, so fall back to the product + program label (matches the Devices menu).
+// The program NAME a device belongs to — the shared deviceProgramName, so People
+// shows the same names as Devices / Programs / Dashboard ('' = detached).
 function deviceProgramLabel(d: Device) {
-  return (d.id.startsWith('prog-') && d.testbedName)
-    ? d.testbedName
-    : ([d.product, (d.program || '').toUpperCase()].filter(Boolean).join(' ').trim() || 'Unknown');
+  return deviceProgramName(d) || 'No program';
 }
 
 // Count of distinct programs a person is part of (devices + roster) — the People row summary.
 function programCountFor(devices: Device[], programs: string[] = []) {
   const keys = new Set<string>();
-  devices.forEach((d) => keys.add(normalizeProgramKey(deviceProgramLabel(d))));
+  devices.forEach((d) => { const name = deviceProgramName(d); if (name) keys.add(normalizeProgramKey(name)); });
   programs.forEach((p) => keys.add(normalizeProgramKey(p)));
   return keys.size;
 }
