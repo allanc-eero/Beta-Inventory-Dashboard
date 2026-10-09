@@ -3,11 +3,10 @@
 // Everything here is side-effect-free and JSX-free: seeding math, formatting,
 // and the demo's identity-match simulation (email → network → beta-model DSN).
 // Keeping them out of ProgramsView makes the view file mostly components + wiring,
-// and lets these be unit-tested in isolation. JSX tag renderers and chart
-// primitives intentionally stay in ProgramsView (they're view concerns).
+// and lets these be unit-tested in isolation. JSX tag renderers
+// intentionally stay in ProgramsView (they're view concerns).
 import type {
-  ProgramType, TechnicalLevel, DemoTester, DemoProgram, DemoSurvey,
-  SurveyWave, RosterEntry, AssignedDevice,
+  ProgramType, TechnicalLevel, DemoTester, DemoProgram, RosterEntry, AssignedDevice,
 } from './types';
 import { Device, Program } from '@/types';
 
@@ -25,23 +24,6 @@ export function hashSeed(s: string): number {
 export function mkSerial(seed: number): string {
   const tail = (4000 + seed).toString(36).toUpperCase().padStart(4, '0');
   return `GGC54MX36114${tail}`;
-}
-
-export function rate(responses: number, recipients: number) {
-  return recipients > 0 ? Math.round((responses / recipients) * 100) : 0;
-}
-
-// "2026-09-08" -> "Sep 8". Used across the wave/phase timelines.
-export function fmtDate(iso?: string) {
-  if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-// The latest wave is the one we show by default; falls back to the survey's own
-// flat responses/recipients for one-offs that carry no wave history.
-export function latestWave(s: DemoSurvey): SurveyWave | null {
-  return s.waves && s.waves.length ? s.waves[s.waves.length - 1] : null;
 }
 
 // Engagement is DERIVED from real activity (response reliability + missed surveys) —

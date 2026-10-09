@@ -6,8 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * The in-app "Programs" tab (and the standalone /programs route). Renders four
  * views:
- *   1. Surveys        — list + results (charts + AI feedback summary + closed-loop
- *                       "create JIRA ticket" from a response). Qualtrics-backed.
+ *   1. Surveys        — the live Qualtrics report (SurveysEngagementReport).
  *   2. Engagement     — reliability / response-time / feedback-quality per tester,
  *                       plus an At-Risk view (rules engine + AI narration).
  *   3. Program Health — the leadership report: deployed, % online, response rate,
@@ -24,7 +23,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Card, Button, Tag, Segmented, Select, ProgressBar, Input, Modal,
+  Card, Button, Tag, Segmented, Select, Input, Modal,
   Icon, ICONS, TableV2, useToast, ToastType,
   Pagination,
 } from '@amzn/eero-web-design-components';
@@ -35,25 +34,21 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { useUiStore } from '@/store/uiStore';
 import DeviceDetailPanel from '../DeviceDetailPanel';
 import SurveysEngagementReport from '@/components/surveysEngagement/SurveysEngagementReport';
-import { Device, Program, DeviceStatus } from '@/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
-import { AISummary, SUMMARIZE_LIVE, fetchSummary, SummaryResponseInput } from '@/lib/summarize';
-import { adminUserUrl, insightNetworkUrl, adminNetworkUrl, resolveEnv, EeroEnv } from '@/lib/format';
+import { insightNetworkUrl, adminNetworkUrl, resolveEnv, EeroEnv } from '@/lib/format';
 import type {
-  ProgramType, SurveyStatus, QuestionType, TechnicalLevel, SurveyKind, Cadence, Phase,
-  DemoQuestion, SurveyWave, DemoSurvey, DemoTester, DemoProgram,
-  MatchState, RosterCandidate, RosterEntry, DeviceLiveStatus, AssignedDevice,
+  ProgramType, SurveyKind, Cadence, Phase,
+  DemoSurvey, DemoTester, DemoProgram, DeviceLiveStatus, AssignedDevice,
 } from './types';
 import {
   TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TRACK,
-  OK_GREEN, WARN_ORANGE, BAD_RED, ACCENT, RATING_BAR_COLORS, CHOICE_BAR_COLORS,
+  OK_GREEN, WARN_ORANGE, BAD_RED, ACCENT,
 } from './theme';
 import {
-  SURVEY_KINDS, PHASES, INITIAL_SURVEYS, TESTERS, INITIAL_PROGRAMS,
-  ROSTER_SEED, FILLER_EMAILS, AI_SUMMARIES, TONE_COLOR, SEVERITY_TAG, PRIORITY_TAG,
+  SURVEY_KINDS, PHASES, INITIAL_SURVEYS, INITIAL_PROGRAMS,
 } from './data';
 import {
-  rate, fmtDate, latestWave, engagementLevel, simulate, betaModelFor, programEnumFor,
+  engagementLevel, simulate, betaModelFor, programEnumFor,
   countryForSerial, seedAssignments, toStoreDevice, slugify, contactToTester,
 } from './helpers';
 
@@ -66,592 +61,15 @@ import {
 // programEnumFor, seedAssignments, toStoreDevice, slugify) live in ./helpers.
 
 // ─── Shared JSX tag renderers ─────────────────────────────────────────────────
-// Status describes the RESPONSE state (the app doesn't author/edit surveys — that's
-// Qualtrics). 'draft' = set up here but no responses yet; 'published' = collecting;
-// 'closed' = done collecting.
-const STATUS_TAG: Record<SurveyStatus, { color: 'green' | 'grey' | 'periwinkle'; label: string }> = {
-  published: { color: 'green', label: 'Published' },
-  draft: { color: 'grey', label: 'Awaiting responses' },
-  closed: { color: 'periwinkle', label: 'Closed' },
-};
-function statusTag(status: SurveyStatus) {
-  const s = STATUS_TAG[status];
-  return <Tag color={s.color} size="regular">{s.label}</Tag>;
-}
-
 function programTag(type: ProgramType, name: string) {
   return (
     <Tag color={type === 'feature' ? 'purple' : 'ocean'} size="regular">{name}</Tag>
   );
 }
 
-function kindTag(kind: SurveyKind, cadence: Cadence) {
-  const k = SURVEY_KINDS[kind];
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <Tag color="periwinkle-4" size="regular">{k.label}</Tag>
-      {cadence === 'recurring'
-        ? <Tag color="ocean" size="regular">Recurring</Tag>
-        : <Tag color="grey" size="regular">One-off</Tag>}
-    </span>
-  );
-}
-
 function phaseTag(phase?: Phase) {
   if (!phase) return null;
   return <Tag color="periwinkle-4" size="regular">{phase}</Tag>;
-}
-
-// ─── Small chart primitives (hand-built SVG/flex — matches OverviewDashboard) ──
-function StatTile({ value, label, accent }: { value: string | number; label: string; accent?: string }) {
-  return (
-    <Card size={2}>
-      <div className="flex flex-col gap-1">
-        <p className="text-2xl font-medium" style={{ color: accent || TEXT_PRIMARY }}>{value}</p>
-        <p className="text-xs" style={{ color: TEXT_TERTIARY }}>{label}</p>
-      </div>
-    </Card>
-  );
-}
-
-function HBar({ label, count, max, color, suffix }: { label: string; count: number; max: number; color: string; suffix?: string }) {
-  const pct = max > 0 ? (count / max) * 100 : 0;
-  return (
-    <div className="mb-2 flex items-center gap-3">
-      <span className="w-44 shrink-0 truncate text-sm" style={{ color: TEXT_SECONDARY }}>{label}</span>
-      <div className="h-3.5 flex-1 overflow-hidden rounded" style={{ backgroundColor: TRACK }}>
-        <div className="h-full rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
-      </div>
-      <span className="w-12 text-right text-xs" style={{ color: TEXT_TERTIARY }}>{count}{suffix || ''}</span>
-    </div>
-  );
-}
-
-function RatingChart({ counts }: { counts: number[] }) {
-  const total = counts.reduce((a, b) => a + b, 0);
-  const avg = total > 0 ? counts.reduce((a, c, i) => a + c * (i + 1), 0) / total : 0;
-  const max = Math.max(...counts, 1);
-  return (
-    <div>
-      <div className="mb-3 flex items-baseline gap-2">
-        <span className="text-2xl font-medium" style={{ color: TEXT_PRIMARY }}>{avg.toFixed(1)}</span>
-        <span className="text-xs" style={{ color: TEXT_TERTIARY }}>avg · {total} responses</span>
-      </div>
-      {counts.map((c, i) => (
-        <HBar key={i} label={`${i + 1} ★`} count={c} max={max} color={RATING_BAR_COLORS[i]} />
-      ))}
-    </div>
-  );
-}
-
-function ChoiceChart({ choices }: { choices: { label: string; count: number }[] }) {
-  const max = Math.max(...choices.map((c) => c.count), 1);
-  return (
-    <div>
-      {choices.map((c, i) => (
-        <HBar key={i} label={c.label} count={c.count} max={max} color={CHOICE_BAR_COLORS[i % CHOICE_BAR_COLORS.length]} />
-      ))}
-    </div>
-  );
-}
-
-function YesNoDonut({ yes, no }: { yes: number; no: number }) {
-  const total = yes + no || 1;
-  const size = 96, stroke = 18, r = (size - stroke) / 2, circ = 2 * Math.PI * r;
-  const yesDash = (yes / total) * circ;
-  return (
-    <div className="flex items-center gap-4">
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ui-core-green-green-5)" strokeWidth={stroke} />
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ui-core-red-red-6)" strokeWidth={stroke} strokeDasharray={`${yesDash} ${circ - yesDash}`} strokeDashoffset={0} />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-bold" style={{ color: TEXT_PRIMARY }}>{Math.round((yes / total) * 100)}%</span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-1 text-sm">
-        <div className="flex items-center gap-2"><span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: 'var(--ui-core-red-red-6)' }} /><span style={{ color: TEXT_SECONDARY }}>Yes</span><b style={{ color: TEXT_PRIMARY }}>{yes}</b></div>
-        <div className="flex items-center gap-2"><span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: 'var(--ui-core-green-green-5)' }} /><span style={{ color: TEXT_SECONDARY }}>No</span><b style={{ color: TEXT_PRIMARY }}>{no}</b></div>
-      </div>
-    </div>
-  );
-}
-
-function sentimentTag(s: 'positive' | 'neutral' | 'negative') {
-  const map = { positive: { c: 'green' as const, l: 'Positive' }, neutral: { c: 'grey' as const, l: 'Neutral' }, negative: { c: 'red' as const, l: 'Needs attention' } };
-  return <Tag color={map[s].c} size="regular">{map[s].l}</Tag>;
-}
-
-// ─── Wave / phase timeline primitives ───────────────────────────────────────
-// The clarity centerpiece: make "surveys repeat within a phase, and pause/resume
-// around other surveys" legible AT A GLANCE instead of something you have to be told.
-
-// One survey's own wave history — dated rows, newest last, with the resumed note.
-function WaveTimeline({ waves, selectedId, onSelect }: { waves: SurveyWave[]; selectedId?: string; onSelect?: (id: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {waves.map((wv) => {
-        const r = rate(wv.responses, wv.recipients);
-        const isSel = wv.id === selectedId;
-        return (
-          <button
-            key={wv.id}
-            type="button"
-            onClick={() => onSelect?.(wv.id)}
-            className="flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors"
-            style={{
-              borderColor: isSel ? 'var(--ui-core-ocean-blue-ocean-5)' : TRACK,
-              backgroundColor: isSel ? 'var(--ui-core-ocean-blue-ocean-1)' : 'transparent',
-              cursor: onSelect ? 'pointer' : 'default',
-            }}
-          >
-            <span className="w-16 shrink-0 text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{wv.label}</span>
-            <span className="w-14 shrink-0 text-xs" style={{ color: TEXT_TERTIARY }}>{fmtDate(wv.date)}</span>
-            <div className="h-2 flex-1 overflow-hidden rounded" style={{ backgroundColor: TRACK }}>
-              <div className="h-full rounded" style={{ width: `${r}%`, backgroundColor: r >= 70 ? 'var(--ui-core-green-green-6)' : 'var(--ui-core-orange-orange-5)' }} />
-            </div>
-            <span className="w-24 shrink-0 text-right text-xs" style={{ color: TEXT_TERTIARY }}>{wv.responses}/{wv.recipients} · {r}%</span>
-            {wv.resumedNote && <Tag color="periwinkle-4" size="regular">Resumed</Tag>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── AI feedback summary ──────────────────────────────────────────────────────
-// Types (AISummary/Tone/Severity/Priority) now live in src/lib/summarize.ts so the
-// AI_SUMMARIES (canned fallback) + TONE_COLOR / SEVERITY_TAG / PRIORITY_TAG live in ./data.
-
-// Stacked positive/neutral/negative sentiment bar with a legend.
-function SentimentBar({ s }: { s: AISummary['sentiment'] }) {
-  const segs = [
-    { key: 'Positive', pct: s.positive, color: 'var(--ui-core-green-green-5)' },
-    { key: 'Neutral', pct: s.neutral, color: 'var(--ui-core-gray-gray-4)' },
-    { key: 'Negative', pct: s.negative, color: 'var(--ui-core-red-red-5)' },
-  ];
-  return (
-    <div>
-      <div className="flex h-3 w-full overflow-hidden rounded-full">
-        {segs.map((seg) => <div key={seg.key} style={{ width: `${seg.pct}%`, backgroundColor: seg.color }} />)}
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-        {segs.map((seg) => (
-          <span key={seg.key} className="flex items-center gap-1.5 text-xs" style={{ color: TEXT_SECONDARY }}>
-            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: seg.color }} />{seg.key} <b style={{ color: TEXT_PRIMARY }}>{seg.pct}%</b>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AISummaryPanel({ survey }: { survey: DemoSurvey }) {
-  const canned = AI_SUMMARIES[survey.id];
-  const textResponses: SummaryResponseInput[] = survey.questions
-    .flatMap((q) => q.textResponses || [])
-    .map((r) => ({ tester: r.tester, text: r.text, sentiment: r.sentiment }));
-  const responsesCount = survey.responses;
-
-  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [summary, setSummary] = useState<AISummary | null>(null);
-
-  // Nothing to summarize — no canned demo summary and no collected responses.
-  if (!canned && textResponses.length === 0) {
-    return <p className="text-sm" style={{ color: TEXT_TERTIARY }}>No responses yet — AI summary available once this survey collects feedback.</p>;
-  }
-
-  const generate = () => {
-    setState('loading');
-    // Live (Bedrock) or any survey without a canned summary → hit /api/summarize
-    // (real Bedrock when configured, computed fallback otherwise). Canned demo
-    // surveys with the flag off just replay the seeded summary.
-    if (SUMMARIZE_LIVE || !canned) {
-      fetchSummary({ surveyId: survey.id, surveyTitle: survey.title, responses: textResponses, previousTrend: canned?.trend })
-        .then((s) => { setSummary(s); setState('done'); })
-        .catch(() => { if (canned) { setSummary(canned); setState('done'); } else { setState('error'); } });
-    } else {
-      simulate(canned).then((s) => { setSummary(s); setState('done'); });
-    }
-  };
-
-  if (state === 'idle') {
-    return (
-      <div className="flex items-center gap-3">
-        <Button type="default" leftIcon={ICONS.FUNCTIONAL_INSIGHTAI} label="Generate AI Summary" onClick={generate} />
-        <span className="text-xs" style={{ color: TEXT_TERTIARY }}>Reads every response via Bedrock and writes the briefing below{SUMMARIZE_LIVE ? '' : ' (simulated)'}</span>
-      </div>
-    );
-  }
-
-  if (state === 'loading') {
-    return <p className="text-sm" style={{ color: TEXT_SECONDARY }}>Reading {responsesCount} responses and summarizing…</p>;
-  }
-
-  if (state === 'error' || !summary) {
-    return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm" style={{ color: 'var(--ui-core-red-red-6)' }}>Couldn&apos;t generate the summary.</span>
-        <Button type="text" label="Retry" onClick={generate} />
-      </div>
-    );
-  }
-
-  const maxReq = Math.max(...summary.featureRequests.map((r) => r.mentions), 1);
-  const SectionLabel = ({ children, color }: { children: React.ReactNode; color: string }) => (
-    <p className="mb-2 text-xs font-bold uppercase tracking-wide" style={{ color }}>{children}</p>
-  );
-
-  return (
-    <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--ui-core-purple-purple-1)' }}>
-      {/* Header + coverage */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-sm font-bold" style={{ color: TEXT_PRIMARY }}><Icon icon={ICONS.FUNCTIONAL_INSIGHTAI} className="h-4 w-4" />AI Feedback Summary</span>
-        <Tag color="purple" size="regular">Generated</Tag>
-        <span className="text-xs" style={{ color: TEXT_TERTIARY }}>Analyzed {summary.responsesAnalyzed} responses</span>
-      </div>
-
-      {/* Headline TL;DR */}
-      <p className="mb-4 text-sm font-medium leading-snug" style={{ color: TEXT_PRIMARY }}>{summary.headline}</p>
-
-      {/* Sentiment */}
-      <div className="mb-4">
-        <SectionLabel color="var(--ui-core-purple-purple-7)">Sentiment</SectionLabel>
-        <SentimentBar s={summary.sentiment} />
-        {summary.trend && (
-          <p className="mt-2 rounded-md px-2.5 py-1.5 text-xs" style={{ backgroundColor: 'var(--ui-core-ocean-blue-ocean-1)', color: TEXT_SECONDARY }}>{summary.trend}</p>
-        )}
-      </div>
-
-      {/* Key themes */}
-      <div className="mb-4">
-        <SectionLabel color="var(--ui-core-purple-purple-7)">Key Themes</SectionLabel>
-        <div className="flex flex-col gap-2">
-          {summary.themes.map((t, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className="mt-1.5 inline-block size-2 shrink-0 rounded-full" style={{ backgroundColor: TONE_COLOR[t.tone] }} />
-              <div>
-                <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.title} <span className="text-xs font-normal" style={{ color: TEXT_TERTIARY }}>· {t.mentions} mentions</span></p>
-                <p className="text-sm leading-snug" style={{ color: TEXT_SECONDARY }}>{t.detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Critical issues */}
-      <div className="mb-4">
-        <SectionLabel color="var(--ui-core-red-red-6)">Critical Issues</SectionLabel>
-        <div className="flex flex-col gap-2">
-          {summary.criticalIssues.map((c, i) => (
-            <div key={i} className="rounded-lg border p-2.5" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-background-bg-primary, #fff)' }}>
-              <div className="mb-1 flex flex-wrap items-center gap-2">
-                <Tag color={SEVERITY_TAG[c.severity].color} size="regular">{SEVERITY_TAG[c.severity].label}</Tag>
-                <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{c.frequency}</span>
-              </div>
-              <p className="text-sm leading-snug" style={{ color: TEXT_SECONDARY }}>{c.issue}</p>
-              {c.quote && <p className="mt-1 text-xs italic leading-snug" style={{ color: TEXT_TERTIARY }}>{c.quote}</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Feature requests with demand */}
-      <div className="mb-4">
-        <SectionLabel color="var(--ui-core-ocean-blue-ocean-6)">Top Feature Requests</SectionLabel>
-        <div className="flex flex-col gap-1.5">
-          {summary.featureRequests.map((r, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="flex-1 text-sm" style={{ color: TEXT_SECONDARY }}>{r.request}</span>
-              <div className="h-2 w-24 overflow-hidden rounded" style={{ backgroundColor: TRACK }}>
-                <div className="h-full rounded" style={{ width: `${(r.mentions / maxReq) * 100}%`, backgroundColor: 'var(--ui-core-ocean-blue-ocean-6)' }} />
-              </div>
-              <span className="w-16 text-right text-xs" style={{ color: TEXT_TERTIARY }}>{r.mentions} asks</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Recommended actions */}
-      <div>
-        <SectionLabel color="var(--ui-core-green-green-6)">Recommended Actions</SectionLabel>
-        <div className="flex flex-col gap-1.5">
-          {summary.actions.map((a, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <Tag color={PRIORITY_TAG[a.priority]} size="regular">{a.priority}</Tag>
-              <span className="text-sm leading-snug" style={{ color: TEXT_SECONDARY }}>{a.action}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Survey results view (charts + AI summary + closed-loop JIRA) ────────────
-function QuestionBlock({ q, onCreateTicket }: { q: DemoQuestion; onCreateTicket: (text: string) => void }) {
-  return (
-    <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{q.title}</span>}>
-      {q.type === 'rating' && q.ratingCounts && <RatingChart counts={q.ratingCounts} />}
-      {q.type === 'multiple_choice' && q.choiceCounts && <ChoiceChart choices={q.choiceCounts} />}
-      {q.type === 'yes_no' && q.yesNo && <YesNoDonut yes={q.yesNo.yes} no={q.yesNo.no} />}
-      {q.type === 'text' && q.textResponses && (
-        <div className="flex flex-col gap-3">
-          {q.textResponses.map((r, i) => (
-            <div key={i} className="rounded-lg border p-3" style={{ borderColor: TRACK }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-medium" style={{ color: TEXT_TERTIARY }}>{r.tester}</span>
-                  <p className="mt-1 text-sm leading-snug" style={{ color: TEXT_SECONDARY }}>{r.text}</p>
-                </div>
-                {/* Sentiment tag + any call-to-action stacked together on the right */}
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  {sentimentTag(r.sentiment)}
-                  {r.sentiment === 'negative' && (
-                    <Button type="text" leftIcon={ICONS.FUNCTIONAL_TAG} label="Create JIRA ticket" onClick={() => onCreateTicket(r.text)} />
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// ─── Draft view ──────────────────────────────────────────────────────────────
-// A survey created here has no responses yet. The app does NOT send surveys — you
-// build and send them in Qualtrics. As testers respond, that data is collected and
-// pushed to Insight, then shown here and rolled up onto the program card. So this
-// view just states that pipeline and shows the survey's setup — no charts, no fake
-// "distribute" action.
-function DraftPanel({ survey, onBack, onDelete }: { survey: DemoSurvey; onBack: () => void; onDelete: () => void }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <Button type="text" label="← Back to surveys" onClick={onBack} />
-        <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} label="Delete survey" onClick={onDelete} />
-      </div>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-medium" style={{ color: TEXT_PRIMARY }}>{survey.title}</h2>
-          <p className="mt-1 max-w-2xl text-sm" style={{ color: TEXT_TERTIARY }}>{survey.description}</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {statusTag(survey.status)}{programTag(survey.programType, survey.programName)}{phaseTag(survey.phase)}{kindTag(survey.kind, survey.cadence)}
-        </div>
-      </div>
-
-      <Card size={4}>
-        <div className="flex flex-col items-center gap-3 py-8 text-center">
-          <span style={{ color: TEXT_TERTIARY }}><Icon icon={ICONS.FUNCTIONAL_PENDING} className="h-8 w-8" title="Awaiting responses" /></span>
-          <div>
-            <p className="text-base font-medium" style={{ color: TEXT_PRIMARY }}>Set up — waiting on responses</p>
-            <p className="mx-auto mt-1 max-w-lg text-sm" style={{ color: TEXT_TERTIARY }}>
-              Build and send this survey to its {survey.recipients > 0 ? <b style={{ color: TEXT_SECONDARY }}>{survey.recipients}</b> : 'program’s'} testers in <b style={{ color: TEXT_SECONDARY }}>Qualtrics</b> as usual. As testers respond, their data is collected and pushed to <b style={{ color: TEXT_SECONDARY }}>Insight</b>, then shown here and rolled up onto the program card — no sending happens from this app.
-            </p>
-          </div>
-        </div>
-
-        {/* Draft metadata — the fields that ARE meaningful for a draft */}
-        <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-3 border-t pt-4 md:grid-cols-4" style={{ borderColor: TRACK }}>
-          <div>
-            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Program</p>
-            <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{survey.programName}</p>
-          </div>
-          <div>
-            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Type</p>
-            <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{SURVEY_KINDS[survey.kind].label}</p>
-          </div>
-          <div>
-            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Cadence</p>
-            <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{survey.cadence === 'recurring' ? 'Recurring' : 'One-off'}</p>
-          </div>
-          <div>
-            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>Audience</p>
-            <p className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{survey.recipients > 0 ? `${survey.recipients} testers` : '—'}</p>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function SurveyResults({ survey, onBack, onToast, onDelete }: { survey: DemoSurvey; onBack: () => void; onToast: (msg: string) => void; onDelete: () => void }) {
-  const waves = survey.waves ?? [];
-  // Default the view to the LATEST wave — the "keep vs get rid of" rule made concrete:
-  // history is kept, but the current wave is what you land on.
-  const [selectedWaveId, setSelectedWaveId] = useState<string>(waves.length ? waves[waves.length - 1].id : '');
-  const selectedWave = waves.find((w) => w.id === selectedWaveId) ?? null;
-  const responses = selectedWave ? selectedWave.responses : survey.responses;
-  const recipients = selectedWave ? selectedWave.recipients : survey.recipients;
-  const responseRate = rate(responses, recipients);
-  let ticketSeq = 4821;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <Button type="text" label="← Back to surveys" onClick={onBack} />
-        <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} label="Delete survey" onClick={onDelete} />
-      </div>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-medium" style={{ color: TEXT_PRIMARY }}>{survey.title}</h2>
-          <p className="mt-1 max-w-2xl text-sm" style={{ color: TEXT_TERTIARY }}>{survey.description}</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">{statusTag(survey.status)}{programTag(survey.programType, survey.programName)}{phaseTag(survey.phase)}{kindTag(survey.kind, survey.cadence)}</div>
-      </div>
-
-      {/* Targeting seam */}
-      <Card size={3}>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm" style={{ color: TEXT_SECONDARY }}>
-          <span>Targeted to <b style={{ color: TEXT_PRIMARY }}>{survey.programName}</b>{survey.audienceFilter ? <> · filtered to <b style={{ color: TEXT_PRIMARY }}>{survey.audienceFilter}</b> testers</> : null}</span>
-          <span>Qualtrics: <code className="text-xs">{survey.qualtricsId}</code></span>
-          <Tag color="periwinkle-4" size="regular">Synced from Qualtrics (simulated)</Tag>
-        </div>
-      </Card>
-
-      {/* Wave history — recurring surveys keep every wave; pick which to view */}
-      {waves.length > 0 && (
-        <Card size={4} title={
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>Waves ({waves.length})</span>
-            <Tag color="ocean" size="regular">Recurring pulse</Tag>
-          </div>
-        }>
-          <p className="mb-3 text-xs" style={{ color: TEXT_TERTIARY }}>
-            Each wave is one weekly send. History is never deleted — you&apos;re viewing <b style={{ color: TEXT_SECONDARY }}>{selectedWave?.label ?? 'the latest wave'}</b> by default; click any wave to see its numbers. A “Resumed” tag marks where the pulse resumed after another survey ran.
-          </p>
-          <WaveTimeline waves={waves} selectedId={selectedWaveId} onSelect={setSelectedWaveId} />
-          {selectedWave?.resumedNote && (
-            <p className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: 'var(--ui-core-periwinkle-periwinkle-1)', color: TEXT_SECONDARY }}>
-              <b style={{ color: TEXT_PRIMARY }}>{selectedWave.label}</b> — {selectedWave.resumedNote}. The pulse paused between the prior wave and this one while that survey ran, then continued its wave count.
-            </p>
-          )}
-        </Card>
-      )}
-
-      {/* Stat row — reflects the selected wave */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <StatTile value={recipients} label="Recipients" />
-        <StatTile value={responses} label={selectedWave ? `Responses · ${selectedWave.label}` : 'Responses'} accent="var(--ui-core-periwinkle-periwinkle-6)" />
-        <StatTile value={`${responseRate}%`} label="Response rate" accent={responseRate >= 70 ? 'var(--ui-core-green-green-6)' : 'var(--ui-core-orange-orange-6)'} />
-        <StatTile value={`${survey.avgCompletionMins}m`} label="Avg completion" />
-      </div>
-
-      {/* AI summary */}
-      <Card size={4} title={<span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>AI Feedback Summary</span>}>
-        <AISummaryPanel survey={survey} />
-      </Card>
-
-      {/* Per-question breakdown */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {survey.questions.map((q) => (
-          <QuestionBlock key={q.id} q={q} onCreateTicket={() => onToast(`Created BETA-${ticketSeq++} from response · linked to ${survey.programName}`)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Survey list view (grouped by program → phase) ───────────────────────────
-function SurveyCard({ s, onSelect, onDelete }: { s: DemoSurvey; onSelect: (s: DemoSurvey) => void; onDelete: (s: DemoSurvey) => void }) {
-  const wave = latestWave(s);
-  const r = wave ? rate(wave.responses, wave.recipients) : rate(s.responses, s.recipients);
-  const responses = wave ? wave.responses : s.responses;
-  const recipients = wave ? wave.recipients : s.recipients;
-  const waveCount = s.waves?.length ?? 0;
-  return (
-    <Card size={4}>
-      {/* Same spacing + column style as the program cards */}
-      <div className="flex items-start gap-x-4 py-3">
-        <div className="min-w-0 flex-[2] leading-snug">
-          <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onSelect(s)}>{s.title}</button>
-          <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>
-            {SURVEY_KINDS[s.kind].label} · {s.cadence === 'recurring' ? 'Recurring' : 'One-off'}{s.phase ? ` · ${s.phase}` : ''}
-          </p>
-        </div>
-        <div className="flex-1"><HealthMetric label="Questions">{s.questions.length}</HealthMetric></div>
-        <div className="flex-1"><HealthMetric label="Latest wave">{waveCount > 0 && wave ? `${wave.label} · ${fmtDate(wave.date)}` : '—'}</HealthMetric></div>
-        <div className="flex-1"><HealthMetric label="Responses">{s.status === 'draft' ? '—' : `${responses}/${recipients} (${r}%)`}</HealthMetric></div>
-        <div className="flex flex-1 items-center justify-end gap-2">
-          {statusTag(s.status)}
-          <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} ariaLabel="Delete survey" onClick={() => onDelete(s)} />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function SurveyList({ surveys, onSelect, onNewSurvey, onDelete }: { surveys: DemoSurvey[]; onSelect: (s: DemoSurvey) => void; onNewSurvey: () => void; onDelete: (s: DemoSurvey) => void }) {
-  const [statusFilter, setStatusFilter] = useState<SurveyStatus | 'all'>('all');
-  const filtered = surveys.filter((s) => statusFilter === 'all' || s.status === statusFilter);
-
-  // Group by program (preserving first-seen order), then order each group by phase then kind.
-  const groups = useMemo(() => {
-    const map = new Map<string, DemoSurvey[]>();
-    for (const s of filtered) {
-      if (!map.has(s.programName)) map.set(s.programName, []);
-      map.get(s.programName)!.push(s);
-    }
-    return Array.from(map.entries());
-  }, [filtered]);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="w-56">
-          <Select
-            id="survey-status-filter"
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v as SurveyStatus | 'all')}
-            options={[
-              { value: 'all', label: 'All statuses' },
-              { value: 'published', label: 'Published' },
-              { value: 'draft', label: 'Awaiting responses' },
-              { value: 'closed', label: 'Closed' },
-            ]}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="primary" leftIcon={ICONS.FUNCTIONAL_ADD} label="New Survey" onClick={onNewSurvey} />
-        </div>
-      </div>
-
-      {groups.map(([programName, group]) => {
-        const programType = group[0].programType;
-        const phases = Array.from(new Set(group.map((s) => s.phase).filter(Boolean))) as Phase[];
-        // Split a program's surveys into phase sub-groups (hardware); feature
-        // programs have no phase, so they fall into a single 'none' bucket.
-        const orderedPhases: (Phase | 'none')[] = [
-          ...PHASES.filter((p) => phases.includes(p)),
-          ...(group.some((s) => !s.phase) ? (['none'] as const) : []),
-        ];
-        return (
-          <div key={programName} className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2 border-b pb-1.5" style={{ borderColor: TRACK }}>
-              <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{programName}</span>
-              <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{group.length} survey{group.length === 1 ? '' : 's'}</span>
-            </div>
-
-            {orderedPhases.map((ph) => {
-              const inPhase = group.filter((s) => (ph === 'none' ? !s.phase : s.phase === ph));
-              if (inPhase.length === 0) return null;
-              return (
-                <div key={ph} className="flex flex-col gap-3">
-                  {inPhase.map((s) => <SurveyCard key={s.id} s={s} onSelect={onSelect} onDelete={onDelete} />)}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 // ─── Engagement & At-Risk view ───────────────────────────────────────────────
@@ -1305,7 +723,6 @@ const TABS = [
 // this in an EDS <ToastProvider> (the in-app tab and the /programs route both do).
 export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedded?: boolean; onNavigateToPerson?: (email: string) => void } = {}) {
   const [view, setView] = useState<string | number>('health');
-  const [selected, setSelected] = useState<DemoSurvey | null>(null);
   // Programs & surveys are now stateful so a newly-created program/survey shows up live.
   const [openProgram, setOpenProgram] = useState<DemoProgram | null>(null);
   const [programs, setPrograms] = useState<DemoProgram[]>(INITIAL_PROGRAMS);
@@ -1339,7 +756,6 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
     if (survey.phase) {
       setPrograms((prev) => prev.map((p) => (p.id === survey.programId ? { ...p, currentPhase: survey.phase } : p)));
     }
-    setSelected(null);
     setView('surveys');
     showToast(`Created "${survey.title}" for ${survey.programName}${survey.phase ? ` · ${survey.phase}` : ''}`);
     setNewSurvey({ open: false });
@@ -1353,17 +769,9 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
   const handleCreateProgram = (program: DemoProgram, firstSurvey: DemoSurvey) => {
     setPrograms((prev) => [...prev, program]);
     setSurveys((prev) => [firstSurvey, ...prev]);
-    setSelected(firstSurvey);
     setView('surveys');
     showToast(`Created ${program.name} (${program.audienceSize} testers) + first survey “${firstSurvey.title}”`);
     setNewProgramOpen(false);
-  };
-
-  const handleDeleteSurvey = (survey: DemoSurvey) => {
-    if (!window.confirm(`Delete the survey “${survey.title}”? This can’t be undone.`)) return;
-    setSurveys((prev) => prev.filter((s) => s.id !== survey.id));
-    setSelected((cur) => (cur?.id === survey.id ? null : cur));
-    showToast(`Deleted survey “${survey.title}”`);
   };
 
   // Close/reopen a program — "completed" ends the beta but keeps it (and its surveys)
@@ -1409,7 +817,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
         <div className="mb-4 w-fit">
           <Segmented
             value={view}
-            onChange={(v) => { setView(v); setSelected(null); setOpenProgram(null); }}
+            onChange={(v) => { setView(v); setOpenProgram(null); }}
             items={TABS.map((t) => ({ label: t.label, value: t.value }))}
           />
         </div>
