@@ -29,6 +29,8 @@ export interface PlannedProgram {
   existingProgramId?: string; // set → rows are added to this program
   cohort: 'beta' | 'dogfood';
   phase?: Phase;
+  startDate: string;  // ISO YYYY-MM-DD
+  finishDate: string; // ISO YYYY-MM-DD — devices are due back
   rows: PlannedRow[];
   newTesterCount: number;
   deviceCount: number;
@@ -51,7 +53,7 @@ export interface SheetPlan {
 // each row to a program and a person. No Status column: online state is only known
 // once the eero API sync checks the device.
 export const SHEET_COLUMNS = [
-  'Program', 'Cohort', 'Serial Number', 'Internal Name', 'Phase', 'Firmware', 'Group', 'Assigned To', 'Tester Email',
+  'Program', 'Cohort', 'Serial Number', 'Internal Name', 'Phase', 'Start Date', 'Finish Date', 'Firmware', 'Group', 'Assigned To', 'Tester Email',
 ];
 
 // Accepted header spellings (compared after lowercasing and stripping non-alphanumerics).
@@ -61,6 +63,8 @@ const ALIASES = {
   serial: ['serialnumber', 'serial', 'dsn', 'sn', 'deviceserial'],
   internalName: ['internalname'],
   phase: ['phase'],
+  startDate: ['startdate', 'start'],
+  finishDate: ['finishdate', 'finish', 'enddate', 'end'],
   firmware: ['firmware', 'firmwareversion'],
   group: ['group', 'networkgroup', 'osupdategroup'],
   name: ['assignedto', 'testername', 'name', 'tester', 'fullname'],
@@ -84,6 +88,25 @@ function hasColumn(headers: string[], aliases: readonly string[]) {
   return headers.some((h) => aliases.includes(norm(h)));
 }
 
+// Accepts 2026-10-15, 10/15/2026, 10/15/26 (what Excel exports), or "Oct 15, 2026".
+// Returns ISO YYYY-MM-DD, or null if it isn't a real date.
+export function parseSheetDate(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  let y: number, m: number, d: number;
+  let match = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match) { y = +match[1]; m = +match[2]; d = +match[3]; }
+  else if ((match = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/))) { m = +match[1]; d = +match[2]; y = +match[3] < 100 ? 2000 + +match[3] : +match[3]; }
+  else {
+    const t = new Date(v);
+    if (Number.isNaN(t.getTime())) return null;
+    y = t.getFullYear(); m = t.getMonth() + 1; d = t.getDate();
+  }
+  const check = new Date(y, m - 1, d);
+  if (check.getFullYear() !== y || check.getMonth() !== m - 1 || check.getDate() !== d) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 function parseCohort(raw: string): 'beta' | 'dogfood' | null {
   const v = raw.toLowerCase();
   if (v.includes('dogfood')) return 'dogfood';
@@ -97,8 +120,15 @@ export function parseProgramSheet(
 ): SheetPlan {
   const headers = rows.length ? Object.keys(rows[0]) : [];
   const missingColumns: string[] = [];
-  if (!hasColumn(headers, ALIASES.program)) missingColumns.push('Program');
-  if (!hasColumn(headers, ALIASES.email)) missingColumns.push('Tester Email');
+  // Every template column must be present. Serial Number / Firmware / Group cells
+  // may be blank (no device yet / filled by the online check); the rest need values.
+  const REQUIRED_HEADERS: [string, readonly string[]][] = [
+    ['Program', ALIASES.program], ['Cohort', ALIASES.cohort], ['Serial Number', ALIASES.serial],
+    ['Internal Name', ALIASES.internalName], ['Phase', ALIASES.phase],
+    ['Start Date', ALIASES.startDate], ['Finish Date', ALIASES.finishDate], ['Firmware', ALIASES.firmware],
+    ['Group', ALIASES.group], ['Assigned To', ALIASES.name], ['Tester Email', ALIASES.email],
+  ];
+  REQUIRED_HEADERS.forEach(([label, aliases]) => { if (!hasColumn(headers, aliases)) missingColumns.push(label); });
   if (missingColumns.length) return { programs: [], issues: [], missingColumns };
 
   const issues: SheetIssue[] = [];
@@ -113,12 +143,30 @@ export function parseProgramSheet(
     const program = pick(row, ALIASES.program);
     const email = pick(row, ALIASES.email).toLowerCase();
     const serial = pick(row, ALIASES.serial).toUpperCase().replace(/\s+/g, '');
-    const name = pick(row, ALIASES.name) || `${pick(row, ALIASES.firstName)} ${pick(row, ALIASES.lastName)}`.trim() || email;
+    const name = pick(row, ALIASES.name);
+    const rawCohort = pick(row, ALIASES.cohort);
+    const rawPhase = pick(row, ALIASES.phase).toUpperCase();
+    const internalName = pick(row, ALIASES.internalName);
+    const rawStart = pick(row, ALIASES.startDate);
+    const rawFinish = pick(row, ALIASES.finishDate);
     const flag = (kind: SheetIssue['kind'], message: string) => issues.push({ rowNumber, program, kind, message });
 
     if (!program && !email && !serial) return; // blank row
-    if (!program) { flag('skipped', 'No Program'); return; }
-    if (!email) { flag('skipped', 'No Tester Email'); return; }
+    const missing = [
+      !program && 'Program', !email && 'Tester Email', !name && 'Assigned To',
+      !rawCohort && 'Cohort', !rawPhase && 'Phase', !internalName && 'Internal Name',
+      !rawStart && 'Start Date', !rawFinish && 'Finish Date',
+    ].filter(Boolean);
+    if (missing.length) { flag('skipped', `Missing ${missing.join(', ')}`); return; }
+    const sheetCohort = parseCohort(rawCohort);
+    if (!sheetCohort) { flag('skipped', `Cohort "${rawCohort}" must be beta or dogfood`); return; }
+    if (!(PHASES as string[]).includes(rawPhase)) { flag('skipped', `Phase "${rawPhase}" must be EVT, DVT or PVT`); return; }
+    const phase = rawPhase as Phase;
+    const startDate = parseSheetDate(rawStart);
+    const finishDate = parseSheetDate(rawFinish);
+    if (!startDate) { flag('skipped', `Start Date "${rawStart}" isn't a date (use YYYY-MM-DD or MM/DD/YYYY)`); return; }
+    if (!finishDate) { flag('skipped', `Finish Date "${rawFinish}" isn't a date (use YYYY-MM-DD or MM/DD/YYYY)`); return; }
+    if (finishDate < startDate) { flag('skipped', `Finish Date ${finishDate} is before Start Date ${startDate}`); return; }
 
     const key = programKey(program);
     const target = programsByKey.get(key);
@@ -151,24 +199,22 @@ export function parseProgramSheet(
 
     let plan = byProgram.get(key);
     if (!plan) {
-      const rawCohort = pick(row, ALIASES.cohort);
-      let cohort = target?.cohort ?? parseCohort(rawCohort) ?? (rawCohort ? null : program.toLowerCase().includes('dogfood') ? 'dogfood' : 'beta');
-      if (!cohort) { flag('warning', `Cohort "${rawCohort}" isn't beta or dogfood — using beta`); cohort = 'beta'; }
-      plan = { name: target?.name ?? program, existingProgramId: target?.id, cohort, rows: [], newTesterCount: 0, deviceCount: 0 };
+      // An existing program keeps its cohort; the sheet's value only seeds new ones.
+      const cohort = target?.cohort ?? sheetCohort;
+      if (target?.cohort && target.cohort !== sheetCohort) flag('warning', `${target.name} is ${target.cohort} — Cohort "${rawCohort}" ignored`);
+      plan = { name: target?.name ?? program, existingProgramId: target?.id, cohort, startDate, finishDate, rows: [], newTesterCount: 0, deviceCount: 0 };
       byProgram.set(key, plan);
     }
 
-    const rawPhase = pick(row, ALIASES.phase).toUpperCase();
-    let phase: Phase | undefined;
-    if (rawPhase) {
-      if ((PHASES as string[]).includes(rawPhase)) phase = rawPhase as Phase;
-      else flag('warning', `Phase "${rawPhase}" isn't EVT, DVT or PVT — left blank`);
+    if (!plan.phase) plan.phase = phase;
+    // One schedule per program — the first row sets it; flag rows that disagree.
+    if (startDate !== plan.startDate || finishDate !== plan.finishDate) {
+      flag('warning', `Dates ${startDate} → ${finishDate} differ from the program's ${plan.startDate} → ${plan.finishDate} (first row) — using the first row's`);
     }
-    if (phase && !plan.phase) plan.phase = phase;
 
     plan.rows.push({
       rowNumber, serial, name, email, phase,
-      internalName: pick(row, ALIASES.internalName),
+      internalName,
       firmware: pick(row, ALIASES.firmware),
       group: pick(row, ALIASES.group),
       existingTesterId: targetTester?.id,
@@ -217,6 +263,7 @@ export function applyProgramSheet(plans: PlannedProgram[], programs: DemoProgram
           id: slugify(plan.name, ids), name: plan.name, type: 'hardware', status: 'active',
           currentPhase: plan.phase, audienceSize: 0, devicesDeployed: 0, devicesOnline: 0,
           surveyResponseRate: 0, avgFeedbackQuality: 0, testers: [], cohort: plan.cohort, source: 'upload',
+          startDate: plan.startDate, finishDate: plan.finishDate,
         };
     ids.push(base.id);
 
@@ -236,6 +283,9 @@ export function applyProgramSheet(plans: PlannedProgram[], programs: DemoProgram
       // Not displayed (cards/Dashboard count from testers + deviceStore) — kept in step with the roster.
       audienceSize: testers.length,
       devicesDeployed: base.devicesDeployed + plan.deviceCount,
+      // The sheet is the schedule of record — adding to an existing program updates it.
+      startDate: plan.startDate,
+      finishDate: plan.finishDate,
     };
     (plan.existingProgramId ? updated : created).push(program);
 
@@ -247,6 +297,8 @@ export function applyProgramSheet(plans: PlannedProgram[], programs: DemoProgram
         internalName: r.internalName || d.internalName,
         phase: r.phase,
         networkGroup: r.group,
+        checkedOutDate: plan.startDate,
+        dueDate: plan.finishDate, // drives "devices due back" on the Dashboard's Coming up
       });
     });
   });

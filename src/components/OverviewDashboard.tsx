@@ -76,7 +76,9 @@ function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[
   return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count], i) => ({ name, count, color: colors[i % colors.length] }));
 }
 
-export default function OverviewDashboard() {
+// `compact` (used by the /demo-dashboard preview): drop the KPI strip and the
+// Status Breakdown donut — the Dashboard already covers both.
+export default function OverviewDashboard({ compact = false }: { compact?: boolean } = {}) {
   const { devices } = useDeviceStore();
 
   const total = devices.length;
@@ -97,7 +99,7 @@ export default function OverviewDashboard() {
   return (
     <div className="space-y-4">
       {/* ROW 1: KPI strip — one card with evenly-spread columns (matches the other menus) */}
-      <Card size={2}>
+      {!compact && <Card size={2}>
         <div className="flex flex-wrap gap-y-3">
           {[
             { label: 'Total Devices', value: total },
@@ -113,11 +115,11 @@ export default function OverviewDashboard() {
             </div>
           ))}
         </div>
-      </Card>
+      </Card>}
 
-      {/* ROW 2: Three Donut Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Devices" />
+      {/* ROW 2: Donut Charts */}
+      <div className={`grid grid-cols-1 gap-4 ${compact ? 'desktop:grid-cols-2' : 'lg:grid-cols-3'}`}>
+        {!compact && <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Devices" />}
         <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" centerValue={regionItems.length} />
         <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Top Model" centerValue={modelItems[0]?.name || '—'} />
       </div>

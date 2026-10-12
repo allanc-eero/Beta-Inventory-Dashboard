@@ -8,10 +8,10 @@
  *
  * Every figure is derived from the shared stores (devices, programs, offerings)
  * through ./dashboardData, so it matches the menus it links to.
- * Integration chips come from GET /api/health (presence of creds only).
+ * Integration status (GET /api/health, presence of creds only) feeds Needs attention.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Tag, Button, ProgressBar, Tooltip } from '@amzn/eero-web-design-components';
+import { Card, Tag, Button, ProgressBar } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useBetaProgramsStore } from '@/store/betaProgramsStore';
 import { useProgramsStore } from '@/store/programsStore';
@@ -21,7 +21,7 @@ import { programEnumFor } from '@/components/programs/helpers';
 import { DonutChart } from '@/components/OverviewDashboard';
 import type { TabType } from '@/types';
 import {
-  greetingFor, relativeTime, fleetKpis, fleetHealth, notOnlineByProgram,
+  greetingFor, fleetKpis, fleetHealth, notOnlineByProgram,
   comingUp, needsAttention, programRows, IntegrationHealth, TimelineState, Severity,
 } from './dashboardData';
 
@@ -55,7 +55,7 @@ function useIntegrationHealth(): IntegrationHealth[] | null {
 }
 
 export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabType) => void }) {
-  const { devices, syncMetadata } = useDeviceStore();
+  const { devices } = useDeviceStore();
   const { programs } = useBetaProgramsStore();
   const { offerings } = useProgramsStore();
   const { currentUser } = useAuthStore();
@@ -72,13 +72,12 @@ export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabTyp
   const now = new Date();
   const kpis = fleetKpis(visibleDevices, visiblePrograms);
   const health = useMemo(() => fleetHealth(visibleDevices), [visibleDevices]);
-  const timeline = useMemo(() => comingUp(offerings, visibleDevices), [offerings, visibleDevices]);
+  const timeline = useMemo(() => comingUp(offerings, visibleDevices, visiblePrograms), [offerings, visibleDevices, visiblePrograms]);
   const attention = useMemo(() => needsAttention(visibleDevices, visiblePrograms, integrations || []), [visibleDevices, visiblePrograms, integrations]);
   const rows = useMemo(() => programRows(visiblePrograms, visibleDevices), [visiblePrograms, visibleDevices]);
   const notOnline = useMemo(() => notOnlineByProgram(visiblePrograms, visibleDevices), [visiblePrograms, visibleDevices]);
 
   const firstName = (currentUser?.name || '').split(/[\s(]/)[0];
-  const dateLine = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="flex flex-col gap-4 pb-10">
@@ -88,26 +87,11 @@ export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabTyp
           <h1 className="text-2xl font-semibold" style={{ color: TEXT_PRIMARY }}>
             {greetingFor(now)}{firstName ? `, ${firstName}` : ''}
           </h1>
-          <p className="mt-1 text-sm" style={{ color: TEXT_TERTIARY }}>
-            {dateLine} · {kpis.activePrograms} of {kpis.programs} programs active · {kpis.online} of {kpis.devices} devices online
-          </p>
         </div>
         <div className="flex gap-2">
           <Button type="default" label="Add devices" onClick={() => onNavigate('shipments')} />
           <Button type="primary" label="Open devices" onClick={() => onNavigate('devices')} />
         </div>
-      </div>
-
-      {/* Status chips */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Tag color="grey" size="regular">Last network sync {relativeTime(syncMetadata?.lastNetworkCheck)}</Tag>
-        {integrations === null
-          ? <Tag color="grey" size="regular">Checking integrations…</Tag>
-          : integrations.map((i) => (
-            <Tooltip key={i.key} title={i.ready ? `${i.label} credentials are configured` : `${i.label} is not configured — using seeded/fallback data`}>
-              <span><Tag color={i.ready ? 'green' : 'grey'} size="regular">{i.ready ? '●' : '○'} {i.label}</Tag></span>
-            </Tooltip>
-          ))}
       </div>
 
       {/* KPI tiles — each opens the menu behind the number */}

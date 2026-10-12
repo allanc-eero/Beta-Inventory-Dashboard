@@ -11,21 +11,8 @@ import { useDeviceStore } from '@/store/deviceStore';
 import { useBetaProgramsStore } from '@/store/betaProgramsStore';
 import { parseProgramSheet, applyProgramSheet, SheetPlan, SheetRow, SHEET_COLUMNS } from '@/lib/programSheet';
 import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY } from './theme';
+import { downloadProgramSheetTemplate } from '@/lib/importTemplates';
 
-const TEMPLATE_CSV = [
-  SHEET_COLUMNS.join(','),
-  'Foghorn PVT,beta,GGC4G70A611511ES,Foghorn PVT,PVT,,,Jake Decker,jake.decker@example.com',
-  'Foghorn PVT,beta,,Foghorn PVT,PVT,,,Eric Busch,eric.busch@example.com',
-].join('\n');
-
-function downloadTemplate() {
-  const url = URL.createObjectURL(new Blob([TEMPLATE_CSV], { type: 'text/csv' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'program-sheet-template.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export default function UploadProgramSheetModal({ onClose, onCreated }: {
   onClose: () => void;
@@ -90,8 +77,8 @@ export default function UploadProgramSheetModal({ onClose, onCreated }: {
           testers to that program. Rows already in the program are flagged and skipped.
         </p>
         <p className="text-xs" style={{ color: TEXT_TERTIARY }}>
-          Columns: {SHEET_COLUMNS.join(', ')}. <b>Program</b> and <b>Tester Email</b> are required. Leave Serial Number blank for
-          testers still awaiting a device.
+          All columns are required: {SHEET_COLUMNS.join(', ')}. Serial Number, Firmware and Group cells may be blank
+          (no device yet / filled by the online check).
         </p>
         <div className="flex items-center gap-3">
           <label className="cursor-pointer rounded-md border px-3 py-1.5 text-sm font-medium" style={{ color: TEXT_PRIMARY }}>
@@ -104,7 +91,7 @@ export default function UploadProgramSheetModal({ onClose, onCreated }: {
             />
           </label>
           {fileName && <span className="truncate text-xs" style={{ color: TEXT_TERTIARY }}>{fileName}</span>}
-          <div className="ml-auto"><Button type="text" label="Download template" onClick={downloadTemplate} /></div>
+          <div className="ml-auto"><Button type="text" label="Download template" onClick={downloadProgramSheetTemplate} /></div>
         </div>
 
         {readError && <p className="text-xs text-[var(--ui-support-text-support-error)]">{readError}</p>}

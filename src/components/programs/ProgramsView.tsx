@@ -80,6 +80,34 @@ function Stars({ n }: { n: number }) {
   return <span style={{ color: 'var(--ui-core-yellow-yellow-6)' }}>{'★'.repeat(n)}<span style={{ color: TRACK }}>{'★'.repeat(5 - n)}</span></span>;
 }
 
+// Pages a long list (10 per page by default) with the same numbered EDS
+// Pagination the roster and Devices menu use. Hidden when it all fits on one page.
+function PagedGroup<T>({ items, children }: { items: T[]; children: (pageItems: T[]) => React.ReactNode }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const current = Math.min(page, totalPages);
+  const pageItems = items.slice((current - 1) * pageSize, current * pageSize);
+  return (
+    <>
+      {children(pageItems)}
+      {items.length > 10 && (
+        <Pagination
+          pagination={{ totalItems: items.length, totalPages, hasPreviousPage: current > 1, hasNextPage: current < totalPages }}
+          currentPage={current}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onNextPage={() => setPage((n) => Math.min(totalPages, n + 1))}
+          onPreviousPage={() => setPage((n) => Math.max(1, n - 1))}
+          onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+          pageSizeOptions={[{ value: 10, label: '10' }, { value: 25, label: '25' }, { value: 50, label: '50' }]}
+          ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (st, en, tot) => `Showing ${st}–${en} of ${tot}` }}
+        />
+      )}
+    </>
+  );
+}
+
 function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToast: (msg: string) => void }) {
   const [narration, setNarration] = useState<'idle' | 'loading' | 'done'>('idle');
 
@@ -173,16 +201,18 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
                   <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_SECONDARY }}>{g.name}</span>
                   <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {g.testers.length} at risk</span>
                 </div>
-                {g.testers.map((t) => (
-                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-core-red-red-1)' }}>
-                    <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</span>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {t.deviceOnline === false && <Tag color="red" size="regular">Device offline</Tag>}
-                      <Tag color="orange" size="regular">{t.missedSurveys} missed surveys</Tag>
-                      <Tag color="grey" size="regular">{t.reliability}% reliability</Tag>
+                <PagedGroup items={g.testers}>
+                  {(rows) => rows.map((t) => (
+                    <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-1.5" style={{ borderColor: 'var(--ui-core-red-red-3)', backgroundColor: 'var(--ui-core-red-red-1)' }}>
+                      <span className="text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{t.name}</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {t.deviceOnline === false && <Tag color="red" size="regular">Device offline</Tag>}
+                        <Tag color="orange" size="regular">{t.missedSurveys} missed surveys</Tag>
+                        <Tag color="grey" size="regular">{t.reliability}% reliability</Tag>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </PagedGroup>
               </div>
             ))}
           </div>
@@ -217,7 +247,9 @@ function EngagementView({ programs, onToast }: { programs: DemoProgram[]; onToas
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TEXT_SECONDARY }}>{g.name}</span>
                 <span className="text-xs" style={{ color: TEXT_TERTIARY }}>· {g.testers.length} testers</span>
               </div>
-              <TableV2 data={g.testers} emptyText="No testers" columns={engagementColumns} />
+              <PagedGroup items={g.testers}>
+                {(rows) => <TableV2 data={rows} emptyText="No testers" columns={engagementColumns} />}
+              </PagedGroup>
             </div>
           ))}
         </div>
@@ -599,6 +631,18 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
 }
 
 // Compact metric cell — small muted label over a small value, Insight row style.
+// "Oct 15 – Dec 15, 2026" from the program's start/finish (sheet uploads set both).
+function programDates(p: DemoProgram): string {
+  if (!p.startDate && !p.finishDate) return '—';
+  const fmt = (iso: string, withYear: boolean) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
+  if (p.startDate && p.finishDate) {
+    const sameYear = p.startDate.slice(0, 4) === p.finishDate.slice(0, 4);
+    return `${fmt(p.startDate, !sameYear)} – ${fmt(p.finishDate, true)}`;
+  }
+  return p.startDate ? `Starts ${fmt(p.startDate, true)}` : `Ends ${fmt(p.finishDate!, true)}`;
+}
+
 function HealthMetric({ label, children, onClick }: { label: string; children: React.ReactNode; onClick?: () => void }) {
   return (
     <div className="min-w-0 leading-snug">
@@ -610,8 +654,9 @@ function HealthMetric({ label, children, onClick }: { label: string; children: R
   );
 }
 
-function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurvey, onDeleteProgram, onToggleStatus, onOpenDevices }: {
+function ProgramHealthView({ programs: allPrograms, surveys, onToast, onNewProgram, onNewSurvey, onDeleteProgram, onToggleStatus, onOpenDevices, groupByStatus = false }: {
   programs: DemoProgram[];
+  groupByStatus?: boolean; // split into Active / Completed sections (preview)
   surveys: DemoSurvey[];
   onToast: (msg: string) => void;
   onNewProgram: () => void;
@@ -626,6 +671,11 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
   const { devices } = useDeviceStore();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  // Closing a program moves it to Completed; Reopen brings it back to Active.
+  const [statusTab, setStatusTab] = useState<'active' | 'completed'>('active');
+  const activeCount = allPrograms.filter((p) => p.status === 'active').length;
+  const completedCount = allPrograms.length - activeCount;
+  const programs = groupByStatus ? allPrograms.filter((p) => p.status === statusTab) : allPrograms;
 
   const totalPages = Math.max(1, Math.ceil(programs.length / pageSize));
   const current = Math.min(page, totalPages);
@@ -635,7 +685,18 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{programs.length} program{programs.length === 1 ? '' : 's'}</p>
+        {groupByStatus
+          ? (
+            <Segmented
+              value={statusTab}
+              onChange={(v) => { setStatusTab(v as 'active' | 'completed'); setPage(1); }}
+              items={[
+                { label: `Active (${activeCount})`, value: 'active' },
+                { label: `Completed (${completedCount})`, value: 'completed' },
+              ]}
+            />
+          )
+          : <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{programs.length} program{programs.length === 1 ? '' : 's'}</p>}
         <div className="flex items-center gap-2">
           <Button type="primary" leftIcon={ICONS.FUNCTIONAL_ADD} label="New Program" onClick={onNewProgram} />
           <Button type="text" leftIcon={ICONS.FUNCTIONAL_DOWNLOAD} label="Export report" onClick={() => onToast('Exported program-health report to CSV (simulated)')} />
@@ -667,6 +728,7 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
                       : <span className="block max-w-full truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>}
                     <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>{p.type === 'feature' ? 'Feature' : `Hardware${p.currentPhase ? ` · ${p.currentPhase}` : ''}`}</p>
                   </div>
+                  <div className="flex-1"><HealthMetric label="Dates">{programDates(p)}</HealthMetric></div>
                   <div className="flex-1"><HealthMetric label="Audience">{p.testers.length} testers</HealthMetric></div>
                   <div className="flex-1"><HealthMetric label="Response rate">{p.surveyResponseRate}%</HealthMetric></div>
                   <div className="flex-1">
@@ -708,7 +770,11 @@ function ProgramHealthView({ programs, surveys, onToast, onNewProgram, onNewSurv
         })}
 
         {programs.length === 0 && (
-          <Card size={4}><p className="text-sm" style={{ color: TEXT_TERTIARY }}>No programs yet. Create one with <b style={{ color: TEXT_PRIMARY }}>New Program</b>.</p></Card>
+          <Card size={4}><p className="text-sm" style={{ color: TEXT_TERTIARY }}>
+            {groupByStatus && statusTab === 'completed'
+              ? <>No completed programs yet. <b style={{ color: TEXT_PRIMARY }}>Close</b> a program to move it here.</>
+              : <>No programs yet. Create one with <b style={{ color: TEXT_PRIMARY }}>New Program</b>.</>}
+          </p></Card>
         )}
       </div>
 
@@ -741,8 +807,22 @@ const TABS = [
 // ─── Programs feature root ───────────────────────────────────────────────────
 // Renders the Programs / Surveys / Engagement / Program Health tabs. Callers wrap
 // this in an EDS <ToastProvider> (the in-app tab and the /programs route both do).
-export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedded?: boolean; onNavigateToPerson?: (email: string) => void } = {}) {
-  const [view, setView] = useState<string | number>('health');
+export type ProgramsSection = (typeof TABS)[number]['value'];
+
+// `section` pins the view to one tab and hides the Programs/Surveys/Engagement
+// switcher — used when each is its own sidebar item (/demo-dashboard preview).
+// In that mode, in-view navigation (e.g. "show me the new survey") goes through
+// onSectionChange so the sidebar follows.
+export function ProgramsView({ embedded = false, onNavigateToPerson, section, onSectionChange }: {
+  embedded?: boolean;
+  onNavigateToPerson?: (email: string) => void;
+  section?: ProgramsSection;
+  onSectionChange?: (section: ProgramsSection) => void;
+} = {}) {
+  const [localView, setLocalView] = useState<string | number>('health');
+  const view = section ?? localView;
+  const setView = (v: string | number) => (section ? onSectionChange?.(v as ProgramsSection) : setLocalView(v));
+  const tab = TABS.find((t) => t.value === view) ?? TABS[0];
   // Programs & surveys are now stateful so a newly-created program/survey shows up live.
   const [openProgram, setOpenProgram] = useState<DemoProgram | null>(null);
   const { programs, setPrograms } = useBetaProgramsStore();
@@ -831,19 +911,21 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
     <div className={embedded ? '' : 'min-h-screen'} style={embedded ? undefined : { backgroundColor: 'var(--ui-background-bg-secondary, #f5f6f7)' }}>
       <div className={`w-full ${embedded ? 'px-0 pt-0 pb-10' : 'px-6 pt-6 pb-10'}`}>
         <header className="mb-3">
-          <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>Surveys &amp; Engagement</h1>
+          <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>{section ? tab.label : 'Surveys & Engagement'}</h1>
           <p className="mt-0.5 text-xs" style={{ color: TEXT_TERTIARY }}>
-            Feedback loop for beta &amp; dogfood programs — surveys via Qualtrics, joined to your testers, programs, and devices.
+            {section ? tab.description : 'Feedback loop for beta & dogfood programs — surveys via Qualtrics, joined to your testers, programs, and devices.'}
           </p>
         </header>
 
-        <div className="mb-4 w-fit">
-          <Segmented
-            value={view}
-            onChange={(v) => { setView(v); setOpenProgram(null); }}
-            items={TABS.map((t) => ({ label: t.label, value: t.value }))}
-          />
-        </div>
+        {!section && (
+          <div className="mb-4 w-fit">
+            <Segmented
+              value={view}
+              onChange={(v) => { setView(v); setOpenProgram(null); }}
+              items={TABS.map((t) => ({ label: t.label, value: t.value }))}
+            />
+          </div>
+        )}
 
         {view === 'surveys' && <SurveysEngagementReport embedded />}
         {view === 'engagement' && <EngagementView programs={visiblePrograms} onToast={showToast} />}
@@ -858,6 +940,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson }: { embedde
               onDeleteProgram={handleDeleteProgram}
               onToggleStatus={handleToggleProgramStatus}
               onOpenDevices={setOpenProgram}
+              groupByStatus={!!section}
             />
         )}
       </div>

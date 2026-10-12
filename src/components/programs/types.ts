@@ -89,6 +89,8 @@ export interface DemoProgram {
   testers: DemoTester[];
   cohort?: 'beta' | 'dogfood'; // explicit cohort (sheet uploads); else inferred from the name
   source?: 'seed' | 'upload';  // 'upload' = created from a device sheet — its devices live in deviceStore
+  startDate?: string;          // ISO date (YYYY-MM-DD) testing starts
+  finishDate?: string;         // ISO date testing ends — devices are due back
 }
 
 // ── Identity-match roster (email → network → beta-model DSN) ──────────────────

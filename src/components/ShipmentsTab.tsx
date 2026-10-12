@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { runDeviceSync } from '@/lib/networkSync';
 import JiraToast from './JiraToast';
 import UploadProgramSheetModal from './programs/UploadProgramSheetModal';
+import { PROGRAM_SHEET_COLUMNS, ColumnSpec, downloadProgramSheetTemplate } from '@/lib/importTemplates';
 import { createJiraIssue } from '@/services/jiraService';
 import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
 import { Button, Select, Input, Tag, Card, Segmented } from '@amzn/eero-web-design-components';
@@ -81,11 +82,15 @@ function parseSpreadsheetInput(text: string): ParsedRow[] {
   }).filter(Boolean) as ParsedRow[];
 }
 
-export default function ShipmentsTab({ showPendingReturns }: { showPendingReturns?: boolean }) {
+// `importsMode` (the /demo-dashboard preview's "Imports" page): upload only —
+// no history/archived tabs, no pipeline, no direction/carrier/FC fields; adds a
+// finish date (the test's end → each device's due-back date).
+export default function ShipmentsTab({ showPendingReturns, importsMode = false }: { showPendingReturns?: boolean; importsMode?: boolean }) {
   const { devices, addDevice, updateDevice, addShipment, markShipmentDelivered, getAllShipments, addHistoryEntry, createJiraTicket } = useDeviceStore();
   const { canEdit } = useAuthStore();
 
-  const [activeView, setActiveView] = useState<'upload' | 'history' | 'pending_returns'>(showPendingReturns ? 'pending_returns' : 'upload');
+  const [activeView, setActiveView] = useState<'upload' | 'history' | 'pending_returns'>(showPendingReturns && !importsMode ? 'pending_returns' : 'upload');
+  const [finishDate, setFinishDate] = useState('');
   const [pasteInput, setPasteInput] = useState('');
   const [carrier, setCarrier] = useState<Carrier>('DHL');
   const [fcLocation, setFcLocation] = useState('');
@@ -265,6 +270,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
     if (parsedRows.length === 0) return;
 
     const allSerials: string[] = [];
+    // Imports mode doesn't ask for carrier / FC; it records the finish date as due-back.
+    const carrierUsed = importsMode ? '' : carrier;
+    const fcUsed = importsMode ? '' : fcLocation;
+    const dueDate = importsMode ? finishDate : '';
     let newDevices = 0;
     let updatedDevices = 0;
 
@@ -282,8 +291,9 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             network: row.networkId || undefined,
             country: row.country || existing.country,
             leg2Tracking: row.tracking,
-            leg2Carrier: carrier,
+            leg2Carrier: carrierUsed,
             leg2Date: shipDate,
+            ...(dueDate ? { dueDate } : {}),
             shipmentStatus: 'in_transit_to_tester' as ShipmentStatus,
             program: program as Device['program'],
             product: productName,
@@ -331,14 +341,14 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             jira: '',
             checkedOutTo: row.name,
             checkedOutDate: shipDate,
-            dueDate: '',
+            dueDate,
             notes: '',
             shipmentStatus: 'in_transit_to_tester',
-            fcLocation: fcLocation,
+            fcLocation: fcUsed,
             leg1Carrier: '',
             leg1Tracking: '',
             leg1Date: '',
-            leg2Carrier: carrier,
+            leg2Carrier: carrierUsed,
             leg2Tracking: row.tracking,
             leg2Date: shipDate,
             testbedId: '',
@@ -370,9 +380,9 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
       id: crypto.randomUUID(),
       leg: 2,
       serials: allSerials,
-      carrier,
+      carrier: (carrierUsed || carrier) as Carrier,
       trackingNumber: 'batch-import',
-      origin: fcLocation || 'Fulfillment Center',
+      origin: fcUsed || 'Fulfillment Center',
       destination: 'Testers',
       status: 'in_transit',
       shippedDate: shipDate,
@@ -408,7 +418,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
       }).join('\n');
 
       const jiraSummary = `[${epicKey}] ${productName || program.toUpperCase()} — ${allSerials.length} device(s) to ${parsedRows.length} tester(s)`;
-      const jiraDescription = `Outgoing shipment batch uploaded on ${new Date().toLocaleDateString()}.\n\nProgram: ${program.toUpperCase()}\nProduct: ${productName || 'N/A'}\nCarrier: ${carrier}\nShip Date: ${shipDate}\nFrom: ${fcLocation || 'Fulfillment Center'}\nTotal Devices: ${allSerials.length}\nTotal Testers: ${parsedRows.length}\n\n--- TESTERS & DEVICES ---\n${testerList}`;
+      const jiraDescription = `Outgoing shipment batch uploaded on ${new Date().toLocaleDateString()}.\n\nProgram: ${program.toUpperCase()}\nProduct: ${productName || 'N/A'}\nCarrier: ${carrierUsed || 'N/A'}\nShip Date: ${shipDate}${dueDate ? `\nFinish Date: ${dueDate}` : ''}\nFrom: ${fcUsed || 'Fulfillment Center'}\nTotal Devices: ${allSerials.length}\nTotal Testers: ${parsedRows.length}\n\n--- TESTERS & DEVICES ---\n${testerList}`;
 
       // Create ONE real JIRA ticket via API
       const jiraResult = await createJiraIssue({
@@ -468,8 +478,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         />
       )}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[var(--ui-text-text-primary)]">Device Ingestion & Returns</h2>
-        <Segmented
+        <h2 className="text-lg font-bold text-[var(--ui-text-text-primary)]">{importsMode ? 'Imports' : 'Device Ingestion & Returns'}</h2>
+        {!importsMode && <Segmented
           value={activeView}
           onChange={(val) => setActiveView(val as 'upload' | 'history' | 'pending_returns')}
           items={[
@@ -489,16 +499,52 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
               ),
             },
           ]}
-        />
+        />}
       </div>
 
-      {activeView === 'upload' && canEdit() && (
+      {/* Imports: one card — upload, template, and exactly what the sheet needs */}
+      {importsMode && canEdit() && (
+        <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Upload program sheet</span>}>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="flex-1 text-xs text-[var(--ui-text-text-tertiary)]">
+              One sheet creates the program (or adds testers to an existing one): its card on Programs, its container on Devices, the tester roster and People entries.
+              Rows already in the program are flagged and skipped.
+            </p>
+            <Button type="default" label="Download template" onClick={downloadProgramSheetTemplate} />
+            <Button type="primary" label="Upload program sheet" onClick={() => setProgramSheetOpen(true)} />
+          </div>
+          {programSheetMsg && <p className="mt-3 text-xs text-[var(--ui-core-green-green-6)]">✓ {programSheetMsg}</p>}
+
+          <div className="mt-6 grid grid-cols-1 gap-6 desktop:grid-cols-3">
+            <div className="desktop:col-span-2">
+              <ColumnGuide
+                title="What goes in the sheet"
+                subtitle="First row = these column headers (capitals and spaces don't matter). One row per device. Save as .xlsx or .csv."
+                columns={PROGRAM_SHEET_COLUMNS}
+              />
+            </div>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm font-semibold text-[var(--ui-text-text-primary)]">How it works</p>
+              <ol className="space-y-2 text-xs text-[var(--ui-text-text-tertiary)]">
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">1.</span> <span><b>Download template</b> and fill in one row per device — two devices for a tester = two rows</span></li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">2.</span> <span>Keep the <b>Program</b> name identical on every row (a new name creates a new program)</span></li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">3.</span> <span>Testers without a device yet: leave <b>Serial Number</b> blank — they show as Awaiting device</span></li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">4.</span> <span><b>Upload program sheet</b> and check the preview — skipped or flagged rows show the reason</span></li>
+                <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">5.</span> <span>Import — it shows up in Programs, Devices and People right away; devices turn Online after the next online check</span></li>
+              </ol>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {activeView === 'upload' && canEdit() && !importsMode && (
         <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Upload Program Sheet</span>}>
           <div className="flex flex-wrap items-center gap-3">
             <p className="flex-1 text-xs text-[var(--ui-text-text-tertiary)]">
               Create a program — or add testers to an existing one — from a tester/device sheet. Each Program in the sheet gets a
               card on the Programs page and a container on the Devices page. Rows already in the program are flagged and skipped.
             </p>
+            {importsMode && <Button type="text" label="Download template" onClick={downloadProgramSheetTemplate} />}
             <Button type="primary" label="Upload program sheet" onClick={() => setProgramSheetOpen(true)} />
           </div>
           {programSheetMsg && <p className="mt-3 text-xs text-[var(--ui-core-green-green-6)]">✓ {programSheetMsg}</p>}
@@ -512,10 +558,10 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
         />
       )}
 
-      {activeView === 'upload' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {activeView === 'upload' && !importsMode && (
+        <div className={`grid grid-cols-1 gap-6 ${importsMode ? 'desktop:grid-cols-3' : 'lg:grid-cols-3'}`}>
           {/* Upload form */}
-          <div className="lg:col-span-2">
+          <div className={importsMode ? 'desktop:col-span-2' : 'lg:col-span-2'}>
           <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Upload Allocation List</span>}>
             <p className="text-xs text-[var(--ui-text-text-tertiary)] mb-4">
               Upload an Excel file (.xlsx) or paste directly from your spreadsheet. Columns auto-detected: ShipTo, TrackingNumber, Alias, DSN 1, DSN 2, etc.
@@ -602,8 +648,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
             )}
 
             {/* Shipment metadata */}
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-4">
-              <div>
+            <div className={`grid grid-cols-2 gap-3 mt-4 ${importsMode ? 'desktop:grid-cols-4' : 'lg:grid-cols-6'}`}>
+              {!importsMode && <div>
                 <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Direction</label>
                 <Select
                   id="shipment-direction"
@@ -614,8 +660,8 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                     { value: 'incoming', label: 'Incoming (to lab/warehouse)' },
                   ]}
                 />
-              </div>
-              <div>
+              </div>}
+              {!importsMode && <div>
                 <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Carrier</label>
                 <Select
                   id="shipment-carrier"
@@ -623,27 +669,40 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                   onChange={(val) => setCarrier(val as Carrier)}
                   options={CARRIERS.map((c) => ({ value: c, label: c }))}
                 />
-              </div>
+              </div>}
               <div>
                 <Input
                   id="shipment-ship-date"
-                  label="Ship Date"
+                  label={importsMode ? 'Ship date' : 'Ship Date'}
                   layout="vertical"
                   type="date"
                   value={shipDate}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShipDate(e.target.value)}
                 />
               </div>
-              <div>
-                <Input
-                  id="shipment-from-fc"
-                  label="From FC"
-                  layout="vertical"
-                  value={fcLocation}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFcLocation(e.target.value)}
-                  placeholder="FC-SFO"
-                />
-              </div>
+              {importsMode ? (
+                <div>
+                  <Input
+                    id="shipment-finish-date"
+                    label="Finish date"
+                    layout="vertical"
+                    type="date"
+                    value={finishDate}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFinishDate(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <Input
+                    id="shipment-from-fc"
+                    label="From FC"
+                    layout="vertical"
+                    value={fcLocation}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFcLocation(e.target.value)}
+                    placeholder="FC-SFO"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-[var(--ui-text-text-tertiary)] mb-1">Phase</label>
                 <Select
@@ -746,10 +805,21 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
 
           {/* Right sidebar — Pipeline + info */}
           <div className="space-y-6">
-            <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Pipeline</span>}>
+            {!importsMode && <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">Pipeline</span>}>
               <PipelineSummary />
-            </Card>
+            </Card>}
 
+            {importsMode ? (
+              <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">How it works</span>}>
+                <ol className="space-y-2 text-xs text-[var(--ui-text-text-tertiary)]">
+                  <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">1.</span> <span>Download the template for your upload (below) and fill in one row per device</span></li>
+                  <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">2.</span> <span><b>New program or adding testers?</b> Use <b>Upload program sheet</b>. <b>Assigning serials / tracking?</b> Use the allocation list</span></li>
+                  <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">3.</span> <span>For allocation lists, set the ship date and finish date (when testing ends — devices are due back then)</span></li>
+                  <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">4.</span> <span>Check the preview — skipped or flagged rows are listed with the reason</span></li>
+                  <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">5.</span> <span>Import — everything shows up in Devices, Programs and People right away; devices turn Online after the next online check</span></li>
+                </ol>
+              </Card>
+            ) : (
             <Card size={5} title={<span className="font-semibold text-[var(--ui-text-text-primary)]">How it works</span>}>
               <ol className="space-y-2 text-xs text-[var(--ui-text-text-tertiary)]">
                 <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">1.</span> Upload the Excel file or paste the allocation list</li>
@@ -759,6 +829,7 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
                 <li className="flex gap-2"><span className="font-bold text-[var(--ui-text-text-placeholder)]">5.</span> Daily sync auto-detects when devices come online</li>
               </ol>
             </Card>
+            )}
           </div>
         </div>
       )}
@@ -899,6 +970,42 @@ export default function ShipmentsTab({ showPendingReturns }: { showPendingReturn
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// One upload's column reference + template download (Imports page).
+function ColumnGuide({ title, subtitle, columns, onDownload }: { title: string; subtitle: string; columns: ColumnSpec[]; onDownload?: () => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--ui-text-text-primary)]">{title}</p>
+          <p className="text-xs text-[var(--ui-text-text-tertiary)]">{subtitle}</p>
+        </div>
+        {onDownload && <Button type="default" label="Download template" onClick={onDownload} />}
+      </div>
+      <div className="overflow-hidden rounded-lg border border-[var(--ui-background-layer-border-border-layer-page)]">
+        <table className="w-full text-xs">
+          <thead className="bg-[var(--ui-background-layer-layer-page-hover)]">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-[var(--ui-text-text-tertiary)]">Column</th>
+              <th className="px-3 py-2 text-left font-medium text-[var(--ui-text-text-tertiary)]">What to put in it</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
+            {columns.map((c) => (
+              <tr key={c.name}>
+                <td className="whitespace-nowrap px-3 py-2 align-top">
+                  <span className="font-mono font-medium text-[var(--ui-text-text-primary)]">{c.name}</span>
+                  {c.required && <span className="ml-2"><Tag color="red" size="regular">Required</Tag></span>}
+                </td>
+                <td className="px-3 py-2 text-[var(--ui-text-text-secondary)]">{c.what}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

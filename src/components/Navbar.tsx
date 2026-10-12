@@ -17,6 +17,10 @@ interface NavbarProps {
   // Extra sidebar items shown above the standard ones (e.g. the Dashboard preview
   // at /demo-dashboard). The main app passes none.
   leadingTabs?: { id: TabType; label: string; key: string }[];
+  // Extra sidebar items inserted right after an existing one (preview only).
+  tabsAfter?: Partial<Record<TabType, { id: TabType; label: string; key: string }[]>>;
+  // Rename existing sidebar items (preview only), e.g. shipments → "Imports".
+  tabLabels?: Partial<Record<TabType, string>>;
 }
 
 const tabs: { id: TabType; label: string; key: string }[] = [
@@ -31,7 +35,7 @@ const tabs: { id: TabType; label: string; key: string }[] = [
   // { id: 'program_signups', label: 'Program Sign-ups', key: 'program_signups' },
 ];
 
-export default function Navbar({ activeTab, setActiveTab, children, leadingTabs = [] }: NavbarProps) {
+export default function Navbar({ activeTab, setActiveTab, children, leadingTabs = [], tabsAfter = {}, tabLabels = {} }: NavbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { currentUser, logout, canEdit, isBetaViewer } = useAuthStore();
@@ -47,7 +51,7 @@ export default function Navbar({ activeTab, setActiveTab, children, leadingTabs 
 
   const visibleTabs = [...leadingTabs, ...(isBetaViewer()
     ? tabs.filter((t) => !['shipments', 'dogfood', 'program_signups'].includes(t.id))
-    : tabs)];
+    : tabs)].flatMap((t) => [t, ...(tabsAfter[t.id] || [])]).map((t) => (tabLabels[t.id] ? { ...t, label: tabLabels[t.id]! } : t));
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

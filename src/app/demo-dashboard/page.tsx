@@ -20,11 +20,21 @@ import SeedDataProvider from '@/components/SeedDataProvider';
 import LoginPage from '@/components/LoginPage';
 import DashboardView from '@/components/dashboard/DashboardView';
 import { ToastProvider } from '@amzn/eero-web-design-components';
-import { ProgramsView } from '@/components/programs/ProgramsView';
+import { ProgramsView, ProgramsSection } from '@/components/programs/ProgramsView';
 import { useAuthStore, DEMO_OPEN_ACCESS } from '@/store/authStore';
 import { AutoSync } from '@/lib/useAutoSync';
 
 const DASHBOARD_TAB: { id: TabType; label: string; key: string }[] = [{ id: 'dashboard', label: 'Dashboard', key: 'dashboard' }];
+// Surveys and Engagement as their own sidebar items, right under Programs.
+const PROGRAM_SECTION_TABS: Partial<Record<TabType, { id: TabType; label: string; key: string }[]>> = {
+  surveys: [
+    { id: 'survey_results', label: 'Surveys', key: 'survey_results' },
+    { id: 'engagement', label: 'Engagement', key: 'engagement' },
+  ],
+};
+// Sidebar tab ↔ ProgramsView section.
+const SECTION_FOR_TAB: Partial<Record<TabType, ProgramsSection>> = { surveys: 'health', survey_results: 'surveys', engagement: 'engagement' };
+const TAB_FOR_SECTION: Record<ProgramsSection, TabType> = { health: 'surveys', surveys: 'survey_results', engagement: 'engagement' };
 
 export default function DashboardPreview() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -51,21 +61,30 @@ export default function DashboardPreview() {
     <SeedDataProvider>
       {/* Weekly stale-check device sync — runs on every tab, for every role. */}
       <AutoSync />
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} leadingTabs={DASHBOARD_TAB}>
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} leadingTabs={DASHBOARD_TAB} tabsAfter={PROGRAM_SECTION_TABS} tabLabels={{ shipments: 'Imports' }}>
         <div className="mb-4 rounded-lg border border-[var(--ui-support-border-support-info)] bg-[var(--ui-support-fill-support-info)] px-4 py-2 text-xs text-[var(--ui-support-text-icon-support-info)]">
           Preview — the Dashboard isn&apos;t in the main app yet. Everything here uses the same live data as <a href="/" className="font-semibold underline">the app</a>.
         </div>
         {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
         {activeTab === 'devices' && (
           <div className="flex flex-col gap-6">
-            <OverviewDashboard />
+            <OverviewDashboard compact />
             <DevicesTab onNavigateToPerson={handleNavigateToPerson} />
           </div>
         )}
         {activeTab === 'locations' && <LocationsTab />}
         {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
-        {activeTab === 'surveys' && <ToastProvider><ProgramsView embedded onNavigateToPerson={handleNavigateToPerson} /></ToastProvider>}
-        {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
+        {SECTION_FOR_TAB[activeTab] && (
+          <ToastProvider>
+            <ProgramsView
+              embedded
+              section={SECTION_FOR_TAB[activeTab]}
+              onSectionChange={(s) => setActiveTab(TAB_FOR_SECTION[s])}
+              onNavigateToPerson={handleNavigateToPerson}
+            />
+          </ToastProvider>
+        )}
+        {activeTab === 'shipments' && <ShipmentsTab importsMode />}
       </Navbar>
     </SeedDataProvider>
   );

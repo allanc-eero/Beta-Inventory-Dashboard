@@ -14,18 +14,6 @@ export function greetingFor(date: Date) {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-export function relativeTime(iso: string | null | undefined, now = Date.now()): string {
-  if (!iso) return 'never';
-  const diff = now - new Date(iso).getTime();
-  if (Number.isNaN(diff)) return 'never';
-  const mins = Math.round(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
-
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 export function fleetKpis(devices: Device[], programs: DemoProgram[]) {
   const live = devices.filter((d) => d.status !== 'deactivated');
@@ -69,7 +57,7 @@ export interface TimelineItem {
 
 // Program phase dates, sign-up deadlines, and device due-back dates, from two
 // weeks back to two months out.
-export function comingUp(offerings: ProgramOffering[], devices: Device[], now = new Date()): TimelineItem[] {
+export function comingUp(offerings: ProgramOffering[], devices: Device[], programs: DemoProgram[] = [], now = new Date()): TimelineItem[] {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const from = today - 14 * DAY_MS;
   const to = today + 60 * DAY_MS;
@@ -82,6 +70,11 @@ export function comingUp(offerings: ProgramOffering[], devices: Device[], now = 
     if (Number.isNaN(t) || t < from || t > to) return;
     items.push({ id, date: new Date(t), title, program, state: stateFor(t, overdueIfPast), tab });
   };
+
+  programs.forEach((p) => {
+    push(`${p.id}-start`, p.startDate, 'Testing starts', p.name, 'surveys');
+    push(`${p.id}-finish`, p.finishDate, 'Testing ends', p.name, 'surveys');
+  });
 
   offerings.forEach((o) => {
     push(`${o.id}-signup`, o.signupDeadline, 'Sign-up deadline', o.name, 'surveys');
