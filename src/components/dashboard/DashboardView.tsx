@@ -8,21 +8,19 @@
  *
  * Every figure is derived from the shared stores (devices, programs, offerings)
  * through ./dashboardData, so it matches the menus it links to.
- * Integration status (GET /api/health, presence of creds only) feeds Needs attention.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Card, Tag, Button, ProgressBar } from '@amzn/eero-web-design-components';
+import { useMemo, useState } from 'react';
+import { Card, Tag, Button, ProgressBar, Pagination } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useBetaProgramsStore } from '@/store/betaProgramsStore';
 import { useProgramsStore } from '@/store/programsStore';
 import { useAuthStore } from '@/store/authStore';
 import { useUiStore, matchesCohort } from '@/store/uiStore';
 import { programEnumFor } from '@/components/programs/helpers';
-import { DonutChart } from '@/components/OverviewDashboard';
 import type { TabType } from '@/types';
 import {
-  greetingFor, fleetKpis, fleetHealth, notOnlineByProgram,
-  comingUp, needsAttention, programRows, IntegrationHealth, TimelineState, Severity,
+  greetingFor, notOnlineByProgram,
+  comingUp, needsAttention, programRows, TimelineState, Severity,
 } from './dashboardData';
 
 const BORDER = 'var(--ui-background-layer-border-border-layer-page)';
@@ -33,26 +31,7 @@ const TEXT_TERTIARY = 'var(--ui-text-text-tertiary)';
 // % online → EDS fill class (tokens from the foundation Tailwind preset).
 const ONLINE_BREAKPOINTS = { 0: 'bg-Red-red-5', 50: 'bg-Orange-orange-5', 80: 'bg-Green-green-6' };
 
-const INTEGRATION_LABELS: Record<string, string> = {
-  insight: 'eero API',
-  databricks: 'Databricks',
-  jira: 'Jira',
-  qualtrics: 'Qualtrics',
-  bedrock: 'Bedrock AI',
-};
-
-function useIntegrationHealth(): IntegrationHealth[] | null {
-  const [health, setHealth] = useState<IntegrationHealth[] | null>(null);
-  useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then((d) => setHealth(Object.entries(INTEGRATION_LABELS).map(([key, label]) => ({
-        key, label, ready: !!d?.integrations?.[key]?.ready,
-      }))))
-      .catch(() => setHealth([]));
-  }, []);
-  return health;
-}
+const PROGRAMS_PER_PAGE = 6;
 
 export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabType) => void }) {
   const { devices } = useDeviceStore();
@@ -60,7 +39,6 @@ export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabTyp
   const { offerings } = useProgramsStore();
   const { currentUser } = useAuthStore();
   const { cohort } = useUiStore();
-  const integrations = useIntegrationHealth();
 
   // The header cohort lens applies here too, same as every other menu.
   const visibleDevices = useMemo(() => devices.filter((d) => matchesCohort(d, cohort)), [devices, cohort]);
@@ -70,11 +48,17 @@ export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabTyp
   );
 
   const now = new Date();
-  const kpis = fleetKpis(visibleDevices, visiblePrograms);
-  const health = useMemo(() => fleetHealth(visibleDevices), [visibleDevices]);
   const timeline = useMemo(() => comingUp(offerings, visibleDevices, visiblePrograms), [offerings, visibleDevices, visiblePrograms]);
-  const attention = useMemo(() => needsAttention(visibleDevices, visiblePrograms, integrations || []), [visibleDevices, visiblePrograms, integrations]);
+  const attention = useMemo(() => needsAttention(visibleDevices, visiblePrograms), [visibleDevices, visiblePrograms]);
   const rows = useMemo(() => programRows(visiblePrograms, visibleDevices), [visiblePrograms, visibleDevices]);
+  // Programs at a glance: active only by default; "All programs" adds completed ones.
+  // Six rows per page, with the page menu when there are more.
+  const [showAllPrograms, setShowAllPrograms] = useState(false);
+  const [programPage, setProgramPage] = useState(1);
+  const listedRows = showAllPrograms ? rows : rows.filter((r) => r.program.status === 'active');
+  const programPages = Math.max(1, Math.ceil(listedRows.length / PROGRAMS_PER_PAGE));
+  const currentProgramPage = Math.min(programPage, programPages);
+  const pageRows = listedRows.slice((currentProgramPage - 1) * PROGRAMS_PER_PAGE, currentProgramPage * PROGRAMS_PER_PAGE);
   const notOnline = useMemo(() => notOnlineByProgram(visiblePrograms, visibleDevices), [visiblePrograms, visibleDevices]);
 
   const firstName = (currentUser?.name || '').split(/[\s(]/)[0];
@@ -88,66 +72,67 @@ export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabTyp
             {greetingFor(now)}{firstName ? `, ${firstName}` : ''}
           </h1>
         </div>
-        <div className="flex gap-2">
-          <Button type="default" label="Add devices" onClick={() => onNavigate('shipments')} />
-          <Button type="primary" label="Open devices" onClick={() => onNavigate('devices')} />
-        </div>
       </div>
 
-      {/* KPI tiles — each opens the menu behind the number */}
-      <div className="grid grid-cols-2 gap-4 tablet:grid-cols-3 desktop:grid-cols-5">
-        <KpiTile label="Active programs" value={kpis.activePrograms} onClick={() => onNavigate('surveys')} />
-        <KpiTile label="Testers enrolled" value={kpis.testers} onClick={() => onNavigate('people')} />
-        <KpiTile label="Devices" value={kpis.devices} onClick={() => onNavigate('devices')} />
-        <KpiTile label="Online" value={kpis.online} sub={`${kpis.onlinePct}% of fleet`} tone="good" onClick={() => onNavigate('devices')} />
-        <KpiTile label="Awaiting device" value={kpis.awaiting} sub="no network yet" onClick={() => onNavigate('devices')} />
-      </div>
-
-      {/* Programs at a glance + health */}
-      <div className="grid grid-cols-1 gap-4 desktop:grid-cols-3">
-        <div className="desktop:col-span-2">
-          <Card size={3}>
-            <SectionTitle title="Programs at a glance" extra={<Button type="text" label="All programs" onClick={() => onNavigate('surveys')} />} />
-            {rows.length === 0
-              ? <EmptyLine text="No programs in this cohort." />
-              : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                        {['Program', 'Cohort', 'Phase', 'Testers', 'Devices online', 'Response rate', 'Status'].map((h) => (
-                          <th key={h} className="px-3 py-2 text-left text-xs font-semibold uppercase" style={{ color: TEXT_TERTIARY }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(({ program: p, cohort: c, testers, deployed, online }) => (
-                        <tr key={p.id} className="cursor-pointer hover:bg-[var(--ui-background-layer-layer-page-hover)]" style={{ borderBottom: `1px solid ${BORDER}` }} onClick={() => onNavigate('surveys')}>
-                          <td className="px-3 py-3">
-                            <p className="font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</p>
-                            <p className="text-xs" style={{ color: TEXT_TERTIARY }}>{p.type === 'feature' ? 'Feature' : 'Hardware'}</p>
-                          </td>
-                          <td className="px-3 py-3"><Tag color={c === 'dogfood' ? 'purple' : 'navy'} size="regular">{c === 'dogfood' ? 'Dogfood' : 'Beta'}</Tag></td>
-                          <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{p.currentPhase || '—'}</td>
-                          <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{testers}</td>
-                          <td className="px-3 py-3" style={{ minWidth: 160 }}>
-                            {p.type === 'feature'
-                              ? <span style={{ color: TEXT_TERTIARY }}>—</span>
-                              : <ProgressBar label={`${online} of ${deployed}`} percent={deployed ? Math.round((online / deployed) * 100) : 0} colorBreakpoints={ONLINE_BREAKPOINTS} />}
-                          </td>
-                          <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{p.surveyResponseRate ? `${p.surveyResponseRate}%` : '—'}</td>
-                          <td className="px-3 py-3"><Tag color={p.status === 'active' ? 'green' : 'grey'} size="regular">{p.status === 'active' ? 'Active' : 'Completed'}</Tag></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+      {/* Programs at a glance */}
+      <Card size={3}>
+        <SectionTitle
+          title={showAllPrograms ? 'Programs at a glance · all programs' : 'Programs at a glance · active programs'}
+          extra={<Button type="text" label={showAllPrograms ? 'Active programs only' : 'All programs'} onClick={() => { setShowAllPrograms((v) => !v); setProgramPage(1); }} />}
+        />
+        {listedRows.length === 0
+          ? <EmptyLine text={showAllPrograms ? 'No programs in this cohort.' : 'No active programs in this cohort.'} />
+          : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    {['Program', 'Cohort', 'Phase', 'Testers', 'Devices online', 'Start date', 'Finish date', 'OK2Street date', 'Status'].map((h) => (
+                      <th key={h} className="px-3 py-2 text-left text-xs font-semibold uppercase" style={{ color: TEXT_TERTIARY }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map(({ program: p, cohort: c, testers, deployed, online }) => (
+                    <tr key={p.id} className="cursor-pointer hover:bg-[var(--ui-background-layer-layer-page-hover)]" style={{ borderBottom: `1px solid ${BORDER}` }} onClick={() => onNavigate('surveys')}>
+                      <td className="px-3 py-3">
+                        <p className="font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</p>
+                        <p className="text-xs" style={{ color: TEXT_TERTIARY }}>{p.type === 'feature' ? 'Feature' : 'Hardware'}</p>
+                      </td>
+                      <td className="px-3 py-3"><Tag color={c === 'dogfood' ? 'purple' : 'navy'} size="regular">{c === 'dogfood' ? 'Dogfood' : 'Beta'}</Tag></td>
+                      <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{p.currentPhase || '—'}</td>
+                      <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{testers}</td>
+                      <td className="px-3 py-3" style={{ minWidth: 160 }}>
+                        {p.type === 'feature'
+                          ? <span style={{ color: TEXT_TERTIARY }}>—</span>
+                          : <ProgressBar label={`${online} of ${deployed}`} percent={deployed ? Math.round((online / deployed) * 100) : 0} colorBreakpoints={ONLINE_BREAKPOINTS} />}
+                      </td>
+                      <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{fmtDay(p.startDate)}</td>
+                      <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{fmtDay(p.finishDate)}</td>
+                      <td className="px-3 py-3" style={{ color: TEXT_SECONDARY }}>{p.ok2StreetDate ? fmtDay(p.ok2StreetDate) : '—'}</td>
+                      <td className="px-3 py-3"><Tag color={p.status === 'active' ? 'green' : 'grey'} size="regular">{p.status === 'active' ? 'Active program' : 'Program completed'}</Tag></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {listedRows.length > PROGRAMS_PER_PAGE && (
+                <div className="mt-2">
+                  <Pagination
+                    pagination={{ totalItems: listedRows.length, totalPages: programPages, hasPreviousPage: currentProgramPage > 1, hasNextPage: currentProgramPage < programPages }}
+                    currentPage={currentProgramPage}
+                    pageSize={PROGRAMS_PER_PAGE}
+                    onPageChange={setProgramPage}
+                    onNextPage={() => setProgramPage((n) => Math.min(programPages, n + 1))}
+                    onPreviousPage={() => setProgramPage((n) => Math.max(1, n - 1))}
+                    onPageSizeChange={() => setProgramPage(1)}
+                    pageSizeOptions={[{ value: PROGRAMS_PER_PAGE, label: String(PROGRAMS_PER_PAGE) }]}
+                    ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (st, en, tot) => `Showing ${st}–${en} of ${tot}` }}
+                  />
                 </div>
               )}
-          </Card>
-        </div>
-
-        <DonutChart title="Fleet health" items={health} total={health.reduce((n, i) => n + i.count, 0)} size={120} strokeWidth={20} centerLabel="Devices" />
-      </div>
+            </div>
+          )}
+      </Card>
 
       {/* Coming up + needs attention */}
       <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
@@ -228,6 +213,10 @@ export default function DashboardView({ onNavigate }: { onNavigate: (tab: TabTyp
 }
 
 // ─── Pieces ───────────────────────────────────────────────────────────────────
+// "Oct 15, 2026" from an ISO date.
+const fmtDay = (iso?: string) =>
+  iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
 function SectionTitle({ title, extra }: { title: string; extra?: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-3">
@@ -239,19 +228,6 @@ function SectionTitle({ title, extra }: { title: string; extra?: React.ReactNode
 
 function EmptyLine({ text }: { text: string }) {
   return <p className="py-6 text-center text-sm" style={{ color: TEXT_TERTIARY }}>{text}</p>;
-}
-
-function KpiTile({ label, value, sub, tone, onClick }: { label: string; value: number; sub?: string; tone?: 'good' | 'warn'; onClick: () => void }) {
-  const color = tone === 'good' ? 'var(--ui-core-green-green-6)' : tone === 'warn' ? 'var(--ui-core-orange-orange-6)' : TEXT_PRIMARY;
-  return (
-    <button className="text-left transition-shadow hover:shadow-md rounded-xl" onClick={onClick}>
-      <Card size={3}>
-        <p className="text-2xl font-semibold" style={{ color }}>{value.toLocaleString()}</p>
-        <p className="mt-1 text-xs" style={{ color: TEXT_SECONDARY }}>{label}</p>
-        <p className="text-xs" style={{ color: TEXT_TERTIARY }}>{sub || ' '}</p>
-      </Card>
-    </button>
-  );
 }
 
 function TimelineTag({ state }: { state: TimelineState }) {

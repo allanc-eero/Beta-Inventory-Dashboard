@@ -2,8 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useDeviceStore } from '@/store/deviceStore';
-import { Button, Input } from '@amzn/eero-web-design-components';
+import { Button, Input, Tooltip } from '@amzn/eero-web-design-components';
 import { Sparkles, Send, X } from 'lucide-react';
+
+// Floating-assistant starter prompts, grouped so people see what it's good at.
+const PROMPT_GROUPS: { title: string; prompts: string[] }[] = [
+  { title: 'Fleet', prompts: ['Which devices have been offline the longest?', 'Which online devices have no OS-update group?'] },
+  { title: 'Programs', prompts: ['Summarize how each active program is doing', 'Which programs finish in the next 30 days?'] },
+  { title: 'Testers', prompts: ['Which testers are still waiting for a device?', 'Who has more than one device?'] },
+  { title: 'Actions', prompts: ['Draft a reminder for testers whose device is not online', 'What should I follow up on today?'] },
+];
 
 // Simple markdown-like formatting for agent responses
 function formatMessage(text: string): string {
@@ -19,7 +27,10 @@ interface Message {
   timestamp: string;
 }
 
-export default function AgentChat() {
+// variant 'inline' = the search-style bar in the Devices toolbar (opens a modal).
+// variant 'floating' = a round AI button docked bottom-right that opens a chat window
+// (the /demo-dashboard preview, on every page).
+export default function AgentChat({ variant = 'inline' }: { variant?: 'inline' | 'floating' } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -106,13 +117,14 @@ export default function AgentChat() {
     });
   };
 
-  const handleSubmit = async () => {
-    if (!input.trim() || loading) return;
+  const handleSubmit = async (override?: string) => {
+    const query = (override ?? input).trim();
+    if (!query || loading) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content: query,
       timestamp: new Date().toISOString(),
     };
 
@@ -124,7 +136,7 @@ export default function AgentChat() {
       const res = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: input.trim(), context: buildContext() }),
+        body: JSON.stringify({ query, context: buildContext() }),
       });
 
       const data = await res.json();
@@ -148,6 +160,124 @@ export default function AgentChat() {
       setLoading(false);
     }
   };
+
+  // Esc closes the floating window.
+  useEffect(() => {
+    if (variant !== 'floating' || !isOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [variant, isOpen]);
+
+  if (variant === 'floating') {
+    return (
+      <>
+        {isOpen && (
+          <div
+            className="fixed bottom-20 right-4 z-50 flex flex-col overflow-hidden rounded-xl border border-[var(--ui-background-layer-border-border-layer-page)] bg-[var(--ui-background-layer-layer-page)] shadow-2xl"
+            style={{ width: 400, height: 560, maxHeight: 'calc(100vh - 8rem)' }}
+            role="dialog"
+            aria-label="AI assistant"
+          >
+            <div className="flex items-center justify-between bg-[var(--ui-core-periwinkle-periwinkle-6)] px-4 py-3">
+              <div className="flex items-center gap-2 text-white">
+                <Sparkles size={18} strokeWidth={2.25} className="text-white" fill="currentColor" />
+                <div>
+                  <p className="text-sm font-semibold leading-tight">Ask Fetch AI</p>
+                  <p className="text-xs leading-tight text-white/70">Answers from your live devices, testers &amp; programs</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
+                  <button onClick={() => setMessages([])} className="rounded px-2 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white">New chat</button>
+                )}
+                <button onClick={() => setIsOpen(false)} className="rounded p-1 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Close assistant"><X size={16} /></button>
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              {messages.length === 0 && (
+                <div className="space-y-4">
+                  <p className="text-sm text-[var(--ui-text-text-secondary)]">Hi! Ask me anything about your beta and dogfood programs — or start with one of these:</p>
+                  {PROMPT_GROUPS.map((g) => (
+                    <div key={g.title}>
+                      <p className="mb-1.5 text-xs font-semibold uppercase text-[var(--ui-text-text-tertiary)]">{g.title}</p>
+                      <div className="flex flex-col gap-1.5">
+                        {g.prompts.map((q) => (
+                          <button
+                            key={q}
+                            onClick={() => handleSubmit(q)}
+                            className="rounded-lg border border-[var(--ui-background-layer-border-border-layer-page)] px-3 py-2 text-left text-xs text-[var(--ui-text-text-secondary)] transition-colors hover:border-[var(--ui-core-periwinkle-periwinkle-6)] hover:bg-[var(--ui-support-fill-support-info)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)]"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                    msg.role === 'user'
+                      ? 'bg-[var(--ui-core-periwinkle-periwinkle-6)] text-white'
+                      : 'bg-[var(--ui-background-layer-layer-page-hover)] text-[var(--ui-text-text-secondary)]'
+                  }`}>
+                    <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
+                  </div>
+                </div>
+              ))}
+
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="rounded-lg bg-[var(--ui-background-layer-layer-page-hover)] px-3 py-2 text-sm text-[var(--ui-text-text-tertiary)]">
+                    <span className="inline-flex gap-1">
+                      <span className="animate-bounce">●</span>
+                      <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>●</span>
+                      <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>●</span>
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="border-t border-[var(--ui-background-layer-border-border-layer-page)] px-3 py-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <Input
+                    id="agent-floating-input"
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+                    onPressEnter={() => handleSubmit()}
+                    placeholder="Ask about devices, testers, programs…"
+                    disabled={loading}
+                  />
+                </div>
+                <Button type="primary" onClick={() => handleSubmit()} disabled={!input.trim() || loading} ariaLabel="Send message" label={<Send size={16} />} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tucked into the right edge so it doesn't sit over page content; slides out on hover. */}
+        <div className="fixed bottom-6 right-0 z-50">
+          <Tooltip title={isOpen ? 'Close AI assistant' : 'Ask Fetch AI'} placement="left">
+            <button
+              onClick={() => setIsOpen((o) => !o)}
+              className={`flex h-11 items-center gap-2 rounded-l-full bg-[var(--ui-core-periwinkle-periwinkle-6)] pl-3 pr-2 text-white shadow-md transition-transform duration-200 hover:translate-x-0 hover:bg-[var(--ui-core-periwinkle-periwinkle-7)] ${isOpen ? 'translate-x-0' : 'translate-x-2'}`}
+              aria-label={isOpen ? 'Close AI assistant' : 'Open AI assistant'}
+            >
+              {isOpen ? <X size={18} strokeWidth={2.5} /> : <Sparkles size={18} strokeWidth={2.25} fill="currentColor" />}
+            </button>
+          </Tooltip>
+        </div>
+      </>
+    );
+  }
 
   if (!isOpen) {
     return (

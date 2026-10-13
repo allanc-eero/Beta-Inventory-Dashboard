@@ -5,7 +5,7 @@ import { OptOutRecord } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { CheckCircle, Circle, ExternalLink, Bell, UserPlus } from 'lucide-react';
-import { adminUserUrl, insightNetworkUrl, resolveEnv } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, resolveEnv, isVerifiedNetwork, isVerifiedUnitId } from '@/lib/format';
 
 interface OptBackInChecklistPanelProps {
   record: OptOutRecord;
@@ -22,8 +22,10 @@ export default function OptBackInChecklistPanel({ record, onComplete, onCancel }
   const [showCompleteNotice, setShowCompleteNotice] = useState(false);
 
   const profile = getTesterProfile(record.personEmail);
-  const networkId = profile?.networkId || '';
-  const adminId = profile?.adminId || '';
+  // Only link ids confirmed for this tester (not demo-generated ones).
+  const testerSerials = devices.filter((d) => d.assignedEmail === record.personEmail).map((d) => d.serialNumber);
+  const networkId = isVerifiedNetwork(profile?.networkId, testerSerials, [record.personEmail]) ? profile!.networkId : '';
+  const adminId = isVerifiedUnitId(profile?.adminId, testerSerials) ? profile!.adminId : '';
   // Route links to the right cloud (dogfood → stage, else prod), inferred from devices.
   const df = devices.find((d) => d.assignedEmail === record.personEmail && (d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood')));
   const personEnv = df ? resolveEnv(df.environment, df.program) : 'prod';

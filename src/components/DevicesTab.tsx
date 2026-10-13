@@ -12,11 +12,17 @@ import AgentChat from './AgentChat';
 import { getStatusBadge } from '@/constants';
 import { useAuthStore } from '@/store/authStore';
 import { useUiStore, matchesCohort, cohortOf } from '@/store/uiStore';
-import { insightNetworkUrl, adminNetworkUrl, resolveEnv } from '@/lib/format';
-import { deviceProgramName, programKey } from '@/lib/programs';
+import { deviceLinks, NETWORK_UNCONFIRMED_TIP } from '@/lib/format';
+import { deviceProgramName, programKey, deviceInProgram } from '@/lib/programs';
 
-export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?: (email: string) => void }) {
-  const { devices, updateDevice, addHistoryEntry } = useDeviceStore();
+// `programName` scopes the whole view to one program (the per-program page opened
+// from a Programs card in the /demo-dashboard preview).
+export default function DevicesTab({ onNavigateToPerson, programName, hideAgent = false }: { onNavigateToPerson?: (email: string) => void; programName?: string; hideAgent?: boolean }) {
+  const { devices: allDevices, updateDevice, addHistoryEntry } = useDeviceStore();
+  const devices = useMemo(
+    () => (programName ? allDevices.filter((d) => deviceInProgram(d, programName)) : allDevices),
+    [allDevices, programName],
+  );
   const { canEdit } = useAuthStore();
   const { cohort } = useUiStore();
   const [search, setSearch] = useState('');
@@ -53,9 +59,11 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
 
   return (
     <div className="space-y-4 pb-10">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 bg-[var(--ui-background-layer-layer-page)] p-4 rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)]">
-        <AgentChat />
+      {/* Toolbar — a slim right-aligned row on a program's page, the full card elsewhere */}
+      <div className={programName
+        ? 'flex flex-wrap items-center justify-end gap-3'
+        : 'flex flex-wrap items-center gap-3 bg-[var(--ui-background-layer-layer-page)] p-4 rounded-xl shadow-sm border border-[var(--ui-background-layer-border-border-layer-page)]'}>
+        {!hideAgent && <AgentChat />}
 
         <div className="w-40">
           <Select
@@ -71,7 +79,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
           />
         </div>
 
-        <div className="w-40">
+        {!programName && <div className="w-40">
           <Select
             id="program-filter"
             value={programFilter}
@@ -87,7 +95,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
               { value: 'other', label: 'Other' },
             ]}
           />
-        </div>
+        </div>}
 
         {canEdit() && (
           <Button type="primary" label="Add Device" onClick={() => setShowAddModal(true)} />
@@ -185,6 +193,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
                 setSelectedDevices={setSelectedDevices}
                 toggleSelect={toggleSelect}
                 onSelectDevice={setSelectedDevice}
+                serialOpensDetail={!!programName}
               />
             ))}
 
@@ -209,7 +218,7 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
       )}
 
       {/* Add Device Modal */}
-      {showAddModal && <AddDeviceModal onClose={() => setShowAddModal(false)} />}
+      {showAddModal && <AddDeviceModal programName={programName} onClose={() => setShowAddModal(false)} />}
 
       {/* Bulk Return Panel */}
       {showBulkReturn && (
@@ -224,13 +233,16 @@ export default function DevicesTab({ onNavigateToPerson }: { onNavigateToPerson?
 
 // One program container — full-width table with its own pagination (long
 // containers like the Merci beta fleet can run 70+ rows).
-function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, toggleSelect, onSelectDevice }: {
+// serialOpensDetail (per-program page): the serial opens the device/tester card;
+// Insight + Admin stay available as the small links underneath.
+function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, toggleSelect, onSelectDevice, serialOpensDetail = false }: {
   prog: string;
   rows: Device[];
   selectedDevices: Set<string>;
   setSelectedDevices: (s: Set<string>) => void;
   toggleSelect: (id: string) => void;
   onSelectDevice: (d: Device) => void;
+  serialOpensDetail?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -274,21 +286,31 @@ function ProgramDeviceGroup({ prog, rows, selectedDevices, setSelectedDevices, t
           <tbody className="divide-y divide-[var(--ui-background-layer-border-border-layer-page)]">
             {paged.map((device) => {
               // Route deep-links to the right cloud: beta → prod, dogfood → stage.
-              const env = resolveEnv(device.environment, device.program);
-              const networkUrl = device.network ? insightNetworkUrl(device.network, env) : '';
-              const adminUrl = device.network ? adminNetworkUrl(device.network, env) : '';
+              // Links only render for a verified network (never a demo-fabricated one).
+              const { env, networkVerified, insightUrl: networkUrl, adminNetworkUrl: adminUrl } = deviceLinks(device);
+              const plainSerialTip = !networkVerified ? NETWORK_UNCONFIRMED_TIP : `${env} Insight URL not configured yet`;
               return (
               <tr key={device.id} className="hover:bg-[var(--ui-background-layer-layer-page-hover)] transition-colors cursor-pointer" onClick={() => onSelectDevice(device)}>
                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                   <Checkbox checked={selectedDevices.has(device.id)} onChange={() => toggleSelect(device.id)} />
                 </td>
                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                  {networkUrl ? (
+                  {serialOpensDetail ? (
+                    <>
+                      <button className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" onClick={() => onSelectDevice(device)} title={networkUrl || adminUrl ? 'Open this device and its tester' : `Open this device and its tester · ${plainSerialTip}`}>{device.serialNumber}</button>
+                      {(networkUrl || adminUrl) && (
+                        <div className="flex gap-3">
+                          {networkUrl && <a href={networkUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title={`Open this device's network in Insight (${env})`}>Insight ↗</a>}
+                          {adminUrl && <a href={adminUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title={`Open this network in Admin (${env})`}>Admin ↗</a>}
+                        </div>
+                      )}
+                    </>
+                  ) : networkUrl ? (
                     <a href={networkUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline" title={`Open this device's network in Insight (${env})`}>{device.serialNumber} ↗</a>
                   ) : (
-                    <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title={device.network ? 'Stage Insight URL not configured yet' : 'No network yet — device not online in Insight'}>{device.serialNumber}</span>
+                    <span className="font-mono text-xs font-medium text-[var(--ui-core-periwinkle-periwinkle-7)]" title={plainSerialTip}>{device.serialNumber}</span>
                   )}
-                  {adminUrl && (
+                  {!serialOpensDetail && adminUrl && (
                     <div>
                       <a href={adminUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-text-text-tertiary)] hover:underline hover:text-[var(--ui-core-periwinkle-periwinkle-6)]" title={`Open this network in Admin (${env})`}>Admin ↗</a>
                     </div>

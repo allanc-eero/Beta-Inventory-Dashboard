@@ -14,36 +14,6 @@ export function greetingFor(date: Date) {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-// ─── KPIs ─────────────────────────────────────────────────────────────────────
-export function fleetKpis(devices: Device[], programs: DemoProgram[]) {
-  const live = devices.filter((d) => d.status !== 'deactivated');
-  const online = live.filter((d) => d.status === 'online').length;
-  const awaiting = live.filter((d) => d.status === 'not_online' && !d.network).length;
-  return {
-    programs: programs.length,
-    activePrograms: programs.filter((p) => p.status === 'active').length,
-    // Unique people on the programs' rosters — a tester on two programs counts once,
-    // and a removed tester drops out immediately.
-    testers: new Set(programs.flatMap((p) => p.testers.map((t) => t.email.toLowerCase().trim()))).size,
-    devices: live.length,
-    online,
-    onlinePct: live.length ? Math.round((online / live.length) * 100) : 0,
-    awaiting,
-  };
-}
-
-// ─── Charts ───────────────────────────────────────────────────────────────────
-export function fleetHealth(devices: Device[]) {
-  const live = devices.filter((d) => d.status !== 'deactivated');
-  const count = (s: Device['status'][]) => live.filter((d) => s.includes(d.status)).length;
-  return [
-    { name: 'Online', count: count(['online']), color: 'var(--ui-core-green-green-6)' },
-    { name: 'Not online', count: count(['not_online']), color: 'var(--ui-core-gray-gray-5)' },
-    { name: 'In repair / testing', count: count(['in_repair', 'in_testing']), color: 'var(--ui-core-orange-orange-5)' },
-    { name: 'Pending return', count: count(['pending_return']), color: 'var(--ui-core-red-red-6)' },
-  ].filter((i) => i.count > 0);
-}
-
 // ─── Coming up ────────────────────────────────────────────────────────────────
 export type TimelineState = 'overdue' | 'past' | 'soon' | 'upcoming';
 export interface TimelineItem {
@@ -74,6 +44,7 @@ export function comingUp(offerings: ProgramOffering[], devices: Device[], progra
   programs.forEach((p) => {
     push(`${p.id}-start`, p.startDate, 'Testing starts', p.name, 'surveys');
     push(`${p.id}-finish`, p.finishDate, 'Testing ends', p.name, 'surveys');
+    push(`${p.id}-ok2street`, p.ok2StreetDate, 'OK2Street', p.name, 'surveys');
   });
 
   offerings.forEach((o) => {
@@ -111,13 +82,8 @@ export interface AttentionItem {
   action: string;
 }
 
-export interface IntegrationHealth {
-  key: string;
-  label: string;
-  ready: boolean;
-}
-
-export function needsAttention(devices: Device[], programs: DemoProgram[], integrations: IntegrationHealth[], now = Date.now()): AttentionItem[] {
+// Device-related items only (no API / AI connection notices).
+export function needsAttention(devices: Device[], programs: DemoProgram[], now = Date.now()): AttentionItem[] {
   const items: AttentionItem[] = [];
   const add = (cond: number, item: Omit<AttentionItem, 'title'> & { title: (n: number) => string }) => {
     if (cond > 0) items.push({ ...item, title: item.title(cond) });
@@ -143,10 +109,6 @@ export function needsAttention(devices: Device[], programs: DemoProgram[], integ
   add(noGroup.length, { id: 'no-group', severity: 'low', title: (n) => `${plural(n, 'online device')} with no OS-update group`, detail: 'Their network has no release channel assigned.', tab: 'devices', action: 'View devices' });
   add(noProgram.length, { id: 'no-program', severity: 'low', title: (n) => `${plural(n, 'device')} with no program`, detail: 'Re-import with a Program column or set it on the device.', tab: 'devices', action: 'View devices' });
 
-  integrations.filter((i) => !i.ready).forEach((i) => items.push({
-    id: `int-${i.key}`, severity: 'low', title: `${i.label} not connected`,
-    detail: 'Running on seeded/fallback data until credentials are added.', tab: 'devices', action: '',
-  }));
 
   return items;
 }

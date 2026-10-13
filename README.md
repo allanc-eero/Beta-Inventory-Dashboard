@@ -13,9 +13,25 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:3000**. You'll land straight in the app — **there is no
-sign-in screen and nothing to configure.** You're automatically signed in as a
+Open **http://localhost:3000**. You'll land straight on the **Dashboard** — **there
+is no sign-in screen and nothing to configure.** You're automatically signed in as a
 demo admin, so every tab and button is live.
+
+**What's in the sidebar**
+
+| Menu | What it's for |
+|---|---|
+| **Dashboard** | Snapshot of everything: active programs at a glance (devices online, start / finish / OK2Street dates), what's coming up, what needs attention, devices not online by program. |
+| **Programs** | Active and completed programs. Click a program to see its devices (Top Regions + device table); click a serial for the device and tester card. Close a program to move it to Completed. |
+| **Surveys** | Each program's surveys — start/finish dates, testers, response rate, feedback score. **+ New survey** on each active program. |
+| **Engagement** | Per-tester reliability and feedback, plus the At-Risk list. |
+| **People** | Every tester across programs. |
+| **Imports** | Upload a program sheet (download the template there) to create a program or add testers/devices to one. |
+
+The **✨ AI** tab on the right edge opens an assistant with starter prompts.
+
+> **eero employee?** Sign in to eero once (`eero api admin --prod auth`, on VPN) and
+> imported devices get real Insight/Admin links — see [Connect to eero](#-connect-to-eero-real-insight--admin-links).
 
 ### What you're looking at is sample data
 
@@ -25,10 +41,10 @@ a fresh clone has none. Concretely:
 
 | Area | What you'll see locally |
 |---|---|
-| **Surveys & Engagement** | 3 seeded Merci surveys instead of the full live Qualtrics list. Generating a report returns sample results with a *"showing sample data"* notice at the top. |
-| **Devices** | Simulated serials generated from each tester's email. Network IDs, firmware, and online/offline status are all fabricated. |
+| **Surveys & Engagement** | 3 seeded Merci Beta surveys instead of the full live Qualtrics list. Generating a report returns sample results with a *"showing sample data"* notice at the top. |
+| **Devices (inside each program)** | A real beta sheet's devices plus simulated serials generated from each tester's email. Without an eero sign-in, status/firmware are sample values. |
 | **Testers / People** | Seeded roster, including filler names added to make the list look realistically sized. |
-| **Deep links** | Insight/Admin links render but point at generated network IDs, so they won't resolve. |
+| **Insight / Admin links** | Hidden ("Network not confirmed yet") until you [connect to eero](#-connect-to-eero-real-insight--admin-links) — then every imported serial is looked up and links open its real network and Admin account. |
 
 Nothing crashes and nothing is missing — every integration is env-gated and falls
 back to seed data so the app always works. Check what's wired up on your machine
@@ -115,7 +131,53 @@ data does and doesn't show.
 Production builds (`npm run build && npm start`) keep the real sign-in screen and
 the `@eero.com` allowlist, so a deployed instance is never left open by accident.
 To run against live data, copy `.env.example` to `.env.local` and fill in the
-Qualtrics/Insight credentials.
+Qualtrics credentials, and [connect to eero](#-connect-to-eero-real-insight--admin-links)
+for real device lookups.
+
+## 🔌 Connect to eero (real Insight & Admin links)
+
+When you import a program sheet (or use **Add Device**), the app looks up every
+serial in the **eero Admin API** to find the network it's on and the owner's Admin
+account. That's what makes each device's **Insight ↗** and **Admin ↗** links open
+the *right* network/account.
+
+The app uses **your own eero sign-in** from the eero CLI on your machine. No token
+is stored in this repo or in `.env` — everyone who clones it signs in as themselves.
+Without a sign-in the app still works, it just uses sample data and hides those links
+(you'll see "Network not confirmed yet").
+
+**One-time setup (eero employees):**
+
+1. **Be on the eero VPN.**
+2. **Install the eero CLI** if `eero --version` doesn't work (internal eero dev
+   tooling — ask in your team's dev channel if you don't have it).
+3. **Sign in** — opens a browser for SSO:
+   ```bash
+   eero api admin --prod auth   # Beta devices (prod cloud)
+   eero api admin auth          # Dogfood devices (stage cloud) — only if you use dogfood
+   ```
+4. **Check it in the app:** open **Imports** → the **eero connection** card should say
+   **Connected as you@eero.com** for each cloud. Click **Recheck** after signing in —
+   no restart needed.
+
+Or from a terminal: `curl -s "localhost:3000/api/insight?op=status&verify=1"`
+
+**Troubleshooting**
+
+| The eero connection card says… | Fix |
+|---|---|
+| **Session expired** | Sessions time out. Re-run the `auth` command above (on VPN), then **Recheck**. |
+| **Not signed in** | Run the `auth` command above for that cloud. |
+| **eero CLI not installed** | Install it, or if it's installed somewhere unusual set `EERO_CLI_PATH=/full/path/to/eero` in `.env.local` and restart `npm run dev`. |
+| Connected, but links still say "not confirmed" | The serial hasn't been looked up yet — re-import, or wait for the next online check. Serials eero doesn't know (not set up yet) stay unconfirmed until the device comes online. |
+
+**What the app does with your sign-in:** read-only lookups only — "get eero by
+serial" and "get network". It never changes anything in eero. The token stays on the
+server side of your local app and is never logged or sent to the browser.
+
+**Hosted (Harmony) deploys** don't have the eero CLI — set
+`EERO_ADMIN_API_TOKEN_PROD` / `EERO_ADMIN_API_TOKEN_STAGE` as server secrets with a
+read-only service credential instead (env vars take priority over the CLI).
 
 ## Requirements
 

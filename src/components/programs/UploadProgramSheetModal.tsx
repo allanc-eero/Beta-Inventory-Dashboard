@@ -12,6 +12,7 @@ import { useBetaProgramsStore } from '@/store/betaProgramsStore';
 import { parseProgramSheet, applyProgramSheet, SheetPlan, SheetRow, SHEET_COLUMNS } from '@/lib/programSheet';
 import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY } from './theme';
 import { downloadProgramSheetTemplate } from '@/lib/importTemplates';
+import { runDeviceSync } from '@/lib/networkSync';
 
 
 export default function UploadProgramSheetModal({ onClose, onCreated }: {
@@ -47,7 +48,11 @@ export default function UploadProgramSheetModal({ onClose, onCreated }: {
     const updatedById = new Map(updated.map((p) => [p.id, p]));
     if (updated.length) setPrograms((prev) => prev.map((p) => updatedById.get(p.id) ?? p));
     if (created.length) addPrograms(created);
-    if (newDevices.length) addDevices(newDevices);
+    if (newDevices.length) {
+      addDevices(newDevices);
+      // Look each new serial up right away (eero Admin API) → network + Admin/Insight links.
+      runDeviceSync(newDevices.map((d) => d.serialNumber));
+    }
     // Testers show up in People right away, even before their device is online.
     [...created, ...updated].forEach((program) => program.testers.forEach((t) => {
       if (!getPersonByEmail(t.email)) addPerson({ id: crypto.randomUUID(), name: t.name, email: t.email, team: '', devices: [] });
@@ -77,8 +82,8 @@ export default function UploadProgramSheetModal({ onClose, onCreated }: {
           testers to that program. Rows already in the program are flagged and skipped.
         </p>
         <p className="text-xs" style={{ color: TEXT_TERTIARY }}>
-          All columns are required: {SHEET_COLUMNS.join(', ')}. Serial Number, Firmware and Group cells may be blank
-          (no device yet / filled by the online check).
+          Required columns: {SHEET_COLUMNS.filter((c) => c !== 'OK2Street Date').join(', ')}. Optional: OK2Street Date.
+          Serial Number, Firmware and Group cells may be blank (no device yet / filled by the online check).
         </p>
         <div className="flex items-center gap-3">
           <label className="cursor-pointer rounded-md border px-3 py-1.5 text-sm font-medium" style={{ color: TEXT_PRIMARY }}>

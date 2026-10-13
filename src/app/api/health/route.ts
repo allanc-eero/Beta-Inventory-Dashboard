@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { bedrockConfigured } from '@/lib/bedrock';
+import { getAuthStatus } from '@/lib/server/eeroAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,9 +56,12 @@ export async function GET() {
       has(process.env.DATABRICKS_WAREHOUSE_ID),
   };
 
+  // eero Admin API (serial → network / Admin ID). Signed in via env token or the eero CLI.
+  const [eeroProd, eeroStage] = await Promise.all([getAuthStatus('prod'), getAuthStatus('stage')]);
   const insight = {
-    ready: has(process.env.EERO_API_TOKEN),
-    apiBase: process.env.EERO_USER_API_BASE || 'https://api-user.e2ro.com',
+    ready: eeroProd.state === 'connected' || eeroStage.state === 'connected',
+    prod: eeroProd,
+    stage: eeroStage,
   };
 
   const breadboard = {

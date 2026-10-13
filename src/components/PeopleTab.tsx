@@ -10,7 +10,7 @@ import DeviceDetailPanel from './DeviceDetailPanel';
 import OptBackInChecklistPanel from './OptBackInChecklistPanel';
 import OptOutChecklistPanel from './OptOutChecklistPanel';
 import { useAuthStore } from '@/store/authStore';
-import { adminUserUrl, insightNetworkUrl, initials, resolveEnv, EeroEnv } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, initials, resolveEnv, EeroEnv, isVerifiedNetwork, isVerifiedUnitId, NETWORK_UNCONFIRMED_TIP } from '@/lib/format';
 import { useUiStore, cohortOf } from '@/store/uiStore';
 import { useBetaProgramsStore } from '@/store/betaProgramsStore';
 import { deviceProgramName } from '@/lib/programs';
@@ -553,8 +553,12 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
               // their devices is dogfood/stage, use stage; otherwise prod.
               const dfDevice = selectedPersonDevices.find((d) => d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood'));
               const personEnv: EeroEnv = dfDevice ? resolveEnv(dfDevice.environment, dfDevice.program) : 'prod';
-              const personInsightUrl = profile?.networkId ? insightNetworkUrl(profile.networkId, personEnv) : '';
-              const personAdminUrl = profile?.adminId ? adminUserUrl(profile.adminId, personEnv) : '';
+              // Only link ids that aren't demo-fabricated for this person's email/serials.
+              const personSerials = selectedPersonDevices.map((d) => d.serialNumber);
+              const personNetworkOk = isVerifiedNetwork(profile?.networkId, personSerials, [selectedPerson || '', profile?.email]);
+              const personAdminOk = isVerifiedUnitId(profile?.adminId, personSerials);
+              const personInsightUrl = personNetworkOk ? insightNetworkUrl(profile!.networkId!.trim(), personEnv) : '';
+              const personAdminUrl = personAdminOk ? adminUserUrl(profile!.adminId!, personEnv) : '';
 
               return (
                 <>
@@ -668,7 +672,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                                 <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">INSIGHT NETWORK</span>
                                 {personInsightUrl
                                   ? <a href={personInsightUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium" title={`Open in Insight (${personEnv})`}>{profile.networkId} ↗</a>
-                                  : <span className="text-sm text-[var(--ui-text-text-secondary)]" title="Stage Insight URL not configured yet">{profile.networkId}</span>}
+                                  : <span className="text-sm text-[var(--ui-text-text-secondary)]" title={personNetworkOk ? `${personEnv} Insight URL not configured yet` : NETWORK_UNCONFIRMED_TIP}>{profile.networkId}</span>}
                               </div>
                             ) : (
                               <ProfileField label="INSIGHT NETWORK" value="" />
@@ -678,7 +682,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                                 <span className="text-xs text-[var(--ui-text-text-tertiary)] uppercase w-36 shrink-0 font-medium">ADMIN ID</span>
                                 {personAdminUrl
                                   ? <a href={personAdminUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium" title={`Open in Admin (${personEnv})`}>{profile.adminId} ↗</a>
-                                  : <span className="text-sm text-[var(--ui-text-text-secondary)]" title="Stage Admin URL not configured yet">{profile.adminId}</span>}
+                                  : <span className="text-sm text-[var(--ui-text-text-secondary)]" title={personAdminOk ? `${personEnv} Admin URL not configured yet` : 'Admin ID not confirmed yet — link appears after the online check'}>{profile.adminId}</span>}
                               </div>
                             ) : (
                               <ProfileField label="ADMIN ID" value="" />
@@ -763,7 +767,7 @@ export default function PeopleTab({ initialSelectedPerson, onClearSelection }: {
                           <span className="text-sm text-[var(--ui-text-text-primary)] font-medium">Removed from eero Admin</span>
                           <p className="text-xs text-[var(--ui-text-text-tertiary)]">Reverted to default user role in admin panel</p>
                         </div>
-                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const df = selectedPersonDevices.find((d) => d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood')); const env = df ? resolveEnv(df.environment, df.program) : 'prod'; const link = aid ? adminUserUrl(aid, env) : nid ? insightNetworkUrl(nid, env) : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
+                        {(() => { const p = getTesterProfile(selectedPerson || ''); const aid = p?.adminId || ''; const nid = p?.networkId || ''; const df = selectedPersonDevices.find((d) => d.environment === 'stage' || (d.program || '').toLowerCase().includes('dogfood')); const env = df ? resolveEnv(df.environment, df.program) : 'prod'; const sers = selectedPersonDevices.map((d) => d.serialNumber); const link = isVerifiedUnitId(aid, sers) ? adminUserUrl(aid, env) : isVerifiedNetwork(nid, sers, [selectedPerson || '', p?.email]) ? insightNetworkUrl(nid.trim(), env) : ''; return link ? <a href={link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--ui-core-periwinkle-periwinkle-6)] hover:underline flex items-center gap-1 shrink-0">Open Admin ↗</a> : null; })()}
                       </label>
                       <label className="flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--ui-background-layer-layer-page)] cursor-pointer">
                         <Checkbox checked={optOutDevicesDone} onChange={(e: CheckboxChangeEvent) => setOptOutDevicesDone(e.target.checked)} className="mt-0.5" />

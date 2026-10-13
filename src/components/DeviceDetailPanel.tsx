@@ -14,7 +14,8 @@ import DeactivateDeviceModal from './DeactivateDeviceModal';
 import AttachmentsPanel from './AttachmentsPanel';
 import SalesforcePanel from './SalesforcePanel';
 import { STATUS_CONFIG as SHARED_STATUS_CONFIG, downloadCSV, daysSince } from '@/constants';
-import { adminUserUrl, insightNetworkUrl, resolveEnv } from '@/lib/format';
+import { deviceLinks, NETWORK_UNCONFIRMED_TIP } from '@/lib/format';
+import { usePreviewMode } from '@/lib/previewMode';
 
 interface DeviceDetailPanelProps {
   device: Device;
@@ -23,7 +24,7 @@ interface DeviceDetailPanelProps {
 }
 
 // ─── Field Definitions (data-driven) ──────────────────────────────────────────
-type FieldDef = { label: string; field: keyof Device; linkUrl?: (d: Device) => string | undefined; options?: string[] };
+type FieldDef = { label: string; field: keyof Device; linkUrl?: (d: Device) => string | undefined; hint?: (d: Device) => string | undefined; options?: string[] };
 
 const DEVICE_FIELDS: FieldDef[] = [
   { label: 'MODEL', field: 'model' },
@@ -36,14 +37,15 @@ const DEVICE_FIELDS: FieldDef[] = [
   { label: 'SKU', field: 'sku' },
   { label: 'PART NUMBER', field: 'partNumber' },
   { label: 'COUNTRY', field: 'country' },
-  { label: 'ADMIN ID', field: 'unitId', linkUrl: (d) => d.unitId ? (adminUserUrl(d.unitId, resolveEnv(d.environment, d.program)) || undefined) : undefined },
+  // Links only for verified ids (demo-fabricated UIDs/networks are never linked).
+  { label: 'ADMIN ID', field: 'unitId', linkUrl: (d) => deviceLinks(d).adminUserUrl || undefined, hint: (d) => d.unitId && !deviceLinks(d).adminUserUrl ? 'Admin ID not confirmed yet — link appears after the online check' : undefined },
   { label: 'FIRMWARE', field: 'firmwareVersion' },
   { label: 'ENVIRONMENT', field: 'environment', options: ['', 'stage', 'prod'] },
 ];
 
 const ASSIGNMENT_FIELDS: FieldDef[] = [
   { label: 'COUNTRY', field: 'country' },
-  { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => d.network ? (insightNetworkUrl(d.network, resolveEnv(d.environment, d.program)) || undefined) : undefined },
+  { label: 'INSIGHT NETWORK', field: 'network', linkUrl: (d) => deviceLinks(d).insightUrl || undefined, hint: (d) => d.network && !deviceLinks(d).networkVerified ? NETWORK_UNCONFIRMED_TIP : undefined },
 ];
 
 const LOGISTICS_FIELDS: FieldDef[] = [
@@ -86,6 +88,7 @@ function exportDeviceCSV(device: Device) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DeviceDetailPanel({ device: initialDevice, onClose, onNavigateToPerson }: DeviceDetailPanelProps) {
+  const preview = usePreviewMode();
   const { devices, updateDevice, addHistoryEntry, getTesterProfile } = useDeviceStore();
   const { canEdit } = useAuthStore();
   const device = devices.find((d) => d.id === initialDevice.id) || initialDevice;
@@ -115,7 +118,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
   const statusInfo = STATUS_CONFIG[device.status] || { color: 'grey' as const, label: device.status };
 
   const renderFields = (fields: FieldDef[], editable = true) =>
-    fields.map(({ label, field, linkUrl, options }) => (
+    fields.map(({ label, field, linkUrl, hint, options }) => (
       <DetailField
         key={`${label}-${field}`}
         label={label}
@@ -125,6 +128,7 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
         editData={editData}
         setEditData={setEditData}
         linkUrl={linkUrl?.(device)}
+        hint={hint?.(device)}
         options={options}
       />
     ));
@@ -146,11 +150,11 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
             {device.country && <span className="text-sm text-[var(--ui-core-red-red-6)] font-medium">📍 {device.country}</span>}
           </div>
           <div className="flex items-center gap-2">
-            <Button type="default" label={<span className="flex items-center gap-1.5"><Download size={14} /> Export</span>} ariaLabel="Export device CSV" onClick={() => exportDeviceCSV(device)} />
+            {!preview && <Button type="default" label={<span className="flex items-center gap-1.5"><Download size={14} /> Export</span>} ariaLabel="Export device CSV" onClick={() => exportDeviceCSV(device)} />}
             {canEdit() && (
               <Button type="primary" label="Edit details" onClick={() => (isEditing ? setIsEditing(false) : startEditing())} />
             )}
-            {canEdit() && device.status !== 'deactivated' && (
+            {!preview && canEdit() && device.status !== 'deactivated' && (
               <Button type="primary" danger label="Return to eero" onClick={() => setShowDeactivateModal(true)} />
             )}
           </div>
@@ -314,23 +318,23 @@ export default function DeviceDetailPanel({ device: initialDevice, onClose, onNa
           </div>
         )}
 
-        {/* Feature panels */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <FirmwarePanel deviceId={device.id} />
+        {/* Feature panels — the preview keeps only Network Health */}
+        <div className={`mt-8 grid grid-cols-1 gap-6 ${preview ? 'pb-12' : 'lg:grid-cols-5'}`}>
+          {!preview && <FirmwarePanel deviceId={device.id} />}
           <HealthPanel deviceId={device.id} />
-          <JiraPanel deviceId={device.id} />
-          <SalesforcePanel deviceId={device.id} deviceSerial={device.serialNumber} />
-          <AttachmentsPanel deviceId={device.id} />
+          {!preview && <JiraPanel deviceId={device.id} />}
+          {!preview && <SalesforcePanel deviceId={device.id} deviceSerial={device.serialNumber} />}
+          {!preview && <AttachmentsPanel deviceId={device.id} />}
         </div>
 
         {/* Timeline */}
-        <div className="mt-10 border-t border-[var(--ui-background-layer-border-border-layer-page)] pt-8 pb-12">
+        {!preview && <div className="mt-10 border-t border-[var(--ui-background-layer-border-border-layer-page)] pt-8 pb-12">
           <div className="flex items-center gap-2 mb-4">
             <Clock size={18} className="text-[var(--ui-text-text-tertiary)]" />
             <h3 className="text-lg font-semibold text-[var(--ui-text-text-primary)]">Device Timeline</h3>
           </div>
           <DeviceTimeline deviceId={device.id} />
-        </div>
+        </div>}
       </div>
 
       {showDeactivateModal && <DeactivateDeviceModal device={device} onClose={() => setShowDeactivateModal(false)} />}
@@ -348,9 +352,9 @@ function SectionBlock({ title, children }: { title: string; children: React.Reac
   );
 }
 
-function DetailField({ label, value, editing, field, editData, setEditData, linkUrl, options }: {
+function DetailField({ label, value, editing, field, editData, setEditData, linkUrl, hint, options }: {
   label: string; value: string; editing: boolean; field: keyof Device;
-  editData: Device; setEditData: (d: Device) => void; linkUrl?: string; options?: string[];
+  editData: Device; setEditData: (d: Device) => void; linkUrl?: string; hint?: string; options?: string[];
 }) {
   if (editing) {
     return (
@@ -381,7 +385,7 @@ function DetailField({ label, value, editing, field, editData, setEditData, link
       {linkUrl && value ? (
         <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ui-core-periwinkle-periwinkle-6)] hover:text-[var(--ui-core-periwinkle-periwinkle-7)] hover:underline font-medium">{value} ↗</a>
       ) : (
-        <span className="text-sm text-[var(--ui-text-text-primary)]">{value || '—'}</span>
+        <span className="text-sm text-[var(--ui-text-text-primary)]" title={hint}>{value || '—'}</span>
       )}
     </div>
   );

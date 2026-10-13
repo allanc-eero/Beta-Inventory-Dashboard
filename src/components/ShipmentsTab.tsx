@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { runDeviceSync } from '@/lib/networkSync';
 import JiraToast from './JiraToast';
 import UploadProgramSheetModal from './programs/UploadProgramSheetModal';
+import EeroConnectionCard from './EeroConnectionCard';
 import { PROGRAM_SHEET_COLUMNS, ColumnSpec, downloadProgramSheetTemplate } from '@/lib/importTemplates';
 import { createJiraIssue } from '@/services/jiraService';
 import { CARRIERS, TRACKING_URLS, EPIC_MAP, JIRA_EPIC_KEY, getTrackingUrl, daysSince as daysSinceFn } from '@/constants';
@@ -501,6 +502,9 @@ export default function ShipmentsTab({ showPendingReturns, importsMode = false }
           ]}
         />}
       </div>
+
+      {/* Imports: eero sign-in status (serial → Insight/Admin links) */}
+      {importsMode && <EeroConnectionCard />}
 
       {/* Imports: one card — upload, template, and exactly what the sheet needs */}
       {importsMode && canEdit() && (

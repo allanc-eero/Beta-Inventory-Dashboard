@@ -36,9 +36,12 @@ import { useBetaProgramsStore } from '@/store/betaProgramsStore';
 import { deviceInProgram, liveProgramDevices } from '@/lib/programs';
 import { runDeviceSync } from '@/lib/networkSync';
 import DeviceDetailPanel from '../DeviceDetailPanel';
+import DevicesTab from '../DevicesTab';
+import OverviewDashboard from '../OverviewDashboard';
 import SurveysEngagementReport from '@/components/surveysEngagement/SurveysEngagementReport';
+import type { BoundSurvey, MilestoneType } from '@/components/surveysEngagement/types';
 import { ENGAGEMENT_LIVE, fetchLiveEngagement, LiveEngagement } from '@/lib/engagement';
-import { insightNetworkUrl, adminNetworkUrl, resolveEnv, EeroEnv } from '@/lib/format';
+import { insightNetworkUrl, adminNetworkUrl, resolveEnv, EeroEnv, isVerifiedNetwork, NETWORK_UNCONFIRMED_TIP } from '@/lib/format';
 import type {
   ProgramType, SurveyKind, Cadence, Phase,
   DemoSurvey, DemoTester, DemoProgram, DeviceLiveStatus, AssignedDevice,
@@ -54,6 +57,22 @@ import {
   engagementLevel, simulate, betaModelFor, programEnumFor,
   countryForSerial, assignmentsFromStore, toStoreDevice, slugify, contactToTester,
 } from './helpers';
+
+// App survey → the Surveys page's bound-survey shape (same Qualtrics id + dates).
+const KIND_TO_MILESTONE: Partial<Record<SurveyKind, MilestoneType>> = { oobe: 'oobe', performance: 'weekly', rtm: 'rtm', final: 'exit' };
+function toBoundSurvey(s: DemoSurvey): BoundSurvey {
+  return {
+    localId: s.id,
+    qualtricsId: s.qualtricsId || null,
+    name: s.title,
+    milestone: KIND_TO_MILESTONE[s.kind] ?? 'custom',
+    phase: s.phase ?? 'Beta',
+    startDate: s.startDate,
+    finishDate: s.finishDate,
+    recipients: s.recipients,
+    responses: s.responses,
+  };
+}
 
 // Types live in ./types. Survey-kind metadata below drives the pickers and tags.
 // Seed data (SURVEY_KINDS, PHASES, INITIAL_SURVEYS, TESTERS, INITIAL_PROGRAMS,
@@ -565,8 +584,16 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                               ? <span className="text-xs" style={{ color: TEXT_SECONDARY }}>📍 {countryForSerial(d.serial).name}</span>
                               : <span className="text-xs" style={{ color: TEXT_TERTIARY }}>awaiting first connection</span>}
                             {d.networkId && (() => {
-                              const nurl = insightNetworkUrl(d.networkId!, linkEnv);
-                              const aurl = adminNetworkUrl(d.networkId!, linkEnv);
+                              // Same rules as the Devices table: the store device's env
+                              // (shapeshift) wins over the program default, and a
+                              // demo-fabricated network id is never linked.
+                              const sd = getDeviceBySerial(d.serial);
+                              const env = sd ? resolveEnv(sd.environment, sd.program) : linkEnv;
+                              if (!isVerifiedNetwork(d.networkId, [d.serial], [t.email, sd?.assignedEmail])) {
+                                return <span className="text-xs" style={{ color: TEXT_TERTIARY }} title={NETWORK_UNCONFIRMED_TIP}>network not confirmed</span>;
+                              }
+                              const nurl = insightNetworkUrl(d.networkId!.trim(), env);
+                              const aurl = adminNetworkUrl(d.networkId!.trim(), env);
                               return (nurl || aurl) ? (
                                 <span className="flex items-center gap-2 text-xs">
                                   {nurl && <a href={nurl} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Insight network ↗</a>}
@@ -574,7 +601,7 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
                                   {aurl && <a href={aurl} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: ACCENT }}>Admin ↗</a>}
                                 </span>
                               ) : (
-                                <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{linkEnv} links not configured</span>
+                                <span className="text-xs" style={{ color: TEXT_TERTIARY }}>{env} links not configured</span>
                               );
                             })()}
                             <div className="ml-auto flex items-center gap-2">
@@ -631,16 +658,9 @@ function ProgramDevicesView({ program, onBack, onToast, onNavigateToPerson }: {
 }
 
 // Compact metric cell — small muted label over a small value, Insight row style.
-// "Oct 15 – Dec 15, 2026" from the program's start/finish (sheet uploads set both).
-function programDates(p: DemoProgram): string {
-  if (!p.startDate && !p.finishDate) return '—';
-  const fmt = (iso: string, withYear: boolean) =>
-    new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
-  if (p.startDate && p.finishDate) {
-    const sameYear = p.startDate.slice(0, 4) === p.finishDate.slice(0, 4);
-    return `${fmt(p.startDate, !sameYear)} – ${fmt(p.finishDate, true)}`;
-  }
-  return p.startDate ? `Starts ${fmt(p.startDate, true)}` : `Ends ${fmt(p.finishDate!, true)}`;
+// "Oct 15, 2026" — program start/finish (sheet uploads set both); "—" when unset.
+function fmtProgramDate(iso?: string): string {
+  return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 }
 
 function HealthMetric({ label, children, onClick }: { label: string; children: React.ReactNode; onClick?: () => void }) {
@@ -698,15 +718,16 @@ function ProgramHealthView({ programs: allPrograms, surveys, onToast, onNewProgr
           )
           : <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{programs.length} program{programs.length === 1 ? '' : 's'}</p>}
         <div className="flex items-center gap-2">
-          <Button type="primary" leftIcon={ICONS.FUNCTIONAL_ADD} label="New Program" onClick={onNewProgram} />
-          <Button type="text" leftIcon={ICONS.FUNCTIONAL_DOWNLOAD} label="Export report" onClick={() => onToast('Exported program-health report to CSV (simulated)')} />
+          {!groupByStatus && <Button type="primary" leftIcon={ICONS.FUNCTIONAL_ADD} label="New Program" onClick={onNewProgram} />}
+          {!groupByStatus && <Button type="text" leftIcon={ICONS.FUNCTIONAL_DOWNLOAD} label="Export report" onClick={() => onToast('Exported program-health report to CSV (simulated)')} />}
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
         {pageItems.map((p) => {
           const surveyCount = surveys.filter((s) => s.programId === p.id).length;
-          const noSurveys = p.status === 'active' && surveyCount === 0;
+          // Preview: surveys are added from the Surveys page, not the program card.
+          const noSurveys = !groupByStatus && p.status === 'active' && surveyCount === 0;
           // Match the DevicesTab container exactly: devices grouped under this
           // program's name. Online = those reporting online right now.
           // Archived / returning units don't count toward the live program.
@@ -728,9 +749,11 @@ function ProgramHealthView({ programs: allPrograms, surveys, onToast, onNewProgr
                       : <span className="block max-w-full truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{p.name}</span>}
                     <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>{p.type === 'feature' ? 'Feature' : `Hardware${p.currentPhase ? ` · ${p.currentPhase}` : ''}`}</p>
                   </div>
-                  <div className="flex-1"><HealthMetric label="Dates">{programDates(p)}</HealthMetric></div>
+                  <div className="flex-1"><HealthMetric label="Start date">{fmtProgramDate(p.startDate)}</HealthMetric></div>
+                  <div className="flex-1"><HealthMetric label="Finish date">{fmtProgramDate(p.finishDate)}</HealthMetric></div>
                   <div className="flex-1"><HealthMetric label="Audience">{p.testers.length} testers</HealthMetric></div>
-                  <div className="flex-1"><HealthMetric label="Response rate">{p.surveyResponseRate}%</HealthMetric></div>
+                  {/* Response rate is shown per program on the Surveys page, not here (preview). */}
+                  {!groupByStatus && <div className="flex-1"><HealthMetric label="Response rate">{p.surveyResponseRate}%</HealthMetric></div>}
                   <div className="flex-1">
                     <HealthMetric label="Devices online" onClick={p.type === 'hardware' ? () => onOpenDevices(p) : undefined}>
                       {p.type === 'feature' ? '—' : `${online} of ${deployed}`}
@@ -759,7 +782,7 @@ function ProgramHealthView({ programs: allPrograms, surveys, onToast, onNewProgr
                 <div className="flex flex-wrap items-center justify-between gap-1">
                   <div className="flex flex-wrap items-center gap-1">
                     {p.type === 'hardware' && <Button type="text" label="View devices" onClick={() => onOpenDevices(p)} />}
-                    {p.status === 'active' && <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey(p.id)} />}
+                    {!groupByStatus && p.status === 'active' && <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey(p.id)} />}
                     <Button type="text" leftIcon={p.status === 'active' ? ICONS.FUNCTIONAL_CHECK : ICONS.FUNCTIONAL_REFRESH} label={p.status === 'active' ? 'Close' : 'Reopen'} onClick={() => onToggleStatus(p)} />
                   </div>
                   <Button type="text" leftIcon={ICONS.FUNCTIONAL_DELETE} label="Delete" onClick={() => onDeleteProgram(p)} />
@@ -791,6 +814,59 @@ function ProgramHealthView({ programs: allPrograms, surveys, onToast, onNewProgr
           ln10_label={{ prevBtn: 'Previous', nextBtn: 'Next', pageBtn: 'Page', itemsPerPage: 'Per page', counter: (s, e, t) => `Showing ${s}–${e} of ${t}` }}
         />
       )}
+    </div>
+  );
+}
+
+// ─── One program's devices (preview) ─────────────────────────────────────────
+// Opened from a program name on the Programs page: the Devices menu view scoped to
+// this program — its Top Regions chart and its device table. Clicking a serial
+// opens the same device detail panel as the Devices menu.
+function ProgramDevicesPage({ program, onBack, onNavigateToPerson }: {
+  program: DemoProgram;
+  onBack: () => void;
+  onNavigateToPerson?: (email: string) => void;
+}) {
+  const { devices } = useDeviceStore();
+  const live = liveProgramDevices(devices, program.name);
+  const online = live.filter((d) => d.status === 'online').length;
+  const details: [string, React.ReactNode][] = [
+    ['Testers', program.testers.length],
+    ['Devices', live.length],
+    ['Online', `${online} of ${live.length}`],
+    ['Not online', live.length - online],
+    ['Cohort', programEnumFor(program) === 'dogfood' ? 'Dogfood · stage' : 'Beta · prod'],
+    ['Phase', program.currentPhase || '—'],
+    ['Start date', fmtProgramDate(program.startDate)],
+    ['Finish date', fmtProgramDate(program.finishDate)],
+    ['OK2Street date', fmtProgramDate(program.ok2StreetDate)],
+  ];
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <button className="text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={onBack}>← Back to programs</button>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold" style={{ color: TEXT_PRIMARY }}>{program.name}</h2>
+          {program.currentPhase && phaseTag(program.currentPhase)}
+          <Tag color={program.status === 'active' ? 'green' : 'grey'} size="regular">{program.status === 'active' ? 'Active program' : 'Program completed'}</Tag>
+        </div>
+      </div>
+      {/* Program details + Top Regions side by side, so neither stretches across the page */}
+      <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
+        <Card size={3}>
+          <p className="mb-4 text-xs font-bold uppercase" style={{ color: TEXT_SECONDARY }}>Program details</p>
+          <dl className="grid grid-cols-3 gap-x-4 gap-y-4">
+            {details.map(([k, v]) => (
+              <div key={k} className="min-w-0">
+                <dt className="text-xs" style={{ color: TEXT_TERTIARY }}>{k}</dt>
+                <dd className="mt-0.5 truncate text-sm font-medium" style={{ color: TEXT_PRIMARY }}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+        <OverviewDashboard compact programName={program.name} />
+      </div>
+      <DevicesTab hideAgent programName={program.name} onNavigateToPerson={onNavigateToPerson} />
     </div>
   );
 }
@@ -830,6 +906,9 @@ export function ProgramsView({ embedded = false, onNavigateToPerson, section, on
   const [newProgramOpen, setNewProgramOpen] = useState(false);
   // New Survey modal — optionally preselected to a program.
   const [newSurvey, setNewSurvey] = useState<{ open: boolean; programId?: string }>({ open: false });
+  // Surveys created this session, handed to the Surveys page (whose containers are
+  // the same store programs) so they appear in their program's container.
+  const [reportAdds, setReportAdds] = useState<{ programId: string; programName: string; survey: BoundSurvey }[]>([]);
 
   const { openToast } = useToast();
   const showToast = (msg: string) => openToast({ type: ToastType.success, description: msg });
@@ -853,6 +932,7 @@ export function ProgramsView({ embedded = false, onNavigateToPerson, section, on
   // If the survey belongs to a later phase, the program advances to that phase.
   const handleCreateSurvey = (survey: DemoSurvey) => {
     setSurveys((prev) => [survey, ...prev]);
+    setReportAdds((prev) => [...prev, { programId: survey.programId, programName: survey.programName, survey: toBoundSurvey(survey) }]);
     if (survey.phase) {
       setPrograms((prev) => prev.map((p) => (p.id === survey.programId ? { ...p, currentPhase: survey.phase } : p)));
     }
@@ -869,6 +949,8 @@ export function ProgramsView({ embedded = false, onNavigateToPerson, section, on
   const handleCreateProgram = (program: DemoProgram, firstSurvey: DemoSurvey) => {
     setPrograms((prev) => [...prev, program]);
     setSurveys((prev) => [firstSurvey, ...prev]);
+    // The wizard's first survey inherits the program's testing window.
+    setReportAdds((prev) => [...prev, { programId: program.id, programName: program.name, survey: toBoundSurvey({ ...firstSurvey, startDate: firstSurvey.startDate ?? program.startDate, finishDate: firstSurvey.finishDate ?? program.finishDate }) }]);
     setView('surveys');
     showToast(`Created ${program.name} (${program.testers.length} testers) + first survey “${firstSurvey.title}”`);
     setNewProgramOpen(false);
@@ -910,12 +992,13 @@ export function ProgramsView({ embedded = false, onNavigateToPerson, section, on
   return (
     <div className={embedded ? '' : 'min-h-screen'} style={embedded ? undefined : { backgroundColor: 'var(--ui-background-bg-secondary, #f5f6f7)' }}>
       <div className={`w-full ${embedded ? 'px-0 pt-0 pb-10' : 'px-6 pt-6 pb-10'}`}>
-        <header className="mb-3">
+        {/* Inside one program's page (preview) the program itself is the header. */}
+        {!(section && openProgram) && <header className="mb-3">
           <h1 className="text-base font-semibold" style={{ color: TEXT_PRIMARY }}>{section ? tab.label : 'Surveys & Engagement'}</h1>
-          <p className="mt-0.5 text-xs" style={{ color: TEXT_TERTIARY }}>
+          {section !== 'surveys' && (<p className="mt-0.5 text-xs" style={{ color: TEXT_TERTIARY }}>
             {section ? tab.description : 'Feedback loop for beta & dogfood programs — surveys via Qualtrics, joined to your testers, programs, and devices.'}
-          </p>
-        </header>
+          </p>)}
+        </header>}
 
         {!section && (
           <div className="mb-4 w-fit">
@@ -927,10 +1010,19 @@ export function ProgramsView({ embedded = false, onNavigateToPerson, section, on
           </div>
         )}
 
-        {view === 'surveys' && <SurveysEngagementReport embedded />}
+        {view === 'surveys' && (section
+          ? <SurveysEngagementReport
+              embedded
+              // Preview: "+ New survey" lives in each active program's container here.
+              onNewSurvey={(programId) => setNewSurvey({ open: true, programId })}
+              addedSurveys={reportAdds}
+            />
+          : <SurveysEngagementReport embedded addedSurveys={reportAdds} />)}
         {view === 'engagement' && <EngagementView programs={visiblePrograms} onToast={showToast} />}
         {view === 'health' && (openProgram
-          ? <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} onNavigateToPerson={onNavigateToPerson} />
+          ? (section
+            ? <ProgramDevicesPage program={openProgram} onBack={() => setOpenProgram(null)} onNavigateToPerson={onNavigateToPerson} />
+            : <ProgramDevicesView program={openProgram} onBack={() => setOpenProgram(null)} onToast={showToast} onNavigateToPerson={onNavigateToPerson} />)
           : <ProgramHealthView
               programs={visiblePrograms}
               surveys={visibleSurveys}
@@ -1309,6 +1401,9 @@ function NewSurveyModal({
   const [kind, setKind] = useState<SurveyKind>('performance');
   const [cadence, setCadence] = useState<Cadence>(SURVEY_KINDS['performance'].defaultCadence);
   const [submitting, setSubmitting] = useState(false); // guards against a double-click creating two
+  const [startDate, setStartDate] = useState('');
+  const [finishDate, setFinishDate] = useState('');
+  const datesInvalid = !!startDate && !!finishDate && finishDate < startDate;
 
   // The Qualtrics survey this collects from (what Insight pulls responses from).
   const { surveys: qSurveys, source: qSource, loading: qLoading } = useQualtricsSurveys();
@@ -1324,10 +1419,10 @@ function NewSurveyModal({
   const ph = isHardware ? phase : undefined;
   // A same program + kind + phase survey already exists → likely an accidental repeat.
   const isDuplicate = !!program && existingKeys.includes(`${program.id}|${kind}|${ph ?? 'none'}`);
-  const canCreate = !!program && !!chosen && !submitting;
+  const canCreate = !!program && !!chosen && !!startDate && !!finishDate && !datesInvalid && !submitting;
 
   const create = () => {
-    if (!program || !chosen || submitting) return;
+    if (!canCreate || !program || !chosen) return;
     setSubmitting(true);
     const base = `${program.id}-${kind}-${ph ?? 'x'}`;
     let id = base, n = 2;
@@ -1347,6 +1442,8 @@ function NewSurveyModal({
       recipients,
       responses: 0,
       avgCompletionMins: 0,
+      startDate,
+      finishDate,
       questions: [{ id: 'q1', type: 'rating', title: 'Responses sync from Qualtrics via Insight', ratingCounts: [0, 0, 0, 0, 0] }],
     });
   };
@@ -1413,6 +1510,17 @@ function NewSurveyModal({
           options={(Object.keys(SURVEY_KINDS) as SurveyKind[]).map((k) => ({ value: k, label: SURVEY_KINDS[k].label }))}
           layout="vertical"
         />
+        <div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input id="ns-start" type="date" label="Start date" value={startDate} layout="vertical"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)} />
+            <Input id="ns-finish" type="date" label="Finish date" value={finishDate} layout="vertical"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFinishDate(e.target.value)} />
+          </div>
+          <p className="mt-1 text-xs" style={{ color: datesInvalid ? BAD_RED : TEXT_TERTIARY }}>
+            {datesInvalid ? 'Finish date must be on or after the start date.' : 'Required — when the survey opens and closes.'}
+          </p>
+        </div>
         <Select
           id="ns-cadence"
           label="Cadence"

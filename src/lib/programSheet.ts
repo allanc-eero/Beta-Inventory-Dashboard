@@ -31,6 +31,7 @@ export interface PlannedProgram {
   phase?: Phase;
   startDate: string;  // ISO YYYY-MM-DD
   finishDate: string; // ISO YYYY-MM-DD — devices are due back
+  ok2StreetDate?: string; // ISO — optional launch milestone
   rows: PlannedRow[];
   newTesterCount: number;
   deviceCount: number;
@@ -53,7 +54,7 @@ export interface SheetPlan {
 // each row to a program and a person. No Status column: online state is only known
 // once the eero API sync checks the device.
 export const SHEET_COLUMNS = [
-  'Program', 'Cohort', 'Serial Number', 'Internal Name', 'Phase', 'Start Date', 'Finish Date', 'Firmware', 'Group', 'Assigned To', 'Tester Email',
+  'Program', 'Cohort', 'Serial Number', 'Internal Name', 'Phase', 'Start Date', 'Finish Date', 'OK2Street Date', 'Firmware', 'Group', 'Assigned To', 'Tester Email',
 ];
 
 // Accepted header spellings (compared after lowercasing and stripping non-alphanumerics).
@@ -65,6 +66,7 @@ const ALIASES = {
   phase: ['phase'],
   startDate: ['startdate', 'start'],
   finishDate: ['finishdate', 'finish', 'enddate', 'end'],
+  ok2StreetDate: ['ok2streetdate', 'ok2street', 'oktostreetdate', 'oktostreet'],
   firmware: ['firmware', 'firmwareversion'],
   group: ['group', 'networkgroup', 'osupdategroup'],
   name: ['assignedto', 'testername', 'name', 'tester', 'fullname'],
@@ -149,6 +151,7 @@ export function parseProgramSheet(
     const internalName = pick(row, ALIASES.internalName);
     const rawStart = pick(row, ALIASES.startDate);
     const rawFinish = pick(row, ALIASES.finishDate);
+    const rawOk2Street = pick(row, ALIASES.ok2StreetDate);
     const flag = (kind: SheetIssue['kind'], message: string) => issues.push({ rowNumber, program, kind, message });
 
     if (!program && !email && !serial) return; // blank row
@@ -207,6 +210,11 @@ export function parseProgramSheet(
     }
 
     if (!plan.phase) plan.phase = phase;
+    if (rawOk2Street) {
+      const ok2 = parseSheetDate(rawOk2Street);
+      if (!ok2) flag('warning', `OK2Street Date "${rawOk2Street}" isn't a date — ignored`);
+      else if (!plan.ok2StreetDate) plan.ok2StreetDate = ok2;
+    }
     // One schedule per program — the first row sets it; flag rows that disagree.
     if (startDate !== plan.startDate || finishDate !== plan.finishDate) {
       flag('warning', `Dates ${startDate} → ${finishDate} differ from the program's ${plan.startDate} → ${plan.finishDate} (first row) — using the first row's`);
@@ -286,6 +294,7 @@ export function applyProgramSheet(plans: PlannedProgram[], programs: DemoProgram
       // The sheet is the schedule of record — adding to an existing program updates it.
       startDate: plan.startDate,
       finishDate: plan.finishDate,
+      ok2StreetDate: plan.ok2StreetDate ?? base.ok2StreetDate,
     };
     (plan.existingProgramId ? updated : created).push(program);
 

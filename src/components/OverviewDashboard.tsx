@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { Card } from '@amzn/eero-web-design-components';
 import { useDeviceStore } from '@/store/deviceStore';
+import { deviceInProgram } from '@/lib/programs';
 
 // ─── Reusable Components ──────────────────────────────────────────────────────
 export function DonutChart({ title, items, total, size, strokeWidth, centerLabel, centerValue }: {
@@ -78,8 +79,14 @@ function groupAndSort(devices: any[], keyFn: (d: any) => string, colors: string[
 
 // `compact` (used by the /demo-dashboard preview): drop the KPI strip and the
 // Status Breakdown donut — the Dashboard already covers both.
-export default function OverviewDashboard({ compact = false }: { compact?: boolean } = {}) {
-  const { devices } = useDeviceStore();
+// `programName` (per-program page in the preview): only that program's devices,
+// and only the Top Regions chart.
+export default function OverviewDashboard({ compact = false, programName }: { compact?: boolean; programName?: string } = {}) {
+  const { devices: allDevices } = useDeviceStore();
+  const devices = useMemo(
+    () => (programName ? allDevices.filter((d) => deviceInProgram(d, programName)) : allDevices),
+    [allDevices, programName],
+  );
 
   const total = devices.length;
   const online = devices.filter((d) => d.status === 'online').length;
@@ -118,10 +125,10 @@ export default function OverviewDashboard({ compact = false }: { compact?: boole
       </Card>}
 
       {/* ROW 2: Donut Charts */}
-      <div className={`grid grid-cols-1 gap-4 ${compact ? 'desktop:grid-cols-2' : 'lg:grid-cols-3'}`}>
+      <div className={`grid grid-cols-1 gap-4 ${programName ? '' : compact ? 'desktop:grid-cols-2' : 'lg:grid-cols-3'}`}>
         {!compact && <DonutChart title="Status Breakdown" items={statusItems} total={total} size={140} strokeWidth={24} centerLabel="Devices" />}
         <DonutChart title="Top Regions" items={regionItems} total={total} size={120} strokeWidth={20} centerLabel="Regions" centerValue={regionItems.length} />
-        <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Top Model" centerValue={modelItems[0]?.name || '—'} />
+        {!programName && <DonutChart title="Top Models" items={modelItems} total={total} size={120} strokeWidth={20} centerLabel="Top Model" centerValue={modelItems[0]?.name || '—'} />}
       </div>
     </div>
   );

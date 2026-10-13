@@ -18,6 +18,8 @@ export const PHASES: Phase[] = ['EVT', 'DVT', 'PVT'];
 export const INITIAL_SURVEYS: DemoSurvey[] = [
   {
     id: 'sv-foghorn-setup',
+    startDate: '2026-09-01',
+    finishDate: '2026-09-12',
     title: 'Foghorn Firmware 7.2 — Setup Experience',
     description: 'First-run feedback on the 7.2 firmware setup flow. Feature beta — no hardware shipped.',
     status: 'published',
@@ -62,6 +64,8 @@ export const INITIAL_SURVEYS: DemoSurvey[] = [
   },
   {
     id: 'sv-merci-weekly',
+    startDate: '2026-08-04',
+    finishDate: '2026-10-30',
     title: 'Merci Beta — Weekly Check-in',
     description: 'Recurring pulse on stability and coverage for the Merci hardware beta cohort.',
     status: 'published',
@@ -114,6 +118,8 @@ export const INITIAL_SURVEYS: DemoSurvey[] = [
   },
   {
     id: 'sv-merci-rtm',
+    startDate: '2026-08-27',
+    finishDate: '2026-09-03',
     title: 'Merci Beta — RTM Validation',
     description: 'Production-unit validation run mid-DVT. The weekly pulse paused while this ran, then resumed as Wave 4.',
     status: 'closed',
@@ -144,6 +150,8 @@ export const INITIAL_SURVEYS: DemoSurvey[] = [
   },
   {
     id: 'sv-outdoor-coverage',
+    startDate: '2026-06-08',
+    finishDate: '2026-06-26',
     title: 'Outdoor Dogfood — Coverage Feedback',
     description: 'Coverage and mounting feedback for the outdoor dogfood program.',
     status: 'closed',
@@ -163,6 +171,8 @@ export const INITIAL_SURVEYS: DemoSurvey[] = [
   },
   {
     id: 'sv-app-redesign',
+    startDate: '2026-10-19',
+    finishDate: '2026-10-30',
     title: 'App Redesign — Concept Test',
     description: 'Draft concept test for the redesigned app home screen. Not yet distributed.',
     status: 'draft',

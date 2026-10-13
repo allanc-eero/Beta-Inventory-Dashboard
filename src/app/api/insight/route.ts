@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { adminBase, getAdminToken, getAuthStatus, markExpired, verifyAdmin } from '@/lib/server/eeroAuth';
 
 /**
  * Resolve a tester's device(s) online status + network from the eero API.
@@ -33,14 +34,13 @@ function parseEnv(v: string | null | undefined): Env {
 }
 
 // Admin API — primary path (global by-serial + network listing).
-function adminConfig(env: Env): { base: string; token: string | undefined } {
-  if (env === 'stage') {
-    return { base: process.env.EERO_ADMIN_API_BASE_STAGE || 'https://api-admin.stage.e2ro.com', token: process.env.EERO_ADMIN_API_TOKEN_STAGE };
-  }
-  return { base: process.env.EERO_ADMIN_API_BASE_PROD || 'https://api-admin.e2ro.com', token: process.env.EERO_ADMIN_API_TOKEN_PROD };
+// Token comes from an env var (hosted) or the eero CLI sign-in on this machine —
+// see src/lib/server/eeroAuth.ts and README → "Connect to eero".
+async function adminConfig(env: Env): Promise<{ base: string; token: string | undefined }> {
+  return { base: adminBase(env), token: (await getAdminToken(env)) ?? undefined };
 }
-function adminLive(env: Env): boolean {
-  const { base, token } = adminConfig(env);
+async function adminLive(env: Env): Promise<boolean> {
+  const { base, token } = await adminConfig(env);
   return !!base && !!token;
 }
 
@@ -60,11 +60,14 @@ function userLive(env: Env): boolean {
 }
 
 // Generic authenticated GET → returns the unwrapped `data` payload.
-async function apiGet(base: string, token: string | undefined, path: string): Promise<any> {
+// Pass `adminEnv` for Admin API calls so a 401 flags that sign-in as expired.
+async function apiGet(base: string, token: string | undefined, path: string, adminEnv?: Env): Promise<any> {
   const res = await fetch(`${base}${path}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    // Same headers the eero CLI sends: X-Admin-Token for the Admin API, X-User-Token for the User API.
+    headers: { [adminEnv ? 'X-Admin-Token' : 'X-User-Token']: token || '', Accept: 'application/json' },
     cache: 'no-store',
   });
+  if ((res.status === 401 || res.status === 403) && adminEnv) markExpired(adminEnv);
   if (!res.ok) throw new Error(`eero ${res.status} for ${path}`);
   const body = await res.json();
   return body?.data ?? body;
@@ -79,14 +82,14 @@ function idFromUrl(url: unknown): string | null {
 
 type MatchState = 'matched' | 'multiple' | 'unmatched';
 interface InsightEero { serial: string; model: string; firmware: string; online: boolean }
-interface ResolvedDevice { serial: string; online: boolean; networkId: string | null; firmware: string; model: string; found: boolean; group: string }
+interface ResolvedDevice { serial: string; online: boolean; networkId: string | null; firmware: string; model: string; found: boolean; group: string; ownerId?: string }
 interface SerialInput { serial: string; network?: string | null }
 
 // ── Batch resolver (Admin API, option B) ───────────────────────────────────────
 // 1) by-serial ONLY the serials whose network we don't already know → learn networkId
 // 2) fetch each UNIQUE network once → nodes[] gives serial+status+firmware for all
 async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<string, ResolvedDevice>> {
-  const { base, token } = adminConfig(env);
+  const { base, token } = await adminConfig(env);
   const out = new Map<string, ResolvedDevice>();
   const networkOf = new Map<string, string>(); // serial → networkId
   const networks = new Set<string>();
@@ -102,7 +105,7 @@ async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<s
   const unknown = items.map((i) => i.serial.trim().toUpperCase()).filter((s) => !networkOf.has(s));
   await Promise.all(unknown.map(async (serial) => {
     try {
-      const e = await apiGet(base, token, `/eeros/serial/${encodeURIComponent(serial)}`);
+      const e = await apiGet(base, token, `/eeros/serial/${encodeURIComponent(serial)}`, env);
       const nid = idFromUrl(e?.network?.url);
       if (nid) { networkOf.set(serial, nid); networks.add(nid); }
       else out.set(serial, { serial, online: false, networkId: null, firmware: '', model: e?.model || '', found: false, group: '' });
@@ -116,11 +119,15 @@ async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<s
   // field on this same response — captured here and applied to every node on it.
   const nodeBySerial = new Map<string, { online: boolean; firmware: string; model: string; networkId: string; group: string }>();
   const groupOf = new Map<string, string>(); // networkId → group
+  // The network owner's user id — the tester's Admin account (owners[0].url "/users/2961227").
+  const ownerOf = new Map<string, string>(); // networkId → owner user id
   await Promise.all(Array.from(networks).map(async (nid) => {
     try {
-      const net = await apiGet(base, token, `/networks/${encodeURIComponent(nid)}`);
+      const net = await apiGet(base, token, `/networks/${encodeURIComponent(nid)}`, env);
       const group = net?.group || '';
       groupOf.set(nid, group);
+      const owner = idFromUrl(net?.owners?.[0]?.url) || idFromUrl(net?.creator?.url);
+      if (owner) ownerOf.set(nid, owner);
       (net?.nodes || []).forEach((n: any) => {
         const s = (n.serial || '').toUpperCase();
         if (!s) return;
@@ -141,7 +148,7 @@ async function resolveSerialsLive(items: SerialInput[], env: Env): Promise<Map<s
     if (out.has(serial)) continue; // already marked not-found in step 1
     const node = nodeBySerial.get(serial);
     if (node) {
-      out.set(serial, { serial, online: node.online, networkId: node.networkId, firmware: node.firmware, model: node.model, found: true, group: node.group });
+      out.set(serial, { serial, online: node.online, networkId: node.networkId, firmware: node.firmware, model: node.model, found: true, group: node.group, ownerId: ownerOf.get(node.networkId) });
     } else {
       const nid = networkOf.get(serial) || null;
       out.set(serial, { serial, online: false, networkId: nid, firmware: '', model: '', found: false, group: nid ? (groupOf.get(nid) || '') : '' });
@@ -233,22 +240,26 @@ export async function GET(request: NextRequest) {
 
   // Readiness probe (per env, both APIs) for the sync connection badge.
   if (searchParams.get('op') === 'status') {
-    const a = { prod: adminLive('prod'), stage: adminLive('stage') };
+    // verify=1 makes one real Admin API call per cloud so an expired session shows as expired.
+    const check = searchParams.get('verify') === '1' ? verifyAdmin : getAuthStatus;
+    const [prod, stage] = await Promise.all([check('prod'), check('stage')]);
+    const a = { prod: prod.state === 'connected', stage: stage.state === 'connected' };
     const u = { prod: userLive('prod'), stage: userLive('stage') };
     return NextResponse.json({
       ready: a.prod || a.stage,
       source: a.prod || a.stage ? 'live' : 'seed',
-      identity: `admin[prod:${a.prod ? 'live' : 'seed'}, stage:${a.stage ? 'live' : adminConfig('stage').base ? 'seed' : 'n/a'}]`,
+      identity: `admin[prod:${a.prod ? 'live' : 'seed'}, stage:${a.stage ? 'live' : 'seed'}]`,
+      auth: { prod, stage },
       envs: {
-        prod: { ready: a.prod, adminConfigured: !!adminConfig('prod').base, userReady: u.prod },
-        stage: { ready: a.stage, adminConfigured: !!adminConfig('stage').base, userReady: u.stage },
+        prod: { ready: a.prod, adminConfigured: true, userReady: u.prod },
+        stage: { ready: a.stage, adminConfigured: true, userReady: u.stage },
       },
     });
   }
 
   // Serial-anchored (PREFERRED) — Admin API via the batch resolver (single serial).
   if (serial) {
-    if (!adminLive(env)) return NextResponse.json(seededSerialLookup(serial, env));
+    if (!(await adminLive(env))) return NextResponse.json(seededSerialLookup(serial, env));
     try {
       const map = await resolveSerialsLive([{ serial }], env);
       const r = map.get(serial.trim().toUpperCase());
@@ -297,10 +308,11 @@ export async function POST(request: NextRequest) {
   }
 
   const statuses: { serial: string; online: boolean }[] = [];
-  const testers: { serial: string; network: string; firmware?: string; group?: string }[] = [];
+  const testers: { serial: string; network: string; firmware?: string; group?: string; ownerId?: string }[] = [];
   const notFound: string[] = [];
 
-  if (!adminLive(env)) {
+  const live = await adminLive(env);
+  if (!live) {
     // Seeded fallback per serial.
     items.forEach((it) => {
       const r = seededSerialLookup(it.serial, env);
@@ -315,7 +327,7 @@ export async function POST(request: NextRequest) {
         const r = map.get(it.serial.trim().toUpperCase());
         if (!r || !r.found) { notFound.push(it.serial); statuses.push({ serial: it.serial, online: false }); return; }
         statuses.push({ serial: it.serial, online: r.online });
-        if (r.networkId) testers.push({ serial: it.serial, network: r.networkId, firmware: r.firmware, group: r.group });
+        if (r.networkId) testers.push({ serial: it.serial, network: r.networkId, firmware: r.firmware, group: r.group, ownerId: r.ownerId });
       });
     } catch (e: any) {
       return NextResponse.json({ success: false, error: e?.message || 'sync failed' }, { status: 502 });
@@ -325,7 +337,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     success: true,
     env,
-    source: adminLive(env) ? 'live' : 'seed',
+    source: live ? 'live' : 'seed',
     statuses,
     testers,
     onlineCount: statuses.filter((s) => s.online).length,

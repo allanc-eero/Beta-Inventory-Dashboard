@@ -70,6 +70,9 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
     // Serials the source could not resolve (Insight: device lookup failed). Their
     // `online:false` is "unknown", not "offline", so they must not be flipped.
     const unresolved = new Set<string>();
+    // Seeded (demo) responses invent network/firmware/group from the serial — never
+    // save those over real values, or links point at a random network.
+    let seeded = false;
 
     const postSync = async (payload: Record<string, unknown>) => {
       const res = await fetch(SYNC_ENDPOINT[DEVICE_SYNC_SOURCE], {
@@ -78,6 +81,7 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
         body: JSON.stringify({ op: 'sync', ...payload }),
       });
       const data = await res.json();
+      if (data.source === 'seed') seeded = true;
       // Never apply a failed lookup — it would wrongly mark everything offline.
       if (!data.success) throw new Error(data.error || 'Device sync failed');
       statuses = statuses.concat(data.statuses || []);
@@ -128,9 +132,14 @@ export async function runDeviceSync(serials?: string[]): Promise<SyncOutcome> {
       const updates: Record<string, string> = {};
       if (t.name && t.name !== device.assignedTo) updates.assignedTo = t.name;
       if (t.email && t.email !== device.assignedEmail) updates.assignedEmail = t.email;
-      if (t.network && t.network !== device.network) updates.network = t.network;
-      if (t.firmware && t.firmware !== device.firmwareVersion) updates.firmwareVersion = t.firmware;
-      if (t.group && t.group !== device.networkGroup) updates.networkGroup = t.group;
+      if (!seeded && t.network && t.network !== device.network) updates.network = t.network;
+      if (!seeded && t.firmware && t.firmware !== device.firmwareVersion) updates.firmwareVersion = t.firmware;
+      if (!seeded && t.group && t.group !== device.networkGroup) updates.networkGroup = t.group;
+      // Admin ID = the network owner's eero user id, stored like the sheet's "UID0002961227".
+      if (!seeded && t.ownerId) {
+        const uid = `UID${String(t.ownerId).padStart(10, '0')}`;
+        if (uid !== device.unitId) updates.unitId = uid;
+      }
       if (t.location && t.location !== device.location) updates.location = t.location;
       // Country: uploaded CSV is source of truth — only fill when empty.
       if (t.country && !device.country) updates.country = t.country;

@@ -20,6 +20,7 @@ export const PROGRAM_SHEET_COLUMNS: ColumnSpec[] = [
   { name: 'Phase', required: true, what: 'EVT, DVT or PVT. Shown on the program card and each device.' },
   { name: 'Start Date', required: true, what: 'When testing starts (YYYY-MM-DD or MM/DD/YYYY). Same on every row of a program.' },
   { name: 'Finish Date', required: true, what: "When testing ends — the testers' devices are due back then. Shows on the program card and the Dashboard's Coming up." },
+  { name: 'OK2Street Date', required: false, what: 'Optional — the OK2Street (launch) date. Shows on the Dashboard and in Coming up.' },
   { name: 'Internal Name', required: true, what: 'Device label in the Devices list (e.g. "Foghorn PVT").' },
   { name: 'Firmware', required: true, what: 'Firmware version if known. Cell may be blank — the online check fills it in.' },
   { name: 'Group', required: true, what: 'OS-update group if known. Cell may be blank — the online check fills it in.' },
@@ -29,10 +30,10 @@ const csv = (rows: string[][]) => rows.map((r) => r.map((c) => (/[",\n]/.test(c)
 
 export const PROGRAM_SHEET_TEMPLATE = csv([
   SHEET_COLUMNS,
-  // [Program, Cohort, Serial Number, Internal Name, Phase, Start Date, Finish Date, Firmware, Group, Assigned To, Tester Email]
-  ['Foghorn PVT', 'beta', 'GGC4G70A611511ES', 'Foghorn PVT', 'PVT', '2026-10-15', '2026-12-15', '', '', 'Jake Decker', 'jake.decker@example.com'],
-  ['Foghorn PVT', 'beta', 'GGC4G70A611512EC', 'Foghorn PVT', 'PVT', '2026-10-15', '2026-12-15', '', '', 'Jake Decker', 'jake.decker@example.com'],
-  ['Foghorn PVT', 'beta', '', 'Foghorn PVT', 'PVT', '2026-10-15', '2026-12-15', '', '', 'Eric Busch', 'eric.busch@example.com'],
+  // [Program, Cohort, Serial Number, Internal Name, Phase, Start Date, Finish Date, OK2Street Date, Firmware, Group, Assigned To, Tester Email]
+  ['Foghorn PVT', 'beta', 'GGC4G70A611511ES', 'Foghorn PVT', 'PVT', '2026-10-15', '2026-12-15', '2027-01-20', '', '', 'Jake Decker', 'jake.decker@example.com'],
+  ['Foghorn PVT', 'beta', 'GGC4G70A611512EC', 'Foghorn PVT', 'PVT', '2026-10-15', '2026-12-15', '2027-01-20', '', '', 'Jake Decker', 'jake.decker@example.com'],
+  ['Foghorn PVT', 'beta', '', 'Foghorn PVT', 'PVT', '2026-10-15', '2026-12-15', '2027-01-20', '', '', 'Eric Busch', 'eric.busch@example.com'],
 ]);
 
 export function downloadCsv(fileName: string, content: string) {

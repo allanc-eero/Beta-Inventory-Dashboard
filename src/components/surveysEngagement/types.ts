@@ -29,6 +29,11 @@ export interface BoundSurvey {
   name: string;
   milestone: MilestoneType;
   phase: Phase;
+  startDate?: string;     // ISO (YYYY-MM-DD) the survey opens
+  finishDate?: string;    // ISO the survey closes
+  recipients?: number;    // testers the survey was sent to
+  responses?: number;     // responses collected so far
+  feedbackScore?: number; // mean score, normalized to /5 (0/undefined = none yet)
 }
 export interface DemoProgram {
   id: string;

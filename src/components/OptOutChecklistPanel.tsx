@@ -5,7 +5,7 @@ import { OptOutRecord } from '@/types';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useAuthStore } from '@/store/authStore';
 import { CheckCircle, Circle, ExternalLink, Bell } from 'lucide-react';
-import { adminUserUrl, insightNetworkUrl, resolveEnv } from '@/lib/format';
+import { adminUserUrl, insightNetworkUrl, resolveEnv, isVerifiedNetwork, isVerifiedUnitId } from '@/lib/format';
 
 interface OptOutChecklistPanelProps {
   record: OptOutRecord;
@@ -21,8 +21,10 @@ export default function OptOutChecklistPanel({ record }: OptOutChecklistPanelPro
   };
 
   const profile = getTesterProfile(record.personEmail);
-  const networkId = profile?.networkId || '';
-  const adminId = profile?.adminId || '';
+  // Only link ids confirmed for this tester (not demo-generated ones).
+  const testerSerials = devices.filter((d) => d.assignedEmail === record.personEmail).map((d) => d.serialNumber);
+  const networkId = isVerifiedNetwork(profile?.networkId, testerSerials, [record.personEmail]) ? profile!.networkId : '';
+  const adminId = isVerifiedUnitId(profile?.adminId, testerSerials) ? profile!.adminId : '';
   const userName = currentUser?.name || 'Admin';
   // Route this tester's Insight/Admin links to the right cloud. Dogfood offboarding
   // touches stage networks, so infer env from the tester's devices.

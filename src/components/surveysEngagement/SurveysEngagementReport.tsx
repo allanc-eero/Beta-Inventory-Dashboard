@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Select, Tag, Card, Modal, Checkbox, Divider, ICONS } from '@amzn/eero-web-design-components';
 import { ChevronLeft, Sparkles, AlertTriangle, CheckCircle2, Wrench, Link2, MessageSquare } from 'lucide-react';
 import {
@@ -8,6 +8,11 @@ import {
   LiveSurveyListItem, LiveReport,
 } from './types';
 import { DEMO_PROGRAMS } from './mockData';
+import type { DemoProgram as AppProgram } from '../programs/types';
+import { programEnumFor } from '../programs/helpers';
+import { programKey } from '@/lib/programs';
+import { useBetaProgramsStore } from '@/store/betaProgramsStore';
+import { useUiStore } from '@/store/uiStore';
 import { generateNarrative, AI_DISCLAIMER, AiNarrative } from './aiNarrative';
 // Reuse the Programs feature's token constants so the demo matches the live
 // design system exactly (inline-style tokens, never arbitrary Tailwind).
@@ -29,31 +34,71 @@ const PHASE_OPTIONS = PHASES.map((p) => ({ value: p, label: p }));
 const today = () => new Date().toISOString().slice(0, 10);
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
+// Seed surveys keyed by programKey(program name) — attached to the store program
+// of the same name (e.g. the Merci surveys → "Merci Beta").
+const SEED_SURVEYS_BY_PROGRAM: Record<string, BoundSurvey[]> = Object.fromEntries(
+  DEMO_PROGRAMS.map((p) => [programKey(p.name), p.surveys]),
+);
+
 // Live Qualtrics survey → report flow. Rendered as the "Surveys" view inside the
 // Surveys & Engagement section (ProgramsView), and standalone-capable.
+// Program containers come from the app's program store (useBetaProgramsStore) —
+// the same list the Programs page shows — filtered by the global cohort lens.
+// Each container's surveys = seed/bound surveys + host-created ones for that program.
 // `embedded` drops the full-page shell since the host provides page chrome.
-export default function SurveysEngagementReport({ embedded = false }: { embedded?: boolean } = {}) {
-  const [programs, setPrograms] = useState<DemoProgram[]>(DEMO_PROGRAMS);
+// `onNewSurvey` (optional) adds a "+ New survey" button to each active program's
+// container — or one in the header when there are no programs — and hands the
+// program id (undefined from the header) back to the host's New Survey modal.
+// `addedSurveys` are surveys the host created (New Survey modal), placed into their
+// program's container by id (falling back to name).
+export default function SurveysEngagementReport({ embedded = false, onNewSurvey, addedSurveys = [] }: {
+  embedded?: boolean;
+  onNewSurvey?: (programId?: string) => void;
+  addedSurveys?: { programId?: string; programName: string; survey: BoundSurvey }[];
+} = {}) {
+  const { programs: storePrograms } = useBetaProgramsStore();
+  const { cohort } = useUiStore();
+  // Surveys bound/edited on this page, keyed by programKey(program name).
+  const [localSurveys, setLocalSurveys] = useState<Record<string, BoundSurvey[]>>(SEED_SURVEYS_BY_PROGRAM);
   const [programId, setProgramId] = useState<string | null>(null);
   const [surveyLocalId, setSurveyLocalId] = useState<string | null>(null);
 
-  const program = programs.find((p) => p.id === programId) || null;
+  // One container per visible store program — active first, completed after.
+  // An added survey that was later edited here already lives in local state, so
+  // it's skipped (no duplicate).
+  const containers = useMemo(() => {
+    const visible = cohort === 'all' ? storePrograms : storePrograms.filter((p) => programEnumFor(p) === cohort);
+    const ordered = [...visible.filter((p) => p.status !== 'completed'), ...visible.filter((p) => p.status === 'completed')];
+    return ordered.map((app) => {
+      const surveys = [...(localSurveys[programKey(app.name)] ?? [])];
+      for (const { programId: pid, programName, survey } of addedSurveys) {
+        const mine = pid ? pid === app.id : programKey(programName) === programKey(app.name);
+        if (mine && !surveys.some((x) => x.localId === survey.localId)) surveys.push(survey);
+      }
+      return { app, program: { id: app.id, name: app.name, surveys } as DemoProgram };
+    });
+  }, [storePrograms, cohort, localSurveys, addedSurveys]);
+
+  const program = containers.find((c) => c.program.id === programId)?.program || null;
   const survey = program?.surveys.find((s) => s.localId === surveyLocalId) || null;
 
-  const saveSurvey = (pid: string, next: BoundSurvey) =>
-    setPrograms((ps) => ps.map((p) => {
-      if (p.id !== pid) return p;
-      const exists = p.surveys.some((s) => s.localId === next.localId);
-      return { ...p, surveys: exists ? p.surveys.map((s) => (s.localId === next.localId ? next : s)) : [...p.surveys, next] };
+  // Persist a bind/edit into local state, starting from the container's current
+  // (merged) list so host-added surveys aren't lost.
+  const saveSurvey = (p: DemoProgram, next: BoundSurvey) => {
+    const exists = p.surveys.some((s) => s.localId === next.localId);
+    setLocalSurveys((prev) => ({
+      ...prev,
+      [programKey(p.name)]: exists ? p.surveys.map((s) => (s.localId === next.localId ? next : s)) : [...p.surveys, next],
     }));
+  };
 
   const content = survey && program ? (
     <SurveyReportScreen program={program} survey={survey} onBack={() => setSurveyLocalId(null)} />
   ) : program ? (
     <ProgramScreen program={program} onBack={() => setProgramId(null)} onOpenSurvey={setSurveyLocalId}
-      onSaveSurvey={(s) => saveSurvey(program.id, s)} />
+      onSaveSurvey={(s) => saveSurvey(program, s)} />
   ) : (
-    <ProgramsScreen programs={programs} onOpen={setProgramId} />
+    <ProgramsScreen containers={containers} onOpen={setProgramId} onNewSurvey={onNewSurvey} />
   );
 
   // Embedded: host (ProgramsView) already supplies the page background, header
@@ -70,23 +115,74 @@ export default function SurveysEngagementReport({ embedded = false }: { embedded
 // ─── Screen 1: programs ───────────────────────────────────────────────────────
 // Row layout mirrors the Program Health view: blue name link · label/value metric
 // columns · status tag on the right.
-function ProgramsScreen({ programs, onOpen }: { programs: DemoProgram[]; onOpen: (id: string) => void }) {
+// Where each number comes from: Survey start/finish = earliest start / latest
+// finish across the program's surveys. Testers = the store program's roster.
+// Response rate / Feedback = this program's survey data (responses ÷ recipients;
+// response-weighted mean score), else the store program's surveyResponseRate /
+// avgFeedbackQuality.
+function programSummary(p: DemoProgram, app: AppProgram) {
+  const starts = p.surveys.map((s) => s.startDate).filter(Boolean) as string[];
+  const finishes = p.surveys.map((s) => s.finishDate).filter(Boolean) as string[];
+  const recipients = p.surveys.reduce((n, s) => n + (s.recipients || 0), 0);
+  const responses = p.surveys.reduce((n, s) => n + (s.responses || 0), 0);
+  const scored = p.surveys.filter((s) => (s.feedbackScore || 0) > 0);
+  const weight = (s: BoundSurvey) => s.responses || 1;
+  const scoreW = scored.reduce((n, s) => n + weight(s), 0);
+  const score = scored.length ? scored.reduce((n, s) => n + (s.feedbackScore || 0) * weight(s), 0) / scoreW : (app.avgFeedbackQuality || 0);
+  const rate = recipients > 0 && responses > 0 ? Math.round((responses / recipients) * 100) : (app.surveyResponseRate || 0);
+  return {
+    start: starts.length ? starts.reduce((a, b) => (a < b ? a : b)) : undefined,
+    finish: finishes.length ? finishes.reduce((a, b) => (a > b ? a : b)) : undefined,
+    testers: app.testers.length,
+    rate: rate > 0 ? rate : undefined,
+    score: score > 0 ? score : undefined,
+  };
+}
+
+function ProgramsScreen({ containers, onOpen, onNewSurvey }: {
+  containers: { app: AppProgram; program: DemoProgram }[];
+  onOpen: (id: string) => void;
+  onNewSurvey?: (programId?: string) => void;
+}) {
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{programs.length} program{programs.length === 1 ? '' : 's'}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium" style={{ color: TEXT_SECONDARY }}>{containers.length} program{containers.length === 1 ? '' : 's'}</p>
+        {onNewSurvey && containers.length === 0 && (
+          <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey()} />
+        )}
+      </div>
       <div className="flex flex-col gap-3">
-        {programs.map((p) => {
+        {containers.map(({ app, program: p }) => {
           const phases = Array.from(new Set(p.surveys.map((s) => s.phase)));
+          const sum = programSummary(p, app);
+          const active = app.status !== 'completed';
           return (
             <Card key={p.id} size={3}>
-              <div className="flex items-start gap-x-4 py-1">
-                <div className="min-w-0 flex-[2] leading-tight">
-                  <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpen(p.id)}>{p.name}</button>
-                  <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>Beta program</p>
+              {/* Same shape as the Programs cards: one fixed-column row (so every card's
+                  labels line up) with the status tag on the right, then an action row. */}
+              <div className="flex flex-col gap-4">
+                <div className="grid items-start gap-x-4 py-1" style={{ gridTemplateColumns: SURVEY_ROW_COLUMNS }}>
+                  <div className="min-w-0 leading-tight">
+                    <button className="block max-w-full truncate text-left text-sm font-medium hover:underline" style={{ color: ACCENT }} onClick={() => onOpen(p.id)}>{p.name}</button>
+                    <p className="mt-0.5 truncate text-xs" style={{ color: TEXT_TERTIARY }}>{programEnumFor(app) === 'dogfood' ? 'Dogfood program' : 'Beta program'}</p>
+                  </div>
+                  <Metric label="Surveys">{p.surveys.length}</Metric>
+                  <Metric label="Phases">{phases.join(', ') || '—'}</Metric>
+                  <Metric label="Survey start">{fmtDate(sum.start)}</Metric>
+                  <Metric label="Survey finish">{fmtDate(sum.finish)}</Metric>
+                  <Metric label="Testers">{sum.testers}</Metric>
+                  <Metric label="Response rate">{sum.rate != null ? `${sum.rate}%` : '—'}</Metric>
+                  <Metric label="Feedback score">{sum.score != null ? `${sum.score.toFixed(1)} / 5` : '—'}</Metric>
+                  <div className="flex justify-end">
+                    <Tag color={active ? 'green' : 'grey'} size="regular">{active ? 'Active program' : 'Program completed'}</Tag>
+                  </div>
                 </div>
-                <div className="flex-1"><Metric label="Surveys">{p.surveys.length}</Metric></div>
-                <div className="flex-1"><Metric label="Phases">{phases.join(', ') || '—'}</Metric></div>
-                <div className="flex flex-1 justify-end"><Tag color="green" size="regular">Active</Tag></div>
+                {onNewSurvey && active && (
+                  <div className="flex items-center gap-2">
+                    <Button type="text" leftIcon={ICONS.FUNCTIONAL_ADD} label="New survey" onClick={() => onNewSurvey(p.id)} />
+                  </div>
+                )}
               </div>
             </Card>
           );
@@ -129,6 +225,8 @@ function ProgramScreen({ program, onBack, onOpenSurvey, onSaveSurvey }: {
                   </div>
                   <div className="flex-1"><Metric label="Milestone">{MILESTONE_LABEL[s.milestone]}</Metric></div>
                   <div className="flex-1"><Metric label="Phase">{s.phase}</Metric></div>
+                  <div className="flex-1"><Metric label="Start">{fmtDate(s.startDate)}</Metric></div>
+                  <div className="flex-1"><Metric label="Finish">{fmtDate(s.finishDate)}</Metric></div>
                   <div className="flex flex-1 justify-end">
                     {bound ? <Tag color="green" size="regular">Linked</Tag> : <Tag color="periwinkle" size="regular">Unbound</Tag>}
                   </div>
@@ -162,6 +260,10 @@ function SurveyBindModal({ survey, onClose, onSave }: {
   const [milestone, setMilestone] = useState<MilestoneType>(survey?.milestone || 'oobe');
   const [phase, setPhase] = useState<Phase>(survey?.phase || 'Beta');
   const [notInQualtrics, setNotInQualtrics] = useState<boolean>(survey ? !survey.qualtricsId : false);
+  const [startDate, setStartDate] = useState<string>(survey?.startDate || '');
+  const [finishDate, setFinishDate] = useState<string>(survey?.finishDate || '');
+  const datesSet = Boolean(startDate && finishDate);
+  const datesInvalid = datesSet && finishDate < startDate;
   const [surveys, setSurveys] = useState<LiveSurveyListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<'live' | 'seed'>('live');
@@ -180,16 +282,19 @@ function SurveyBindModal({ survey, onClose, onSave }: {
 
   const save = () => {
     const name = notInQualtrics ? (survey?.name || 'New survey (awaiting Qualtrics)') : (chosen?.name || survey?.name || 'Survey');
+    if (!datesSet || datesInvalid) return;
     onSave({
+      ...survey,
       localId: survey?.localId || `sv-${Date.now()}`,
       qualtricsId: notInQualtrics ? null : (qualtricsId || null),
-      name, milestone, phase,
+      name, milestone, phase, startDate, finishDate,
     });
   };
 
   return (
     <Modal isOpen title={survey ? 'Edit survey' : 'Add survey'} onCancel={onClose} onOk={save}
-      okText={survey && !survey.qualtricsId ? 'Bind survey' : 'Save'} cancelText="Cancel">
+      okText={survey && !survey.qualtricsId ? 'Bind survey' : 'Save'} cancelText="Cancel"
+      okButtonProps={{ disabled: !datesSet || datesInvalid }}>
       <div className="space-y-4">
         <div>
           <label className="mb-1 block text-sm font-medium" style={{ color: TEXT_SECONDARY }}>Qualtrics survey</label>
@@ -221,6 +326,18 @@ function SurveyBindModal({ survey, onClose, onSave }: {
             <label className="mb-1 block text-sm font-medium" style={{ color: TEXT_SECONDARY }}>Phase</label>
             <Select id="bind-phase" value={phase} onChange={(v: Phase) => setPhase(v)} options={PHASE_OPTIONS} />
           </div>
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input id="bind-start" type="date" label="Start date" value={startDate} layout="vertical"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)} />
+            <Input id="bind-finish" type="date" label="Finish date" value={finishDate} layout="vertical"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFinishDate(e.target.value)} />
+          </div>
+          <p className="mt-1 text-xs" style={{ color: datesInvalid ? BAD_RED : TEXT_TERTIARY }}>
+            {datesInvalid ? 'Finish date must be on or after the start date.' : 'Required — when the survey opens and closes.'}
+          </p>
         </div>
       </div>
     </Modal>
@@ -482,6 +599,18 @@ function FactualReport({ report }: { report: LiveReport }) {
 // ─── Shared bits ──────────────────────────────────────────────────────────────
 // Metric column — bold label over a muted value. Matches the Program Health
 // view's HealthMetric so rows read identically across the section.
+// "Aug 3, 2026" from an ISO date (parsed as local, not UTC); "—" if unknown.
+function fmtDate(iso?: string) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '—';
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Shared column template for the Surveys program cards: name (2 parts), seven
+// metrics (1 part each), status tag — identical on every card so they line up.
+const SURVEY_ROW_COLUMNS = 'minmax(0, 2fr) repeat(7, minmax(0, 1fr)) 10.5rem';
+
 function Metric({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0 leading-snug">

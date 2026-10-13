@@ -2,16 +2,21 @@
 // used when the live Qualtrics call can't run (no creds / missing response-read
 // scope / offline) — the standard demo seam. The showcase program binds to REAL
 // Merci 10.3 survey ids so "Generate" pulls live data when the token allows.
+// Program names match the app's program store (programKey) — that's how these
+// surveys attach to the "Merci Beta" container on the Surveys page.
 import { DemoProgram, LiveSurveyListItem, LiveReport } from './types';
 
 // Real Merci 10.3 surveys (verified via the live Qualtrics account).
 export const DEMO_PROGRAMS: DemoProgram[] = [
   {
-    id: 'merci', name: 'Merci 10.3 Beta',
+    id: 'merci-beta', name: 'Merci Beta',
     surveys: [
-      { localId: 'm-oobe', qualtricsId: 'SV_0Bv2TV4c3VtgjCS', name: '[Merci 10.3 PVT - Mahalo] OOBE/Setup Survey', milestone: 'oobe', phase: 'PVT' },
-      { localId: 'm-weekly', qualtricsId: 'SV_40YxW3ytA2lLiu2', name: '[Merci 10.3 EB2 PVT] Weekly Performance Testing', milestone: 'weekly', phase: 'PVT' },
-      { localId: 'm-rtm', qualtricsId: 'SV_0TfYO9G20q6lxPM', name: 'Merci 10 Weekly Performance Survey - RTM Testing', milestone: 'rtm', phase: 'DVT' },
+      { localId: 'm-oobe', qualtricsId: 'SV_0Bv2TV4c3VtgjCS', name: '[Merci 10.3 PVT - Mahalo] OOBE/Setup Survey', milestone: 'oobe', phase: 'PVT',
+        startDate: '2026-08-03', finishDate: '2026-08-14', recipients: 40, responses: 34, feedbackScore: 4.1 },
+      { localId: 'm-weekly', qualtricsId: 'SV_40YxW3ytA2lLiu2', name: '[Merci 10.3 EB2 PVT] Weekly Performance Testing', milestone: 'weekly', phase: 'PVT',
+        startDate: '2026-08-17', finishDate: '2026-10-30', recipients: 40, responses: 27, feedbackScore: 3.6 },
+      { localId: 'm-rtm', qualtricsId: 'SV_0TfYO9G20q6lxPM', name: 'Merci 10 Weekly Performance Survey - RTM Testing', milestone: 'rtm', phase: 'DVT',
+        startDate: '2026-07-06', finishDate: '2026-07-24', recipients: 24, responses: 18, feedbackScore: 3.9 },
     ],
   },
 ];

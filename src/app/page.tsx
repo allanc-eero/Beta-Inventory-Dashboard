@@ -1,32 +1,42 @@
 'use client';
 
+// eero Fetch — main app shell.
+// Sidebar: Dashboard · Programs · Surveys · Engagement · People · Imports.
+// Devices live inside each program (Programs → click a program); Locations and the
+// standalone Devices menu are hidden (their code stays for now).
 import { useState, useEffect } from 'react';
 import { TabType } from '@/types';
 import Navbar from '@/components/Navbar';
-import DevicesTab from '@/components/DevicesTab';
-import LocationsTab from '@/components/LocationsTab';
 import PeopleTab from '@/components/PeopleTab';
 import ShipmentsTab from '@/components/ShipmentsTab';
-import OverviewDashboard from '@/components/OverviewDashboard';
 import SeedDataProvider from '@/components/SeedDataProvider';
-import OverdueAlertsBanner from '@/components/OverdueAlertsBanner';
-import NetworkSyncButton from '@/components/NetworkSyncButton';
-import PendingReturnReminder from '@/components/PendingReturnReminder';
 import LoginPage from '@/components/LoginPage';
 import DogfooderPortal from '@/components/DogfooderPortal';
-import DogfoodOnboarding from '@/components/DogfoodOnboarding';
-import ProgramSignupsTab from '@/components/ProgramSignupsTab';
+import DashboardView from '@/components/dashboard/DashboardView';
+import AgentChat from '@/components/AgentChat';
+import { PreviewModeContext } from '@/lib/previewMode';
 import { ToastProvider } from '@amzn/eero-web-design-components';
-import { ProgramsView } from '@/components/programs/ProgramsView';
+import { ProgramsView, ProgramsSection } from '@/components/programs/ProgramsView';
 import { useAuthStore, DEMO_OPEN_ACCESS } from '@/store/authStore';
 import { AutoSync } from '@/lib/useAutoSync';
 
+const DASHBOARD_TAB: { id: TabType; label: string; key: string }[] = [{ id: 'dashboard', label: 'Dashboard', key: 'dashboard' }];
+// Surveys and Engagement as their own sidebar items, right under Programs.
+const PROGRAM_SECTION_TABS: Partial<Record<TabType, { id: TabType; label: string; key: string }[]>> = {
+  surveys: [
+    { id: 'survey_results', label: 'Surveys', key: 'survey_results' },
+    { id: 'engagement', label: 'Engagement', key: 'engagement' },
+  ],
+};
+// Sidebar tab ↔ ProgramsView section.
+const SECTION_FOR_TAB: Partial<Record<TabType, ProgramsSection>> = { surveys: 'health', survey_results: 'surveys', engagement: 'engagement' };
+const TAB_FOR_SECTION: Record<ProgramsSection, TabType> = { health: 'surveys', surveys: 'survey_results', engagement: 'engagement' };
+
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabType>('devices');
-  const [resetKey, setResetKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [selectedPersonEmail, setSelectedPersonEmail] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { isLoggedIn, currentUser, canEdit, isBetaViewer, isDogfoofer, loginAsGuest } = useAuthStore();
+  const { isLoggedIn, currentUser, isDogfoofer, loginAsGuest } = useAuthStore();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -37,29 +47,18 @@ export default function Home() {
     if (mounted && DEMO_OPEN_ACCESS && !currentUser) loginAsGuest();
   }, [mounted, currentUser, loginAsGuest]);
 
-  // Reset to Devices tab (now the default landing, with Overview merged in) on user change
+  // Back to the Dashboard whenever the signed-in user changes.
   useEffect(() => {
-    if (currentUser) {
-      setActiveTab('devices');
-      setResetKey((k) => k + 1);
-    }
+    if (currentUser) setActiveTab('dashboard');
   }, [currentUser?.email]);
-
-  const handleSetActiveTab = (tab: TabType) => {
-    setActiveTab(tab);
-    if (tab === 'devices') {
-      setResetKey((k) => k + 1);
-    }
-  };
 
   const handleNavigateToPerson = (email: string) => {
     setSelectedPersonEmail(email);
     setActiveTab('people');
   };
 
-  // Prevent hydration mismatch — don't render data-dependent content until client
-  // is ready. In open-access mode also hold the skeleton for the one tick it takes
-  // the guest sign-in effect to run, so the login page never flashes.
+  // Prevent hydration mismatch — don't render data-dependent content until the
+  // client is ready (and, in open-access mode, until the guest sign-in has run).
   if (!mounted || (DEMO_OPEN_ACCESS && !currentUser)) {
     return (
       <div className="min-h-screen bg-[var(--ui-background-layer-background-page)]">
@@ -74,47 +73,42 @@ export default function Home() {
     );
   }
 
-  // Auth gate — show login if not authenticated
-  if (!isLoggedIn()) {
-    return <LoginPage />;
-  }
-
-  // Dogfoofers get the Dogfoofer Portal
-  if (isDogfoofer()) {
-    return <DogfooderPortal />;
-  }
+  if (!isLoggedIn()) return <LoginPage />;
+  if (isDogfoofer()) return <DogfooderPortal />;
 
   return (
-    <SeedDataProvider>
-      {/* Weekly stale-check device sync — runs on every tab, for every role. */}
-      <AutoSync />
-      <Navbar activeTab={activeTab} setActiveTab={handleSetActiveTab}>
-        <PendingReturnReminder onNavigateToReturns={() => handleSetActiveTab('shipments')} />
-        {activeTab !== 'devices' && activeTab !== 'surveys' && activeTab !== 'people' && (
-          <>
-            <OverdueAlertsBanner />
-            {canEdit() && (
-              <div className="mt-4">
-                <NetworkSyncButton />
-              </div>
-            )}
-          </>
-        )}
-        <div className={activeTab === 'surveys' || activeTab === 'people' ? '' : 'mt-6'}>
-          {activeTab === 'devices' && (
-            <div className="flex flex-col gap-6">
-              <OverviewDashboard />
-              <DevicesTab key={resetKey} onNavigateToPerson={handleNavigateToPerson} />
-            </div>
-          )}
-          {activeTab === 'dogfood' && <DogfoodOnboarding />}
-          {activeTab === 'program_signups' && <ProgramSignupsTab />}
-          {activeTab === 'locations' && <LocationsTab />}
+    // The app runs in the streamlined layout (trimmed device page, per-program
+    // device views, etc.) — see src/lib/previewMode.ts.
+    <PreviewModeContext.Provider value={true}>
+      <SeedDataProvider>
+        {/* Weekly stale-check device sync — runs on every tab, for every role. */}
+        <AutoSync />
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          leadingTabs={DASHBOARD_TAB}
+          tabsAfter={PROGRAM_SECTION_TABS}
+          tabLabels={{ shipments: 'Imports' }}
+          hiddenTabs={['locations', 'devices']}
+        >
+          {/* Devices isn't in the sidebar — device links from the Dashboard open Programs (each program has its device list). */}
+          {activeTab === 'dashboard' && <DashboardView onNavigate={(t) => setActiveTab(t === 'devices' ? 'surveys' : t)} />}
           {activeTab === 'people' && <PeopleTab initialSelectedPerson={selectedPersonEmail} onClearSelection={() => setSelectedPersonEmail(null)} />}
-          {activeTab === 'surveys' && <ToastProvider><ProgramsView embedded onNavigateToPerson={handleNavigateToPerson} /></ToastProvider>}
-          {activeTab === 'shipments' && <ShipmentsTab showPendingReturns />}
-        </div>
-      </Navbar>
-    </SeedDataProvider>
+          {SECTION_FOR_TAB[activeTab] && (
+            <ToastProvider>
+              <ProgramsView
+                embedded
+                section={SECTION_FOR_TAB[activeTab]}
+                onSectionChange={(s) => setActiveTab(TAB_FOR_SECTION[s])}
+                onNavigateToPerson={handleNavigateToPerson}
+              />
+            </ToastProvider>
+          )}
+          {activeTab === 'shipments' && <ShipmentsTab importsMode />}
+        </Navbar>
+        {/* AI assistant — floating button on every page */}
+        <AgentChat variant="floating" />
+      </SeedDataProvider>
+    </PreviewModeContext.Provider>
   );
 }

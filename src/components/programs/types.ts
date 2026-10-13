@@ -56,6 +56,8 @@ export interface DemoSurvey {
   responses: number;               // = latest wave's responses (kept in sync for cards/stats)
   avgCompletionMins: number;
   ranOn?: string;                  // one-off surveys: the single date it ran (ISO)
+  startDate?: string;              // ISO (YYYY-MM-DD) the survey opens
+  finishDate?: string;             // ISO the survey closes
   waves?: SurveyWave[];            // recurring surveys: the wave history (newest last)
   questions: DemoQuestion[];       // aggregated for the LATEST wave (demo simplification)
 }
@@ -91,6 +93,7 @@ export interface DemoProgram {
   source?: 'seed' | 'upload';  // 'upload' = created from a device sheet — its devices live in deviceStore
   startDate?: string;          // ISO date (YYYY-MM-DD) testing starts
   finishDate?: string;         // ISO date testing ends — devices are due back
+  ok2StreetDate?: string;      // ISO date of the OK2Street (launch) milestone
 }
 
 // ── Identity-match roster (email → network → beta-model DSN) ──────────────────
