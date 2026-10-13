@@ -6,12 +6,22 @@ A single control tower for eero's **beta and dogfood** hardware programs: track 
 
 ## 👀 Just want to look around?
 
-Three commands, no account needed:
+Two commands:
 
 ```bash
 npm install
 npm run dev
 ```
+
+> **Before `npm install`:** you need **Node 24** (`node -v`) and access to eero's private
+> npm registry (CodeArtifact), because the eero design system packages (`@amzn/…`) come
+> from there. If `npm install` fails with **E401 / 403 on an `@amzn/` package**, log in
+> to the registry first, then re-run it:
+> ```bash
+> aws codeartifact login --tool npm --domain amazon --domain-owner 149122183214 \
+>   --repository eero-shared --region us-west-2
+> ```
+> (Needs AWS credentials for that account — ask in your team's dev channel if you don't have them.)
 
 Open **http://localhost:3000**. You'll land straight on the **Dashboard** — **there
 is no sign-in screen and nothing to configure.** You're automatically signed in as a
@@ -181,8 +191,9 @@ read-only service credential instead (env vars take priority over the CLI).
 
 ## Requirements
 
-- **Node.js** 18.x or higher
-- **npm** 9.x or higher
+- **Node.js** 24.x (the eero design system packages require `^24.12.0`)
+- Access to eero's CodeArtifact npm registry for `@amzn/*` packages (see [Just want to look around?](#-just-want-to-look-around))
+- **npm** 11.x (comes with Node 24)
 - No database required to run locally — all data persists in browser localStorage via Zustand. (A shared production deployment will need server-side persistence + SSO — see `docs/Surveys_Feature_Handoff.md`.)
 
 ## Tech Stack
